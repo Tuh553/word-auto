@@ -2,6 +2,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { attr, parseParaProps, parseRunProps, parseXml } from "./ooxml.js";
 import { computeEffective } from "./resolve.js";
 import { parseStyles } from "./styles.js";
+import { parseTheme } from "./theme.js";
 import type { DocModel, Paragraph, Run } from "./types.js";
 
 export * from "./types.js";
@@ -22,8 +23,10 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   const read = (p: string): string | undefined =>
     files[p] ? strFromU8(files[p]) : undefined;
 
+  const theme = parseTheme(read("word/theme/theme1.xml") ?? "<a:theme/>");
   const { styles, docDefaults } = parseStyles(
     read("word/styles.xml") ?? "<w:styles/>",
+    theme,
   );
 
   const docXml = read("word/document.xml");
@@ -36,11 +39,11 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   const paragraphs: Paragraph[] = wps.map((wp, index) => {
     const pPr = wp["w:pPr"];
     const directPara = parseParaProps(pPr);
-    const markRun = parseRunProps(pPr?.["w:rPr"]);
+    const markRun = parseRunProps(pPr?.["w:rPr"], theme);
     const runsRaw: any[] = wp["w:r"] ?? [];
     const runs: Run[] = runsRaw.map((r) => ({
       text: extractText(r),
-      props: parseRunProps(r["w:rPr"]),
+      props: parseRunProps(r["w:rPr"], theme),
     }));
     const text = runs.map((r) => r.text).join("");
 

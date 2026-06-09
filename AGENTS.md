@@ -32,11 +32,15 @@
   `exact`/`atLeast` 时 `@w:line / 20` = pt
 - 缩进 `*Chars` 属性单位是 1/100 字符；`firstLine`/`left` 是 twips
 
-### 3. 主题字体尚未解析（已知漏报点）
+### 3. 主题字体解析（已实现，`packages/parser/src/theme.ts`）
 
-当 run 用 `w:asciiTheme`/`w:eastAsiaTheme` 而非显式字体名时，`w:rFonts/@w:eastAsia`
-为空，字体校验被跳过。要根治需解析 `word/theme/theme1.xml` 的 `minorFont`/`majorFont`
-并在 resolve 时回填。
+run 用 `w:asciiTheme`/`w:eastAsiaTheme` 等主题引用而非显式字体名时，解析
+`word/theme/theme1.xml` 的 `fontScheme` 回填实际字体：`major*` → 标题字体组，
+其余 → 正文字体组；含 `EastAsia` 取东亚字体（`a:ea` 为空时回退 `script="Hans"`），
+否则取 `a:latin`。`parseRunProps(rPr, theme)` 在解析时即回填。
+
+校验降噪：纯中文段落不报西文字体、纯西文段落不报中文字体
+（`validator/src/validate.ts` 按 `hasCJK`/`hasLatin` 判断）。
 
 ### 4. 读取外部规则库 JSON 要剥 BOM
 
@@ -58,8 +62,8 @@
 
 ## 下一步（按价值/风险排序）
 
-1. 解析主题字体（消除字体漏报）。
-2. 补全检测维度：页边距、分节页码、页眉、段前段后距。
-3. `apps/web`：上传 + `docx-preview` 预览 + 问题高亮定位。
+1. 补全检测维度：页边距、分节页码、页眉、段前段后距。
+2. 行距"缺失"提示（段落未显式设行距时也给出提示）。
+3. `apps/web`：上传 + `docx-preview` 预览 + 问题高亮定位（已有，待提升定位精度）。
 4. 多模板支持（规则库参数化）。
 5. （远期、高风险）自动套版改写——务必无损保留分节/域/题注/交叉引用。

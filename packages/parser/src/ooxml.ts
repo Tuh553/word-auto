@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { resolveThemeFont, type ThemeFonts } from "./theme.js";
 import type { LineSpacing, ParaProps, RunProps } from "./types.js";
 
 // 保留命名空间前缀（w:、w14: 等并存），属性前缀统一为 @_，属性值不做类型推断（字体名等需保持字符串）。
@@ -43,15 +44,22 @@ const makeLineSpacing = (line: number, rule: string): LineSpacing => {
   return { value: line / 240, rule: "auto", multiple: line / 240 };
 };
 
-/** 从 rPr 节点提取 run 级格式 */
-export const parseRunProps = (rPr: any): RunProps => {
+/** 从 rPr 节点提取 run 级格式（theme 用于解析主题字体引用） */
+export const parseRunProps = (rPr: any, theme?: ThemeFonts): RunProps => {
   const p: RunProps = {};
   if (!rPr || typeof rPr !== "object") return p;
   const fonts = rPr["w:rFonts"];
   if (fonts) {
-    const ea = attr(fonts, "w:eastAsia");
-    const as = attr(fonts, "w:ascii");
-    const ha = attr(fonts, "w:hAnsi");
+    // 显式字体名优先；否则解析 *Theme 主题字体引用
+    const ea =
+      attr(fonts, "w:eastAsia") ??
+      resolveThemeFont(attr(fonts, "w:eastAsiaTheme"), theme);
+    const as =
+      attr(fonts, "w:ascii") ??
+      resolveThemeFont(attr(fonts, "w:asciiTheme"), theme);
+    const ha =
+      attr(fonts, "w:hAnsi") ??
+      resolveThemeFont(attr(fonts, "w:hAnsiTheme"), theme);
     if (ea) p.fontEastAsia = ea;
     if (as) p.fontAscii = as;
     if (ha) p.fontHAnsi = ha;

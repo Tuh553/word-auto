@@ -30,6 +30,9 @@ const preview = (t: string): string =>
 const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
   const e = p.effective;
   const out: Issue[] = [];
+  // 段落含哪类字符，决定查不查对应脚本的字体（纯中文段落不报西文字体，反之亦然）
+  const hasCJK = /[一-鿿]/.test(p.text);
+  const hasLatin = /[A-Za-z]/.test(p.text);
   const push = (
     field: string,
     expected: unknown,
@@ -49,14 +52,14 @@ const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
     });
   };
 
-  // 中文字体（仅当文档显式标注了东亚字体时比对，theme 字体暂不解析）
-  if (rule.font_east_asia && e.fontEastAsia && e.fontEastAsia !== rule.font_east_asia) {
+  // 中文字体（仅当段落含中文且文档显式标注/主题可解析时比对）
+  if (rule.font_east_asia && hasCJK && e.fontEastAsia && e.fontEastAsia !== rule.font_east_asia) {
     push("font_east_asia", rule.font_east_asia, e.fontEastAsia, "error",
       `中文字体应为「${rule.font_east_asia}」，实际「${e.fontEastAsia}」`);
   }
 
-  // 西文字体
-  if (rule.font_latin && e.fontAscii && e.fontAscii !== rule.font_latin) {
+  // 西文字体（仅当段落含拉丁字母时比对）
+  if (rule.font_latin && hasLatin && e.fontAscii && e.fontAscii !== rule.font_latin) {
     push("font_latin", rule.font_latin, e.fontAscii, "error",
       `西文字体应为「${rule.font_latin}」，实际「${e.fontAscii}」`);
   }
