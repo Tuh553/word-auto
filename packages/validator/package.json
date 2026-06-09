@@ -1,0 +1,13 @@
+{
+  "name": "@word-auto/validator",
+  "version": "0.0.1",
+  "description": "文档模型 × 规则库 → 合规问题报告",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@word-auto/parser": "workspace:*"
+  }
+}

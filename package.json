@@ -1,0 +1,16 @@
+{
+  "name": "word-auto",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Word 论文排版合规检测平台（OOXML 解析，跨平台，无需 Word/COM）",
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "check": "pnpm -r --filter ./apps/cli run check"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

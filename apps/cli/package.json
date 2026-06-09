@@ -1,0 +1,13 @@
+{
+  "name": "@word-auto/cli",
+  "version": "0.0.1",
+  "description": "命令行：解析 docx + 规则校验，输出合规报告",
+  "type": "module",
+  "scripts": {
+    "check": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@word-auto/parser": "workspace:*",
+    "@word-auto/validator": "workspace:*"
+  }
+}
