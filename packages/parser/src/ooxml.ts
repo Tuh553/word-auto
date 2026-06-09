@@ -151,5 +151,13 @@ export const parseSectPr = (sect: any): SectionProps => {
       if (v !== undefined) s[key] = v;
     }
   }
+
+  const pn = sect["w:pgNumType"];
+  if (pn) {
+    const fmt = attr(pn, "w:fmt");
+    const start = num(attr(pn, "w:start"));
+    if (fmt) s.pageNumberFormat = fmt;
+    if (start !== undefined) s.pageNumberStart = start;
+  }
   return s;
 };

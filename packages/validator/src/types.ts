@@ -28,6 +28,11 @@ export interface RuleLibrary {
     footer_distance_cm?: number;
     gutter_cm?: number;
   };
+  page_numbers?: {
+    front_matter_format?: string;
+    body_format?: string;
+    body_restart_at?: number;
+  };
   styles: Record<string, StyleRule>;
   [k: string]: unknown;
 }

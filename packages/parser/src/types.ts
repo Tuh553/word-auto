@@ -106,6 +106,10 @@ export interface SectionProps {
   headerTwips?: number;
   footerTwips?: number;
   gutterTwips?: number;
+  /** 页码格式：decimal / upperRoman / lowerRoman 等（缺省视为 decimal） */
+  pageNumberFormat?: string;
+  /** 页码起始值（pgNumType@start） */
+  pageNumberStart?: number;
 }
 
 export interface DocModel {

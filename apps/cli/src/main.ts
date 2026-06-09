@@ -58,6 +58,14 @@ if (sec) {
   );
 }
 
+if (model.sections.length) {
+  const fmts = model.sections.map(
+    (s) =>
+      `${s.pageNumberFormat ?? "decimal"}${s.pageNumberStart != null ? "@" + s.pageNumberStart : ""}`,
+  );
+  console.log(`分节页码（共 ${model.sections.length} 节）: ${fmts.join(" | ")}`);
+}
+
 console.log("\n=== 校验报告 ===");
 console.log(`规则库: ${report.ruleName}`);
 console.log(

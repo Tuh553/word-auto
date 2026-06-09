@@ -180,13 +180,56 @@ const checkDocument = (model: DocModel, rules: RuleLibrary): Issue[] => {
   return out;
 };
 
+/** 分节页码检测：前置部分格式（如大写罗马）、正文格式（阿拉伯）并重新起始 */
+const checkPageNumbers = (model: DocModel, rules: RuleLibrary): Issue[] => {
+  const pn = rules.page_numbers;
+  if (!pn) return [];
+  const out: Issue[] = [];
+  const push = (field: string, expected: unknown, actual: unknown, message: string): void => {
+    out.push({ paraIndex: -1, role: "document", field, expected, actual, severity: "error", message, textPreview: "页码" });
+  };
+
+  // 规则页码格式词汇 → OOXML pgNumType@fmt
+  const FMT: Record<string, string> = {
+    RomanUpper: "upperRoman",
+    RomanLower: "lowerRoman",
+    Arabic: "decimal",
+  };
+  const fmts = model.sections.map((s) => s.pageNumberFormat ?? "decimal");
+
+  if (pn.front_matter_format) {
+    const want = FMT[pn.front_matter_format] ?? pn.front_matter_format;
+    if (!model.sections.some((s) => s.pageNumberFormat === want)) {
+      push("page_number_front", pn.front_matter_format, fmts.join(","),
+        `前置部分页码应使用 ${pn.front_matter_format}（${want}），未找到对应分节`);
+    }
+  }
+
+  if (pn.body_format) {
+    const want = FMT[pn.body_format] ?? pn.body_format;
+    const restart = pn.body_restart_at ?? 1;
+    const ok = model.sections.some(
+      (s) => (s.pageNumberFormat ?? "decimal") === want && s.pageNumberStart === restart,
+    );
+    if (!ok) {
+      push("page_number_body", `${pn.body_format} start=${restart}`, fmts.join(","),
+        `正文页码应为 ${pn.body_format}（${want}）并从 ${restart} 重新编号`);
+    }
+  }
+
+  return out;
+};
+
 /** 校验整篇文档 */
 export const validateDoc = (
   model: DocModel,
   rules: RuleLibrary,
 ): ValidationReport => {
   const roles = classifyParagraphs(model.paragraphs);
-  const issues: Issue[] = [...checkDocument(model, rules)];
+  const issues: Issue[] = [
+    ...checkDocument(model, rules),
+    ...checkPageNumbers(model, rules),
+  ];
   let classified = 0;
 
   model.paragraphs.forEach((p, i) => {
