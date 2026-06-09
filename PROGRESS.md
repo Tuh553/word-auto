@@ -30,6 +30,26 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
   属长尾——见待办。
 - 原则：标准模板理想应"近零 error"，剩余即下一批优化坐标。
 
+## ⚠️ 当前调试中：web 预览渲染（最高优先）
+
+用户反馈预览「十几页内容压到几页/叠加」。排查与现状：
+- ✅ 已修「重影」：`<StrictMode>` 下 effect 双跑 + renderAsync 异步并发渲染到同容器。
+  改为渲染到游离节点、完成后 `replaceChildren` 整体挂载 + stale 标志丢弃过期渲染。
+- ✅ 排除 pt 单位疑点：docx-preview `convertLength` 对 `595.30pt` 这类直接当 CSS 长度，正确。
+- ✅ 「塌缩重叠」是我乱调 options 所致（`ignoreHeight:true`/`breakPages:false`/`experimental`）。
+  已退回 docx-preview **默认配置**（仅 `className:"docx"` + `inWrapper:true`），见 commit `42b76cf`。
+- ❓ 用户尚未确认默认配置版是否解决。
+- 高亮定位已改**段落原文文本匹配**（PreviewPanel `targetText`，不再用序号），文档级问题不定位。
+
+**下一步（重启会话后做）**：chrome-devtools MCP 已配置(`--auto-connect`)但本会话启动前未注入，
+重启后工具可用。届时：
+1. 重新起 dev server：`pnpm --filter @word-auto/web run dev`（后台进程随旧会话终止）。
+2. 用 chrome-devtools 打开 `http://localhost:5173/`，上传 `templates/source/*.docx`，**截图自查**。
+3. 对照 DOM 判定塌缩根因：容器 CSS / docx-preview 对该文档兼容性 / 挂载方式，修到对再给用户看。
+4. 别再让用户反复刷新当测试员。
+
+预览相关文件：`apps/web/src/components/PreviewPanel.tsx`、`App.tsx`、`styles.css`(`.preview*`)。
+
 ## 待办 ⬜（按价值/风险）
 
 1. **多模板支持**（任务3，未做）：web 支持上传自定义规则库 JSON（去 BOM + 校验 styles），
