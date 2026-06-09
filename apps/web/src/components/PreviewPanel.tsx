@@ -13,7 +13,8 @@ const norm = (s: string | null | undefined): string =>
 export function PreviewPanel({ buffer, targetText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // 连续流式渲染（不模拟 A4 分页），避免复杂文档分页定位叠加；
+  // 用 docx-preview 默认配置（默认即分页渲染、保留页高），不再自行覆盖
+  // ignoreHeight/breakPages/experimental 等——那些覆盖反而破坏分页布局。
   // 渲染到游离节点完成后整体挂载，stale 标志丢弃过期渲染，杜绝并发重影。
   useEffect(() => {
     const host = ref.current;
@@ -23,14 +24,6 @@ export function PreviewPanel({ buffer, targetText }: Props) {
     renderAsync(buffer.slice(0), mount, undefined, {
       className: "docx",
       inWrapper: true,
-      ignoreWidth: false,
-      ignoreHeight: true,
-      ignoreFonts: false,
-      breakPages: false,
-      renderHeaders: false,
-      renderFooters: false,
-      renderFootnotes: true,
-      renderEndnotes: true,
     })
       .then(() => {
         if (stale) return;
