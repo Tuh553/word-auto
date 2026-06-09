@@ -28,6 +28,14 @@ export function PreviewPanel({ buffer, targetText }: Props) {
       .then(() => {
         if (stale) return;
         host.replaceChildren(mount);
+        // 修补：docx-preview 对部分固定行距文档会算出极小行高(如 1pt)，导致文字行重叠。
+        // 凡行高 < 字高(必然重叠)的元素，行高重置为 normal；正常行距(≥字高)不动。
+        host.querySelectorAll<HTMLElement>("*").forEach((el) => {
+          const cs = getComputedStyle(el);
+          const lh = parseFloat(cs.lineHeight);
+          const fs = parseFloat(cs.fontSize);
+          if (lh && fs && lh < fs) el.style.lineHeight = "normal";
+        });
       })
       .catch((e: unknown) => {
         if (!stale) host.textContent = "预览渲染失败：" + (e as Error).message;
