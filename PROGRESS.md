@@ -41,12 +41,16 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 - ❓ 用户尚未确认默认配置版是否解决。
 - 高亮定位已改**段落原文文本匹配**（PreviewPanel `targetText`，不再用序号），文档级问题不定位。
 
-**下一步（重启会话后做）**：chrome-devtools MCP 已配置(`--auto-connect`)但本会话启动前未注入，
-重启后工具可用。届时：
-1. 重新起 dev server：`pnpm --filter @word-auto/web run dev`（后台进程随旧会话终止）。
-2. 用 chrome-devtools 打开 `http://localhost:5173/`，上传 `templates/source/*.docx`，**截图自查**。
-3. 对照 DOM 判定塌缩根因：容器 CSS / docx-preview 对该文档兼容性 / 挂载方式，修到对再给用户看。
-4. 别再让用户反复刷新当测试员。
+**下一步（重启会话后做）**：chrome-devtools MCP 配置已修好——旧配置 `--auto-connect` 与
+新版 Chrome 冲突（默认 profile 禁止远程调试，报 DevToolsActivePort/端口不可连），已改为
+user config 无 auto-connect（`cmd /c npx -y chrome-devtools-mcp@latest`），让 MCP 自启隔离
+Chrome。`claude mcp list` 已显示新配置 ✓Connected，但**当前会话的 MCP 进程仍是旧实例，需
+重启会话**才生效。重启后：
+1. 重新起 dev server：`pnpm --filter @word-auto/web run dev`（重启后端口应回到 5173）。
+2. 直接 `mcp__chrome-devtools__new_page` 打开 `http://localhost:5173/`（首次调用自启 Chrome）。
+3. 上传 `templates/source/*.docx`，**截图自查**预览渲染（塌缩/叠加是否还在）。
+4. 对照 DOM 判定根因：容器 CSS / docx-preview 兼容 / 挂载方式，修到对再给用户看。
+5. 别再让用户反复刷新当测试员。
 
 预览相关文件：`apps/web/src/components/PreviewPanel.tsx`、`App.tsx`、`styles.css`(`.preview*`)。
 
