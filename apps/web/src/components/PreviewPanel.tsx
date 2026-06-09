@@ -13,9 +13,8 @@ const norm = (s: string | null | undefined): string =>
 export function PreviewPanel({ buffer, targetText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // 全量渲染：保留页眉/页脚/分页/字体，尽量贴近 Word 原貌。
-  // 渲染到游离节点，完成后整体挂载；stale 标志丢弃过期渲染，
-  // 避免 StrictMode/快速切换下两次 renderAsync 并发造成「重影」。
+  // 连续流式渲染（不模拟 A4 分页），避免复杂文档分页定位叠加；
+  // 渲染到游离节点完成后整体挂载，stale 标志丢弃过期渲染，杜绝并发重影。
   useEffect(() => {
     const host = ref.current;
     if (!host) return;
@@ -25,14 +24,11 @@ export function PreviewPanel({ buffer, targetText }: Props) {
       className: "docx",
       inWrapper: true,
       ignoreWidth: false,
-      ignoreHeight: false,
+      ignoreHeight: true,
       ignoreFonts: false,
-      breakPages: true,
-      ignoreLastRenderedPageBreak: true,
-      experimental: true,
-      useBase64URL: true,
-      renderHeaders: true,
-      renderFooters: true,
+      breakPages: false,
+      renderHeaders: false,
+      renderFooters: false,
       renderFootnotes: true,
       renderEndnotes: true,
     })
