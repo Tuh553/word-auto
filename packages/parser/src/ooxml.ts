@@ -1,6 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
 import { resolveThemeFont, type ThemeFonts } from "./theme.js";
-import type { LineSpacing, ParaProps, RunProps } from "./types.js";
+import type {
+  LineSpacing,
+  ParaProps,
+  RunProps,
+  SectionProps,
+} from "./types.js";
 
 // 保留命名空间前缀（w:、w14: 等并存），属性前缀统一为 @_，属性值不做类型推断（字体名等需保持字符串）。
 export const xmlParser = new XMLParser({
@@ -115,4 +120,36 @@ export const parseParaProps = (pPr: any): ParaProps => {
     if (lvl !== undefined) p.outlineLevel = lvl;
   }
   return p;
+};
+
+/** 从 sectPr 节点提取页面设置（页宽高、页边距、页眉页脚距、装订线），单位 twips */
+export const parseSectPr = (sect: any): SectionProps => {
+  const s: SectionProps = {};
+  if (!sect || typeof sect !== "object") return s;
+
+  const pgSz = sect["w:pgSz"];
+  if (pgSz) {
+    const w = num(attr(pgSz, "w:w"));
+    const h = num(attr(pgSz, "w:h"));
+    if (w !== undefined) s.pageWidthTwips = w;
+    if (h !== undefined) s.pageHeightTwips = h;
+  }
+
+  const m = sect["w:pgMar"];
+  if (m) {
+    const map: [keyof SectionProps, string][] = [
+      ["marginTopTwips", "w:top"],
+      ["marginBottomTwips", "w:bottom"],
+      ["marginLeftTwips", "w:left"],
+      ["marginRightTwips", "w:right"],
+      ["headerTwips", "w:header"],
+      ["footerTwips", "w:footer"],
+      ["gutterTwips", "w:gutter"],
+    ];
+    for (const [key, a] of map) {
+      const v = num(attr(m, a));
+      if (v !== undefined) s[key] = v;
+    }
+  }
+  return s;
 };

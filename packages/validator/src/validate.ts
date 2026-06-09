@@ -1,4 +1,4 @@
-import type { DocModel, Paragraph } from "@word-auto/parser";
+import { units, type DocModel, type Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
 import type {
   Issue,
@@ -99,6 +99,9 @@ const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
     } else if (ls?.multiple != null) {
       push("line_spacing_pt", rule.line_spacing_pt, `${ls.multiple} 倍`, "warn",
         `行距应为固定 ${rule.line_spacing_pt}pt，实际为 ${ls.multiple} 倍多倍行距`);
+    } else {
+      push("line_spacing_pt", rule.line_spacing_pt, "(未设置)", "info",
+        `未显式设置行距（应为固定 ${rule.line_spacing_pt}pt）`);
     }
   }
 
@@ -115,13 +118,75 @@ const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
   return out;
 };
 
+/** 文档/页面级检测：页边距、页眉页脚距、装订线、纸张 */
+const checkDocument = (model: DocModel, rules: RuleLibrary): Issue[] => {
+  const sec = model.sections.at(-1); // 最后一节为正文主体
+  const doc = rules.document;
+  if (!sec || !doc) return [];
+  const out: Issue[] = [];
+
+  const push = (
+    field: string,
+    expected: unknown,
+    actual: unknown,
+    message: string,
+  ): void => {
+    out.push({
+      paraIndex: -1,
+      role: "document",
+      field,
+      expected,
+      actual,
+      severity: "error",
+      message,
+      textPreview: "页面设置",
+    });
+  };
+
+  const cm = (tw?: number): number | undefined =>
+    tw == null ? undefined : units.round(units.twipsToCm(tw), 2);
+
+  const checkCm = (
+    field: string,
+    label: string,
+    ruleCm: number | undefined,
+    tw: number | undefined,
+  ): void => {
+    if (ruleCm == null) return;
+    const actual = cm(tw);
+    if (actual == null) return;
+    if (Math.abs(actual - ruleCm) > 0.05) {
+      push(field, ruleCm, actual, `${label}应为 ${ruleCm}cm，实际 ${actual}cm`);
+    }
+  };
+
+  checkCm("margin_top_cm", "上边距", doc.margin_top_cm, sec.marginTopTwips);
+  checkCm("margin_bottom_cm", "下边距", doc.margin_bottom_cm, sec.marginBottomTwips);
+  checkCm("margin_left_cm", "左边距", doc.margin_left_cm, sec.marginLeftTwips);
+  checkCm("margin_right_cm", "右边距", doc.margin_right_cm, sec.marginRightTwips);
+  checkCm("header_distance_cm", "页眉距", doc.header_distance_cm, sec.headerTwips);
+  checkCm("footer_distance_cm", "页脚距", doc.footer_distance_cm, sec.footerTwips);
+  checkCm("gutter_cm", "装订线", doc.gutter_cm, sec.gutterTwips);
+
+  if (doc.paper_size === "A4" && sec.pageWidthTwips && sec.pageHeightTwips) {
+    const w = cm(sec.pageWidthTwips)!;
+    const h = cm(sec.pageHeightTwips)!;
+    if (Math.abs(w - 21) > 0.1 || Math.abs(h - 29.7) > 0.1) {
+      push("paper_size", "A4 (21×29.7cm)", `${w}×${h}cm`,
+        `纸张应为 A4 (21×29.7cm)，实际 ${w}×${h}cm`);
+    }
+  }
+
+  return out;
+};
+
 /** 校验整篇文档 */
 export const validateDoc = (
   model: DocModel,
   rules: RuleLibrary,
 ): ValidationReport => {
   const roles = classifyParagraphs(model.paragraphs);
-  const issues: Issue[] = [];
+  const issues: Issue[] = [...checkDocument(model, rules)];
   let classified = 0;
 
   model.paragraphs.forEach((p, i) => {

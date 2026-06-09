@@ -19,17 +19,22 @@ export interface StyleRule {
 export interface RuleLibrary {
   meta?: { name?: string; version?: string };
   document?: {
+    paper_size?: string;
     margin_top_cm?: number;
     margin_bottom_cm?: number;
     margin_left_cm?: number;
     margin_right_cm?: number;
+    header_distance_cm?: number;
+    footer_distance_cm?: number;
+    gutter_cm?: number;
   };
   styles: Record<string, StyleRule>;
   [k: string]: unknown;
 }
 
-/** 文档段落被识别到的语义角色，对应 styles 表的 key */
+/** 文档段落被识别到的语义角色，对应 styles 表的 key；'document' 为文档/页面级 */
 export type Role =
+  | "document"
   | "abstract_title_cn"
   | "abstract_body_cn"
   | "keywords_cn"

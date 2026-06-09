@@ -45,6 +45,19 @@ model.paragraphs.forEach((p, i) => {
   );
 });
 
+const sec = model.sections.at(-1);
+if (sec) {
+  const cm = (tw?: number): string =>
+    tw == null ? "-" : (tw / 566.93).toFixed(2);
+  console.log("\n=== 页面设置（主体节，实测）===");
+  console.log(
+    `纸张 ${cm(sec.pageWidthTwips)}×${cm(sec.pageHeightTwips)}cm | ` +
+      `边距 上${cm(sec.marginTopTwips)}/下${cm(sec.marginBottomTwips)}/` +
+      `左${cm(sec.marginLeftTwips)}/右${cm(sec.marginRightTwips)}cm | ` +
+      `页眉${cm(sec.headerTwips)}/页脚${cm(sec.footerTwips)}/装订${cm(sec.gutterTwips)}cm`,
+  );
+}
+
 console.log("\n=== 校验报告 ===");
 console.log(`规则库: ${report.ruleName}`);
 console.log(
@@ -56,8 +69,9 @@ console.log(
 
 console.log("\n--- 问题明细（前 30 条）---");
 report.issues.slice(0, 30).forEach((it) => {
+  const loc = it.paraIndex < 0 ? "[页面设置]" : `#${it.paraIndex + 1}`;
   console.log(
-    `#${it.paraIndex} [${it.severity}] (${it.role}.${it.field}) ${it.message}  «${it.textPreview}»`,
+    `${loc} [${it.severity}] (${it.role}.${it.field}) ${it.message}  «${it.textPreview}»`,
   );
 });
 if (report.issues.length > 30) {

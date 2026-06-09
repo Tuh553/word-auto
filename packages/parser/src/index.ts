@@ -1,9 +1,15 @@
 import { strFromU8, unzipSync } from "fflate";
-import { attr, parseParaProps, parseRunProps, parseXml } from "./ooxml.js";
+import {
+  attr,
+  parseParaProps,
+  parseRunProps,
+  parseSectPr,
+  parseXml,
+} from "./ooxml.js";
 import { computeEffective } from "./resolve.js";
 import { parseStyles } from "./styles.js";
 import { parseTheme } from "./theme.js";
-import type { DocModel, Paragraph, Run } from "./types.js";
+import type { DocModel, Paragraph, Run, SectionProps } from "./types.js";
 
 export * from "./types.js";
 export * as units from "./units.js";
@@ -63,5 +69,14 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     return para;
   });
 
-  return { paragraphs, styles, docDefaults };
+  // 收集分节页面设置：各分节点在段落 pPr/sectPr，最后一节在 body 末尾 sectPr
+  const sectPrs: any[] = [];
+  for (const wp of wps) {
+    const sp = wp["w:pPr"]?.["w:sectPr"];
+    if (sp) sectPrs.push(sp);
+  }
+  if (body["w:sectPr"]) sectPrs.push(body["w:sectPr"]);
+  const sections: SectionProps[] = sectPrs.map(parseSectPr);
+
+  return { paragraphs, styles, docDefaults, sections };
 };

@@ -95,8 +95,23 @@ export interface DocDefaults {
   run?: RunProps;
 }
 
+/** 一个分节的页面设置（来自 sectPr），单位 twips */
+export interface SectionProps {
+  pageWidthTwips?: number;
+  pageHeightTwips?: number;
+  marginTopTwips?: number;
+  marginBottomTwips?: number;
+  marginLeftTwips?: number;
+  marginRightTwips?: number;
+  headerTwips?: number;
+  footerTwips?: number;
+  gutterTwips?: number;
+}
+
 export interface DocModel {
   paragraphs: Paragraph[];
   styles: Map<string, StyleDef>;
   docDefaults: DocDefaults;
+  /** 文档各分节的页面设置，按出现顺序；最后一个为正文主体节 */
+  sections: SectionProps[];
 }

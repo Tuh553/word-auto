@@ -57,7 +57,8 @@ export function ReportPanel({ report, active, onToggle, onSelect }: Props) {
             <div className="top">
               <span className={`badge ${it.severity}`}>{SEV[it.severity]}</span>
               <span className="role">
-                第 {it.paraIndex + 1} 段 · {it.role}.{it.field}
+                {it.paraIndex < 0 ? "页面设置" : `第 ${it.paraIndex + 1} 段`} ·{" "}
+                {it.role}.{it.field}
               </span>
             </div>
             <div className="msg">{it.message}</div>
