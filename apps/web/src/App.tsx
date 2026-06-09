@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { analyze, type ValidationReport } from "./lib/analyze.js";
+import { analyze, type AnalyzeResult } from "./lib/analyze.js";
 import { TEMPLATES } from "./lib/templates.js";
 import { PreviewPanel } from "./components/PreviewPanel.js";
 import { ReportPanel } from "./components/ReportPanel.js";
@@ -14,9 +14,9 @@ export default function App() {
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
   const [templateId, setTemplateId] = useState(TEMPLATES[0].id);
   const [active, setActive] = useState<Set<Severity>>(new Set(ALL_SEV));
-  const [report, setReport] = useState<ValidationReport | null>(null);
+  const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [selectedText, setSelectedText] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -34,12 +34,22 @@ export default function App() {
     if (!buffer) return;
     try {
       const tpl = TEMPLATES.find((t) => t.id === templateId)!;
-      setReport(analyze(buffer, tpl.rules));
+      setResult(analyze(buffer, tpl.rules));
       setError(null);
+      setSelectedText(null);
       setStep(3);
     } catch (e) {
       setError("检测失败：" + (e as Error).message);
     }
+  };
+
+  // 点击问题 → 取该段原文交给预览定位（文档级问题 paraIndex<0 不定位）
+  const onSelect = (paraIndex: number) => {
+    if (!result || paraIndex < 0) {
+      setSelectedText(null);
+      return;
+    }
+    setSelectedText(result.model.paragraphs[paraIndex]?.text ?? null);
   };
 
   const toggle = (s: Severity) => {
@@ -52,9 +62,9 @@ export default function App() {
     setStep(0);
     setFile(null);
     setBuffer(null);
-    setReport(null);
+    setResult(null);
     setError(null);
-    setSelectedIndex(null);
+    setSelectedText(null);
   };
 
   return (
@@ -175,20 +185,20 @@ export default function App() {
       )}
 
       {/* 步骤 4：结果 */}
-      {step === 3 && report && buffer && (
+      {step === 3 && result && buffer && (
         <>
           <div className="btns" style={{ marginBottom: 12 }}>
             <button onClick={reset}>重新开始</button>
           </div>
           <div className="result">
             <div className="preview-wrap">
-              <PreviewPanel buffer={buffer} selectedIndex={selectedIndex} />
+              <PreviewPanel buffer={buffer} targetText={selectedText} />
             </div>
             <ReportPanel
-              report={report}
+              report={result.report}
               active={active}
               onToggle={toggle}
-              onSelect={setSelectedIndex}
+              onSelect={onSelect}
             />
           </div>
         </>

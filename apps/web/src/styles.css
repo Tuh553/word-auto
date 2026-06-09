@@ -185,17 +185,27 @@ button:disabled {
   border-radius: 12px;
   height: calc(100vh - 220px);
   overflow: auto;
+}
+
+.report-wrap {
   padding: 16px;
+}
+
+/* docx-preview 自带灰底 wrapper 与白色页面，容器不再加内边距 */
+.preview-wrap {
+  padding: 0;
+  background: #f0f0f0;
 }
 
 .preview {
   transform-origin: top left;
 }
 
-.preview p.hl {
-  outline: 2px solid var(--warn);
-  background: #fff7ed;
-  scroll-margin: 40px;
+.preview .wa-hl {
+  outline: 2px solid var(--error);
+  outline-offset: 1px;
+  background: #fff3cd !important;
+  scroll-margin: 60px;
 }
 
 /* 报告 */

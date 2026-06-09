@@ -3,14 +3,17 @@ import { renderAsync } from "docx-preview";
 
 interface Props {
   buffer: ArrayBuffer;
-  /** 要高亮定位的段落序号（与 parser 的 body 段落顺序对应） */
-  selectedIndex: number | null;
+  /** 要定位高亮的段落原文（文档级问题为 null，不定位） */
+  targetText: string | null;
 }
 
-export function PreviewPanel({ buffer, selectedIndex }: Props) {
+const norm = (s: string | null | undefined): string =>
+  (s ?? "").replace(/\s+/g, "");
+
+export function PreviewPanel({ buffer, targetText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // 渲染 docx 原貌。关闭页眉/页脚/脚注渲染，使正文 <p> 顺序尽量贴合 body 段落顺序。
+  // 全量渲染：保留页眉/页脚/分页/字体，尽量贴近 Word 原貌
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -18,28 +21,39 @@ export function PreviewPanel({ buffer, selectedIndex }: Props) {
     renderAsync(buffer.slice(0), el, undefined, {
       className: "docx",
       inWrapper: true,
-      ignoreHeight: true,
-      renderHeaders: false,
-      renderFooters: false,
-      renderFootnotes: false,
-      renderEndnotes: false,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreFonts: false,
+      breakPages: true,
+      ignoreLastRenderedPageBreak: true,
+      experimental: true,
+      useBase64URL: true,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true,
     }).catch((e: unknown) => {
       el.textContent = "预览渲染失败：" + (e as Error).message;
     });
   }, [buffer]);
 
-  // 点击问题时定位高亮
+  // 按段落原文匹配定位（不依赖序号，避免与渲染 DOM 错位）
   useEffect(() => {
     const el = ref.current;
-    if (!el || selectedIndex == null) return;
-    el.querySelectorAll("p.hl").forEach((p) => p.classList.remove("hl"));
-    const ps = el.querySelectorAll("p");
-    const target = ps[selectedIndex];
-    if (target) {
-      target.classList.add("hl");
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!el || !targetText) return;
+    const key = norm(targetText).slice(0, 18);
+    if (key.length < 3) return;
+
+    el.querySelectorAll(".wa-hl").forEach((n) => n.classList.remove("wa-hl"));
+    const blocks = el.querySelectorAll("p, h1, h2, h3, h4, h5, h6, td, li");
+    for (const b of Array.from(blocks)) {
+      if (norm(b.textContent).includes(key)) {
+        b.classList.add("wa-hl");
+        b.scrollIntoView({ behavior: "smooth", block: "center" });
+        break;
+      }
     }
-  }, [selectedIndex]);
+  }, [targetText]);
 
   return <div className="preview" ref={ref} />;
 }
