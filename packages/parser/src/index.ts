@@ -78,5 +78,17 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   if (body["w:sectPr"]) sectPrs.push(body["w:sectPr"]);
   const sections: SectionProps[] = sectPrs.map(parseSectPr);
 
-  return { paragraphs, styles, docDefaults, sections };
+  // 提取各页眉纯文本（header*.xml）
+  const headers: string[] = [];
+  for (const name of Object.keys(files)) {
+    if (/^word\/header\d+\.xml$/.test(name)) {
+      const xml = strFromU8(files[name]);
+      const text = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
+        .map((m) => m[1])
+        .join("");
+      if (text.trim()) headers.push(text);
+    }
+  }
+
+  return { paragraphs, styles, docDefaults, sections, headers };
 };

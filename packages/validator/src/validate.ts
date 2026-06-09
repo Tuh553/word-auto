@@ -220,6 +220,27 @@ const checkPageNumbers = (model: DocModel, rules: RuleLibrary): Issue[] => {
   return out;
 };
 
+/** 页眉内容检测：页眉是否包含规定文字（如「重庆大学硕士学位论文」） */
+const checkHeaders = (model: DocModel, rules: RuleLibrary): Issue[] => {
+  const h = rules.headers;
+  if (!h?.left_text) return [];
+  const target = h.left_text.replace(/\s+/g, "");
+  const found = model.headers.some((t) => t.replace(/\s+/g, "").includes(target));
+  if (found) return [];
+  return [
+    {
+      paraIndex: -1,
+      role: "document",
+      field: "header_text",
+      expected: h.left_text,
+      actual: model.headers.join(" / ") || "(无页眉文字)",
+      severity: "warn",
+      message: `页眉应包含「${h.left_text}」`,
+      textPreview: "页眉",
+    },
+  ];
+};
+
 /** 校验整篇文档 */
 export const validateDoc = (
   model: DocModel,
@@ -229,6 +250,7 @@ export const validateDoc = (
   const issues: Issue[] = [
     ...checkDocument(model, rules),
     ...checkPageNumbers(model, rules),
+    ...checkHeaders(model, rules),
   ];
   let classified = 0;
 

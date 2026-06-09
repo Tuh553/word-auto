@@ -44,7 +44,22 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       continue;
     }
 
-    // 2. 关键词行
+    // 2. 目录条目（TOC1/2/3 样式）
+    const sid = (p.styleId ?? "").toLowerCase();
+    if (sid === "toc1") {
+      roles.push("toc1");
+      continue;
+    }
+    if (sid === "toc2") {
+      roles.push("toc2");
+      continue;
+    }
+    if (sid === "toc3") {
+      roles.push("toc3");
+      continue;
+    }
+
+    // 3. 关键词行
     if (/^关键词/.test(t)) {
       roles.push("keywords_cn");
       continue;
@@ -54,7 +69,7 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       continue;
     }
 
-    // 3. 大纲级别（标题）
+    // 4. 大纲级别（标题）
     const ol = p.effective.outlineLevel;
     const sn = (p.styleName ?? "").toLowerCase();
     if (ol === 0 || /heading\s*1|标题\s*1/.test(sn)) {

@@ -118,4 +118,6 @@ export interface DocModel {
   docDefaults: DocDefaults;
   /** 文档各分节的页面设置，按出现顺序；最后一个为正文主体节 */
   sections: SectionProps[];
+  /** 各页眉（header*.xml）的纯文本，用于页眉内容检测 */
+  headers: string[];
 }

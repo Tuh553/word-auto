@@ -33,6 +33,10 @@ export interface RuleLibrary {
     body_format?: string;
     body_restart_at?: number;
   };
+  headers?: {
+    left_text?: string;
+    [k: string]: unknown;
+  };
   styles: Record<string, StyleRule>;
   [k: string]: unknown;
 }
@@ -47,6 +51,9 @@ export type Role =
   | "abstract_body_en"
   | "keywords_en"
   | "toc_title"
+  | "toc1"
+  | "toc2"
+  | "toc3"
   | "heading1"
   | "heading2"
   | "heading3"
