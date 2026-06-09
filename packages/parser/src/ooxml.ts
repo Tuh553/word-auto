@@ -49,6 +49,32 @@ const makeLineSpacing = (line: number, rule: string): LineSpacing => {
   return { value: line / 240, rule: "auto", multiple: line / 240 };
 };
 
+/**
+ * OOXML 通用测量值 → twips。兼容整数(twips) 与带单位写法(pt/cm/mm/in/pc)。
+ * 某些文档把 pgMar/ind 等写成 "85.05pt"/"3cm" 而非整数 twips。
+ */
+const measureToTwips = (v: string | undefined): number | undefined => {
+  if (v === undefined) return undefined;
+  const m = /^(-?[\d.]+)(pt|cm|mm|in|pc)?$/.exec(v.trim());
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  if (Number.isNaN(n)) return undefined;
+  switch (m[2]) {
+    case "pt":
+      return n * 20;
+    case "pc":
+      return n * 240;
+    case "in":
+      return n * 1440;
+    case "cm":
+      return Math.round(n * (1440 / 2.54));
+    case "mm":
+      return Math.round(n * (144 / 2.54));
+    default:
+      return n; // 无单位 = twips
+  }
+};
+
 /** 从 rPr 节点提取 run 级格式（theme 用于解析主题字体引用） */
 export const parseRunProps = (rPr: any, theme?: ThemeFonts): RunProps => {
   const p: RunProps = {};
@@ -89,11 +115,11 @@ export const parseParaProps = (pPr: any): ParaProps => {
 
   const ind = pPr["w:ind"];
   if (ind) {
-    const fl = num(attr(ind, "w:firstLine"));
+    const fl = measureToTwips(attr(ind, "w:firstLine"));
     const flc = num(attr(ind, "w:firstLineChars"));
-    const hg = num(attr(ind, "w:hanging"));
+    const hg = measureToTwips(attr(ind, "w:hanging"));
     const hgc = num(attr(ind, "w:hangingChars"));
-    const lf = num(attr(ind, "w:left") ?? attr(ind, "w:start"));
+    const lf = measureToTwips(attr(ind, "w:left") ?? attr(ind, "w:start"));
     const lfc = num(attr(ind, "w:leftChars") ?? attr(ind, "w:startChars"));
     if (fl !== undefined) p.firstLineIndentTwips = fl;
     if (flc !== undefined) p.firstLineIndentChars = flc / 100;
@@ -105,11 +131,15 @@ export const parseParaProps = (pPr: any): ParaProps => {
 
   const sp = pPr["w:spacing"];
   if (sp) {
-    const line = num(attr(sp, "w:line"));
     const rule = attr(sp, "w:lineRule") ?? "auto";
+    // auto 时 line 是 1/240 行（整数）；exact/atLeast 时是测量值（可带单位）
+    const line =
+      rule === "auto"
+        ? num(attr(sp, "w:line"))
+        : measureToTwips(attr(sp, "w:line"));
     if (line !== undefined) p.lineSpacing = makeLineSpacing(line, rule);
-    const before = num(attr(sp, "w:before"));
-    const after = num(attr(sp, "w:after"));
+    const before = measureToTwips(attr(sp, "w:before"));
+    const after = measureToTwips(attr(sp, "w:after"));
     if (before !== undefined) p.spacingBeforePt = before / 20;
     if (after !== undefined) p.spacingAfterPt = after / 20;
   }
@@ -129,8 +159,8 @@ export const parseSectPr = (sect: any): SectionProps => {
 
   const pgSz = sect["w:pgSz"];
   if (pgSz) {
-    const w = num(attr(pgSz, "w:w"));
-    const h = num(attr(pgSz, "w:h"));
+    const w = measureToTwips(attr(pgSz, "w:w"));
+    const h = measureToTwips(attr(pgSz, "w:h"));
     if (w !== undefined) s.pageWidthTwips = w;
     if (h !== undefined) s.pageHeightTwips = h;
   }
@@ -147,7 +177,7 @@ export const parseSectPr = (sect: any): SectionProps => {
       ["gutterTwips", "w:gutter"],
     ];
     for (const [key, a] of map) {
-      const v = num(attr(m, a));
+      const v = measureToTwips(attr(m, a));
       if (v !== undefined) s[key] = v;
     }
   }
