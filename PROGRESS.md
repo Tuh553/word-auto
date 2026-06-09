@@ -14,38 +14,48 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 
 | 模块 | 说明 |
 | --- | --- |
-| monorepo 骨架 | pnpm workspace + tsconfig + .gitignore |
-| `packages/parser` | docx→文档模型；样式继承（docDefaults→basedOn链→直接格式）；主题字体解析（theme1.xml）；`sectPr` 页面设置解析；单位换算 |
-| `packages/validator` | 章节状态机识别角色；规则比对（字体/字号/加粗/对齐/行距/首行缩进）；按 hasCJK/hasLatin 降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；行距缺失 info 提示 |
-| `apps/cli` | PoC 入口，跑 demo 出报告 + 页面设置实测 |
-| `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 问题高亮（页面级显示「页面设置」） |
-| GitHub Pages 部署 | `.github/workflows/deploy.yml`（push main 自动 build+deploy） |
+| `packages/parser` | docx→文档模型；样式继承；主题字体(theme1.xml)；`sectPr` 页面设置；**带单位测量值(pt/cm/mm/in)**；页眉文本提取；单位换算 |
+| `packages/validator` | 章节状态机识别角色（**含封面区跳过 + TOC1/2/3 目录条目**）；规则比对（字体/字号/加粗/对齐/行距/首行缩进）；按 hasCJK/hasLatin 降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；**分节页码**（前置罗马/正文阿拉伯重起）；**页眉内容**；行距缺失提示 |
+| `apps/cli` | PoC：报告 + 页面设置/页码实测；支持传入 docx/规则库路径 |
+| `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 问题高亮 |
+| 标准模板 | `templates/source/*.docx`（权威批注版），作校准依据 + 检测金标准 |
+| 部署 | `.github/workflows/deploy.yml`（push main 自动 GitHub Pages） |
 
-提交节点：初始 MVP → 主题字体解析+降噪 → 文档级检测+行距缺失提示。
+## 标准模板对账（关键里程碑）
 
-demo 实测验证：页面设置 21×29.7cm(A4)/边距3-2.5-2.5-2.5/页眉1.6页脚1.5装订1.0，全合规；
-正文「等线」命中「应为宋体」，字号 10.5≠12 命中，误报为零。
+用引擎解析权威标准模板（而非生成的 demo）后暴露并修复了：
+- **pt 单位 bug**：真实文档 pgMar 写成 `85.05pt` 等，旧解析丢失 → 已修（measureToTwips）。
+- **封面误报**：封面/扉页被当正文狂报 → 分类器加封面区跳过，error 76→16。
+- 剩余 16 error 为**特殊正文元素**（图表注释/资料来源 9pt、公式编号 (1.1)）被当正文，
+  属长尾——见待办。
+- 原则：标准模板理想应"近零 error"，剩余即下一批优化坐标。
 
 ## 待办 ⬜（按价值/风险）
 
-1. 分节页码：前置罗马数字 / 正文阿拉伯重起 1（解析 `sectPr/pgNumType` + footer XML）。
-2. web 高亮定位精度（docx-preview 段落与 body 段落序号对齐偶有偏差；可改用文本匹配定位）。
-3. 多模板支持（规则库参数化，UI 已留模板下拉）。
-4. 目录条目（TOC1/2/3）校验；表格内段落、页眉页脚内容。
-5. （远期、高风险）自动套版改写——务必无损保留分节/域/题注/交叉引用。
+1. **多模板支持**（任务3，未做）：web 支持上传自定义规则库 JSON（去 BOM + 校验 styles），
+   TEMPLATES 数组已就绪；UI 模板步骤加上传入口。
+2. **特殊正文元素识别**：图表注释/资料来源(9pt)、公式编号——新增角色或在分类器归类，
+   避免按正文 12pt 误报。
+3. **表格内段落**：parser 现仅取 body 直接 w:p；表格内 w:tbl>w:tc>w:p 未提取。
+   需 fast-xml-parser `preserveOrder` 重构（影响所有 XML 访问，风险高，单独评估）。
+4. web 高亮定位精度（docx-preview 段落与 body 段落序号对齐偶有偏差，可改文本匹配）。
+5. 参考文献后致谢/附录被当 reference_body（状态机停在 references）。
+6. （远期、高风险）自动套版改写——务必无损保留分节/域/题注/交叉引用。
 
 ## 已知坑（详见 AGENTS.md）
 
-- 外部规则库 JSON 带 BOM（PowerShell `Set-Content -Encoding UTF8` 所致），读取要
-  `.replace(/^﻿/, "")`。
+- 外部规则库 JSON 带 BOM（PowerShell `Set-Content -Encoding UTF8` 所致），读取要 strip。
 - 主题字体 `a:ea` 常为空，需回退 `script="Hans"`。
-- 校验字体要按段落 hasCJK/hasLatin 降噪，否则纯中文段落误报西文字体。
-- 单位：字号 half-point(/2)、缩进/边距 twips、行距 auto 为倍数(/240)、exact/atLeast 为 pt(/20)。
+- 校验字体要按段落 hasCJK/hasLatin 降噪。
+- 测量值可能带单位（pt/cm/mm/in），不只是整数 twips——用 measureToTwips。
+- 单位：字号 half-point(/2)、行距 auto 倍数(/240)、exact/atLeast pt(/20)。
 
 ## 本地运行
 
 ```bash
 pnpm install
 pnpm --filter @word-auto/web run dev   # http://localhost:5173/
-pnpm --filter @word-auto/cli run check # 命令行报告
+pnpm --filter @word-auto/cli run check # demo 报告
+# 解析标准模板：
+pnpm --filter @word-auto/cli exec tsx src/main.ts "<标准模板.docx 绝对路径>"
 ```
