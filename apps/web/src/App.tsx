@@ -3,6 +3,7 @@ import { analyze, type AnalyzeResult } from "./lib/analyze.js";
 import { PreviewPanel } from "./components/PreviewPanel.js";
 import { ReportPanel } from "./components/ReportPanel.js";
 import { RuleConfigPanel } from "./components/RuleConfigPanel.js";
+import { TemplateProposalPanel } from "./components/TemplateProposalPanel.js";
 import {
   hasUnpublishedChanges,
   loadRuleLibraryRecords,
@@ -15,7 +16,14 @@ import {
   touchDraft,
   type RuleLibraryRecord,
 } from "./lib/ruleLibraries.js";
-import type { Severity } from "@word-auto/validator";
+import { parseDocx } from "@word-auto/parser";
+import {
+  applyProposalFieldToDraft,
+  applyProposalRoleToDraft,
+  extractRuleProposal,
+  type RuleProposal,
+  type Severity,
+} from "@word-auto/validator";
 
 const STEPS = ["上传文件", "选择模板", "配置选项", "检测结果"];
 const ALL_SEV: Severity[] = ["error", "warn", "info"];
@@ -37,9 +45,11 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<Record<string, RuleProposal>>({});
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const proposalRef = useRef<HTMLInputElement>(null);
 
   const currentLibrary = libraries.find((item) => item.id === templateId) ?? libraries[0];
   const savedLibrary = savedLibraries.find((item) => item.id === currentLibrary?.id);
@@ -49,6 +59,7 @@ export default function App() {
   const unpublishedChanges = currentLibrary
     ? hasUnpublishedChanges(currentLibrary)
     : false;
+  const currentProposal = currentLibrary ? proposals[currentLibrary.id] ?? null : null;
 
   const pickFile = async (f: File) => {
     if (!f.name.toLowerCase().endsWith(".docx")) {
@@ -176,6 +187,46 @@ export default function App() {
     }
   };
 
+  const handleExtractProposal = async (candidateFile: File) => {
+    if (!currentLibrary) return;
+    if (!candidateFile.name.toLowerCase().endsWith(".docx")) {
+      setRuleMessage("候选提取只支持 .docx 文件");
+      return;
+    }
+
+    try {
+      const model = parseDocx(new Uint8Array(await candidateFile.arrayBuffer()));
+      const proposal = extractRuleProposal(model, { sourceName: candidateFile.name });
+      setProposals((prev) => ({ ...prev, [currentLibrary.id]: proposal }));
+      setRuleMessage(
+        `已从「${candidateFile.name}」提取 ${proposal.roles.length} 个角色候选，可接受到当前草稿`,
+      );
+    } catch (e) {
+      setRuleMessage("候选提取失败：" + (e as Error).message);
+    }
+  };
+
+  const acceptProposalField = (
+    role: NonNullable<typeof currentProposal>["roles"][number],
+    field: NonNullable<typeof currentProposal>["roles"][number]["fields"][number],
+  ) => {
+    updateLibrary((record) => ({
+      ...record,
+      draft: applyProposalFieldToDraft(record.draft, role, field),
+    }));
+    setRuleMessage(`已将 ${role.label} / ${field.key} 候选写入草稿`);
+  };
+
+  const acceptProposalRole = (
+    role: NonNullable<typeof currentProposal>["roles"][number],
+  ) => {
+    updateLibrary((record) => ({
+      ...record,
+      draft: applyProposalRoleToDraft(record.draft, role),
+    }));
+    setRuleMessage(`已将 ${role.label} 的 ${role.fields.length} 个候选写入草稿`);
+  };
+
   const handleExportDraft = () => {
     if (!currentLibrary) return;
     downloadJson(
@@ -214,40 +265,49 @@ export default function App() {
       </nav>
 
       {view === "rules" && currentLibrary && (
-        <RuleConfigPanel
-          draft={currentLibrary.draft}
-          published={currentLibrary.published}
-          publishedUpdatedAt={currentLibrary.publishedUpdatedAt}
-          draftDirty={draftDirty}
-          unpublishedChanges={unpublishedChanges}
-          libraryOptions={libraries.map((item) => ({
-            id: item.id,
-            name: item.published.name,
-            version: item.published.version,
-          }))}
-          statusMessage={ruleMessage}
-          onSelectLibrary={(id) => {
-            setTemplateId(id);
-            setRuleMessage(null);
-          }}
-          onChange={(draft) => {
-            updateLibrary((record) => ({
-              ...record,
-              draft: {
-                ...record.draft,
-                ...stripDraftMeta(draft),
-                status: "draft",
-                updatedAt: record.draft.updatedAt,
-              },
-            }));
-            setRuleMessage(null);
-          }}
-          onSaveDraft={saveDraft}
-          onPublish={handlePublish}
-          onImport={() => importRef.current?.click()}
-          onExportDraft={handleExportDraft}
-          onExportPublished={handleExportPublished}
-        />
+        <>
+          <RuleConfigPanel
+            draft={currentLibrary.draft}
+            published={currentLibrary.published}
+            publishedUpdatedAt={currentLibrary.publishedUpdatedAt}
+            draftDirty={draftDirty}
+            unpublishedChanges={unpublishedChanges}
+            libraryOptions={libraries.map((item) => ({
+              id: item.id,
+              name: item.published.name,
+              version: item.published.version,
+            }))}
+            statusMessage={ruleMessage}
+            onSelectLibrary={(id) => {
+              setTemplateId(id);
+              setRuleMessage(null);
+            }}
+            onChange={(draft) => {
+              updateLibrary((record) => ({
+                ...record,
+                draft: {
+                  ...record.draft,
+                  ...stripDraftMeta(draft),
+                  status: "draft",
+                  updatedAt: record.draft.updatedAt,
+                },
+              }));
+              setRuleMessage(null);
+            }}
+            onSaveDraft={saveDraft}
+            onPublish={handlePublish}
+            onImport={() => importRef.current?.click()}
+            onExportDraft={handleExportDraft}
+            onExportPublished={handleExportPublished}
+          />
+          <TemplateProposalPanel
+            draft={currentLibrary.draft}
+            proposal={currentProposal}
+            onExtract={() => proposalRef.current?.click()}
+            onAcceptField={acceptProposalField}
+            onAcceptRole={acceptProposalRole}
+          />
+        </>
       )}
 
       {view === "detect" && (
@@ -407,6 +467,17 @@ export default function App() {
         onChange={(e) => {
           const selected = e.target.files?.[0];
           if (selected) void handleImport(selected);
+          e.currentTarget.value = "";
+        }}
+      />
+      <input
+        ref={proposalRef}
+        type="file"
+        accept=".docx"
+        hidden
+        onChange={(e) => {
+          const selected = e.target.files?.[0];
+          if (selected) void handleExtractProposal(selected);
           e.currentTarget.value = "";
         }}
       />

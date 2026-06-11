@@ -11,7 +11,7 @@ import type {
   StyleRule,
 } from "./types.js";
 
-const ROLE_LABELS: Record<Exclude<Role, "document">, string> = {
+export const ROLE_LABELS: Record<Exclude<Role, "document">, string> = {
   abstract_title_cn: "中文摘要标题",
   abstract_body_cn: "中文摘要正文",
   keywords_cn: "中文关键词",
@@ -43,10 +43,10 @@ const ROLE_LABELS: Record<Exclude<Role, "document">, string> = {
   table_cell: "表格单元格",
 };
 
-const roleLabel = (role: string): string =>
+export const getRoleLabel = (role: string): string =>
   ROLE_LABELS[role as Exclude<Role, "document">] ?? role;
 
-const FIELD_LABELS: Record<RuleFieldKey, string> = {
+export const FIELD_LABELS: Record<RuleFieldKey, string> = {
   fontFamilyCn: "中文字体",
   fontFamilyLatin: "西文字体",
   fontSizePt: "字号",
@@ -60,6 +60,51 @@ const FIELD_LABELS: Record<RuleFieldKey, string> = {
   leftIndentChars: "左缩进",
   outlineLevel: "大纲级别",
 };
+
+export const RULE_FIELD_UNITS: Record<RuleFieldKey, "pt" | "chars" | "enum" | "bool" | "level"> = {
+  fontFamilyCn: "enum",
+  fontFamilyLatin: "enum",
+  fontSizePt: "pt",
+  bold: "bool",
+  align: "enum",
+  lineHeightPt: "pt",
+  spaceBeforePt: "pt",
+  spaceAfterPt: "pt",
+  firstLineIndentChars: "chars",
+  hangingIndentChars: "chars",
+  leftIndentChars: "chars",
+  outlineLevel: "level",
+};
+
+export const RULE_FIELD_ORDER: RuleFieldKey[] = [
+  "fontFamilyCn",
+  "fontFamilyLatin",
+  "fontSizePt",
+  "bold",
+  "align",
+  "lineHeightPt",
+  "spaceBeforePt",
+  "spaceAfterPt",
+  "firstLineIndentChars",
+  "hangingIndentChars",
+  "leftIndentChars",
+  "outlineLevel",
+];
+
+export const getFieldLabel = (key: RuleFieldKey): string => FIELD_LABELS[key];
+
+export const defaultSeverityForField = (key: RuleFieldKey): RuleField["severity"] =>
+  key === "fontFamilyCn" || key === "fontFamilyLatin" || key === "fontSizePt"
+    ? "error"
+    : "warn";
+
+export const buildRuleField = (key: RuleFieldKey, value: RuleField["value"]): RuleField => ({
+  key,
+  label: getFieldLabel(key),
+  enabled: true,
+  severity: defaultSeverityForField(key),
+  value,
+});
 
 type StyleFieldSpec = {
   legacyKey: keyof StyleRule;
@@ -85,7 +130,7 @@ const STYLE_FIELD_SPECS: StyleFieldSpec[] = [
 const roleEntries = (styles: RuleLibrary["styles"] = {}): RoleRuleSet[] =>
   Object.entries(styles).map(([role, styleRule]) => ({
     role,
-    label: roleLabel(role),
+    label: getRoleLabel(role),
     fields: styleRuleToFields(styleRule),
   }));
 
@@ -93,19 +138,11 @@ const styleRuleToFields = (styleRule: StyleRule): RuleField[] =>
   STYLE_FIELD_SPECS.flatMap((spec) => {
     const raw = styleRule[spec.legacyKey];
     if (raw == null) return [];
-    return [{
-      key: spec.key,
-      label: FIELD_LABELS[spec.key],
-      enabled: true,
-      severity: spec.key === "fontFamilyCn" || spec.key === "fontFamilyLatin" || spec.key === "fontSizePt"
-        ? "error"
-        : "warn",
-      value: {
+    return [buildRuleField(spec.key, {
         mode: "exact",
         exact: raw as string | number | boolean,
         unit: spec.unit,
-      },
-    }];
+      })];
   });
 
 const fieldValueToLegacy = (fields: RuleField[], key: RuleFieldKey): string | number | boolean | undefined => {

@@ -15,15 +15,18 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 | 模块 | 说明 |
 | --- | --- |
 | `packages/parser` | docx→文档模型；样式继承；主题字体；`sectPr` 页面设置；带单位测量值；分节页码；页眉文本；**表格内段落提取（`inTable` / `table_cell`）** |
-| `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色**）；规则比对；按脚本降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；页眉内容；行距缺失提示；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；单元测试（`node:test`，27 例） |
+| `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色**）；规则比对；按脚本降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；页眉内容；行距缺失提示；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；**模板候选提取 `extractRuleProposal`**；单元测试（`node:test`，32 例） |
 | `apps/cli` | PoC：报告 + 页面/页码实测；可传 docx/规则库路径 |
-| `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 文本匹配高亮（见下，已攻克渲染问题）；**规则配置页骨架**（视图切换 + 角色列表 + 字段编辑 + 实时 `lintRuleLibrary` 校验） |
+| `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 文本匹配高亮（见下，已攻克渲染问题）；规则配置页；字段值编辑；`mode` 切换；草稿保存/发布；发布后回灌检测；多模板切换；自定义规则库 JSON 导入/导出；模板候选面板 |
 | 标准模板 | `templates/source/*.docx`，校准依据 + 检测金标准 |
-| 部署 | `.github/workflows/deploy.yml`（push main 自动 GitHub Pages） |
+| 部署/CI | `.github/workflows/deploy.yml`（push main 自动 GitHub Pages）；`.github/workflows/quality.yml`（PR/push 运行 type-check、test、build） |
 
 验证结果（2026-06-11）：
-- `pnpm test`：27/27 通过
+- `pnpm typecheck`：通过（parser / validator / cli / web）
+- `pnpm test`：通过（parser 4/4，validator 32/32，web 3/3）
 - `pnpm -r build`：通过
+- `pnpm run ci`：通过（串联 typecheck → test → build）
+- 注意：`pnpm ci` 不是脚本入口，会触发 pnpm 的未实现内置命令；应使用 `pnpm run ci`。
 
 ## ✅ web 预览（已解决 — chrome-devtools 自查验证）
 
@@ -43,19 +46,17 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 - `upload_file` 受 workspace root 限制（root = `E:\Claude code\docs`）；上传 word-auto 外的
   文件需先复制到该 root 内（如 `docs/output/`）。
 
-## 待办 ⬜（按价值/风险）
+## 待办 ⬜（集中维护）
 
-> 主线（多模板规则库可视化，见 `docs/plans/2026-06-09-rule-library-and-template-implementation-plan.md`）：
-> 阶段 1 模型/兼容层 + 阶段 3 合法性校验 `lintRuleLibrary`/测试 + 阶段 4 配置页骨架（视图切换/角色列表/字段编辑/实时校验）已完成 ✅；
-> 下一步 = 字段值编辑控件（数值/字体/枚举/范围）+ 规则方式 `mode` 切换 + 草稿/发布态（阶段 2，发布后回灌检测）。
+完整 TODO 已整理到 [`docs/TODO.md`](docs/TODO.md)。当前优先级摘要：
 
-1. 多模板支持：web 上传自定义规则库 JSON（去 BOM + 校验 styles）。
-2. 规则配置闭环：字段值编辑控件、`mode` 切换、草稿/发布态，以及发布后回灌检测链路。
-3. parser 识别增强：补 `w:drawing` / OMML 公式等结构信号，降低特殊正文元素仍依赖文本启发式的误判空间。
+1. parser 结构信号：补 `w:drawing` / OMML 公式 / 嵌入对象，降低特殊正文元素仍依赖文本启发式的误判空间。
+2. 报告可信度：接入规则依据 `source.provenance`、修复建议、角色识别置信度、问题分组。
+3. 模板候选增强：多样本聚合、候选 diff、证据下钻、评分校准。
 4. 表格增强：当前已提取表格段落，但未保留表格与正文的全局交错顺序；表格专属规则/降噪待做。
-5. 附录细分：当前已是正式章节并接入校验，但附录内部的小标题、成果清单、落款仍可继续拆细角色。
-6. 预览：封面页(不检测)在 docx-preview 下仍可能排版偏差，但不影响核心；可考虑默认定位到首个问题。
-7. （远期、高风险）自动套版改写——务必无损保留分节/域/题注/交叉引用。
+5. Web 体验：Web Worker、错误分流、默认定位首个问题、批量检测、带批注 docx 导出。
+6. CLI 收尾：去默认路径硬编码，补 `--help`、参数校验、非零退出码和输出路径。
+7. （远期、高风险）自动套版改写——务必无损保留分节/域/题注/交叉引用，绝不引入 Word COM。
 
 ## 已知坑（详见 AGENTS.md）
 

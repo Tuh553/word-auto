@@ -625,6 +625,141 @@ button:disabled {
   color: var(--muted);
 }
 
+.proposal-card {
+  margin-top: 16px;
+}
+
+.proposal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.proposal-head h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.proposal-head p,
+.proposal-meta,
+.proposal-empty,
+.proposal-field-current,
+.proposal-field-hint,
+.proposal-evidence,
+.proposal-role-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.proposal-notices {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.proposal-notice {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.proposal-roles {
+  display: grid;
+  gap: 16px;
+}
+
+.proposal-role {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: #fbfdff;
+}
+
+.proposal-role-head,
+.proposal-field-main,
+.proposal-field-stats,
+.proposal-conflicts {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.proposal-role-name,
+.proposal-field-name {
+  font-weight: 600;
+}
+
+.proposal-fields {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.proposal-field {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.proposal-field-value {
+  margin-top: 4px;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.proposal-field-stats {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.proposal-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.proposal-badge.high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.proposal-badge.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.proposal-badge.low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.proposal-field-hint,
+.proposal-conflicts,
+.proposal-evidence {
+  margin-top: 8px;
+}
+
+.proposal-conflicts {
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #7c2d12;
+}
+
+.proposal-conflicts span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+}
+
 @media (max-width: 960px) {
   .result,
   .rc-body {
@@ -651,6 +786,12 @@ button:disabled {
 
   .rc-field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .proposal-head,
+  .proposal-role-head,
+  .proposal-field-main {
+    flex-direction: column;
   }
 
   select {

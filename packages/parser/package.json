@@ -7,6 +7,11 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
   "dependencies": {
     "fast-xml-parser": "^4.5.0",
     "fflate": "^0.8.2"

@@ -2,7 +2,8 @@
 
 > 日期：2026-06-10　配套：[`2026-06-10-enhancement-roadmap.md`](./2026-06-10-enhancement-roadmap.md)
 > 覆盖**现有已实现功能**与**规划新功能**两大部分，用 Mermaid 时序图描述运行时交互。
-> **仅为设计/说明，未写实现代码。** 不支持 Mermaid 渲染时，可读每图下方「说明」。
+> 2026-06-11 更新：图 6-8 的导入/草稿发布/模板候选 MVP 已落地；图 9-11 仍是规划。
+> 不支持 Mermaid 渲染时，可读每图下方「说明」。
 
 ## 参与者图例
 
@@ -14,7 +15,8 @@
 | `classifyParagraphs` / `validateDoc` | `@word-auto/validator` | 现有 |
 | `lintRuleLibrary` / `normalizeRuleLibrary` / `toLegacyRuleLibrary` | `validator` 规则模型 | 现有 |
 | `docx-preview` | 第三方预览渲染 | 现有 |
-| 草稿存储 / 生效规则库 / Web Worker / 候选提取器 / 批注导出器 | 路线图新增 | **新增** |
+| 草稿存储 / 生效规则库 / 候选提取器 | `apps/web/src/lib/ruleLibraries.ts` / `validator/proposals.ts` | 现有 MVP |
+| Web Worker / 批注导出器 | 路线图新增 | 规划 |
 
 ---
 
@@ -221,7 +223,7 @@ sequenceDiagram
 
 # 第二部分　规划新功能
 
-## 图 6　导入自定义规则库（roadmap §4）
+## 图 6　导入自定义规则库（已实现 MVP）
 
 上传 JSON → 去 BOM → 归一 → 合法性校验 → 载入或拒绝。
 
@@ -251,7 +253,7 @@ sequenceDiagram
 
 ---
 
-## 图 7　规则配置：草稿 → 发布 → 回灌检测（roadmap §3.3 + §4）
+## 图 7　规则配置：草稿 → 发布 → 回灌检测（已实现 MVP）
 
 草稿/发布态分离 + 引擎对齐（检测直接消费 `RuleValue`，支持 `oneOf`/`range`）。
 
@@ -288,7 +290,7 @@ sequenceDiagram
 
 ---
 
-## 图 8　模板候选提取（roadmap §4 阶段 6-7）
+## 图 8　模板候选提取（已实现 MVP）
 
 上传模板 → 复用 parser+classify 聚合 → 候选规则 → 人工确认接受到草稿。
 
@@ -402,7 +404,7 @@ sequenceDiagram
 
 ## 标记约定
 
-- **现有功能（图 1-5）**：已在代码库实现并经测试/对账验证（含本轮表格段落提取）。
-- **新增功能（图 6-11）**：路线图规划，尚未实现；草稿存储、生效规则库、Web Worker、候选提取器、批注导出器为待建模块。
-- **改造点**：图 7 的 `validateDoc` 由「降级到 legacy 单值」改为「直接消费 `RuleValue`」。
+- **现有功能（图 1-8）**：已在代码库实现并经测试/对账验证（含表格段落提取、草稿/发布、规则库导入、候选提取 MVP）。
+- **规划功能（图 9-11）**：Web Worker、批注导出器、问题下钻增强仍未实现。
+- **已完成改造点**：图 7 的 `validateDoc` 已支持直接消费 `RuleValue`。
 - 所有流程严守：纯 OOXML（无 Word COM）、检测与改写分离、规则可回溯依据、文件不离开浏览器。

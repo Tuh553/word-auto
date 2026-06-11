@@ -127,13 +127,35 @@ export interface RuleProposalField {
   key: RuleFieldKey;
   proposedValue: RuleValue;
   confidence: number;
+  confidenceLevel: "high" | "medium" | "low";
+  confidenceHint: string;
   sampleCount: number;
   coverage: number;
+  observedCount: number;
+  totalCount: number;
   evidence: string[];
   conflicts?: Array<{
     value: RuleValue;
     sampleCount: number;
+    evidence: string[];
   }>;
+}
+
+export interface RoleRuleProposal {
+  role: Role;
+  label: string;
+  totalCount: number;
+  fields: RuleProposalField[];
+}
+
+export interface RuleProposal {
+  sourceName: string;
+  extractedAt: string;
+  paragraphCount: number;
+  classifiedCount: number;
+  unclassifiedCount: number;
+  notices: string[];
+  roles: RoleRuleProposal[];
 }
 
 // ── 规则合法性校验（lint）：对规则库「配置本身」做静态检查，不依赖真实 .docx ──

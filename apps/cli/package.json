@@ -4,7 +4,9 @@
   "description": "命令行：解析 docx + 规则校验，输出合规报告",
   "type": "module",
   "scripts": {
-    "check": "tsx src/main.ts"
+    "build": "tsc -p tsconfig.json",
+    "check": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@word-auto/parser": "workspace:*",

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Paragraph } from "@word-auto/parser";
+import type { DocModel, LineSpacing, Paragraph } from "@word-auto/parser";
 import { classifyParagraphs, validateDoc, type EditableRuleLibrary, type RuleLibrary } from "./index.js";
 
 const mkPara = (
@@ -10,7 +10,7 @@ const mkPara = (
     styleName?: string;
     alignment?: string;
     sizePt?: number;
-    inTable?: boolean;
+  inTable?: boolean;
   } = {},
 ): Paragraph => ({
   index: 0,
@@ -26,6 +26,26 @@ const mkPara = (
     sizePt: opts.sizePt,
   },
   inTable: opts.inTable,
+});
+
+const mkModel = (paragraphs: Paragraph[]): DocModel => ({
+  paragraphs,
+  styles: new Map(),
+  docDefaults: {},
+  sections: [],
+  headers: [],
+});
+
+const exactLineSpacing = (pt: number): LineSpacing => ({
+  value: pt,
+  rule: "exact",
+  pt,
+});
+
+const autoLineSpacing = (multiple: number): LineSpacing => ({
+  value: multiple,
+  rule: "auto",
+  multiple,
 });
 
 test("章节尾部：参考文献后切到致谢/附录/成果，不再继续 reference_body", () => {
@@ -149,8 +169,7 @@ test("旧规则兼容：后置部分旧泛化规则仍能覆盖新角色", () =>
 });
 
 test("可编辑规则：oneOf / range / unset 直接回灌检测", () => {
-  const model = {
-    paragraphs: [
+  const model = mkModel([
       mkPara("摘要"),
       mkPara("这是摘要正文"),
       mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
@@ -159,15 +178,10 @@ test("可编辑规则：oneOf / range / unset 直接回灌检测", () => {
         effective: {
           alignment: "justify",
           sizePt: 12,
-          lineSpacing: { value: 20, rule: "exact", pt: 20 },
+          lineSpacing: exactLineSpacing(20),
         },
       },
-    ],
-    styles: new Map(),
-    docDefaults: {},
-    sections: [],
-    headers: [],
-  };
+    ]);
   const rules: EditableRuleLibrary = {
     id: "editable",
     name: "Editable",
@@ -191,8 +205,7 @@ test("可编辑规则：oneOf / range / unset 直接回灌检测", () => {
 });
 
 test("可编辑规则：严重级别与字段模式进入报告", () => {
-  const model = {
-    paragraphs: [
+  const model = mkModel([
       mkPara("摘要"),
       mkPara("这是摘要正文"),
       mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
@@ -201,15 +214,10 @@ test("可编辑规则：严重级别与字段模式进入报告", () => {
         effective: {
           alignment: "right",
           sizePt: 9,
-          lineSpacing: { value: 1.5, rule: "auto", multiple: 1.5 },
+          lineSpacing: autoLineSpacing(1.5),
         },
       },
-    ],
-    styles: new Map(),
-    docDefaults: {},
-    sections: [],
-    headers: [],
-  };
+    ]);
   const rules: EditableRuleLibrary = {
     id: "editable",
     name: "Editable",
