@@ -1,6 +1,10 @@
 import { parseDocx, type DocModel } from "@word-auto/parser";
-import { validateDoc } from "@word-auto/validator";
-import type { RuleLibrary, ValidationReport } from "@word-auto/validator";
+import { toLegacyRuleLibrary, validateDoc } from "@word-auto/validator";
+import type {
+  EditableRuleLibrary,
+  LegacyRuleLibrary,
+  ValidationReport,
+} from "@word-auto/validator";
 
 export type { ValidationReport };
 
@@ -10,7 +14,10 @@ export interface AnalyzeResult {
 }
 
 /** 浏览器内完成：解析 docx + 规则校验（文件不上传，纯本地计算） */
-export const analyze = (buf: ArrayBuffer, rules: RuleLibrary): AnalyzeResult => {
+export const analyze = (
+  buf: ArrayBuffer,
+  rules: LegacyRuleLibrary | EditableRuleLibrary,
+): AnalyzeResult => {
   const model = parseDocx(new Uint8Array(buf));
-  return { model, report: validateDoc(model, rules) };
+  return { model, report: validateDoc(model, toLegacyRuleLibrary(rules)) };
 };

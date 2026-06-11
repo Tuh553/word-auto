@@ -4,8 +4,11 @@ import { parseDocx } from "@word-auto/parser";
 import type { LineSpacing } from "@word-auto/parser";
 import {
   classifyParagraphs,
+  normalizeRuleLibrary,
+  toLegacyRuleLibrary,
   validateDoc,
-  type RuleLibrary,
+  type EditableRuleLibrary,
+  type LegacyRuleLibrary,
 } from "@word-auto/validator";
 
 const DOCS = "E:/Claude code/docs";
@@ -21,11 +24,11 @@ const buf = readFileSync(docxPath);
 // 去掉可能的 UTF-8 BOM（PowerShell `Set-Content -Encoding UTF8` 会写 BOM）
 const rules = JSON.parse(
   readFileSync(rulesPath, "utf8").replace(/^﻿/, ""),
-) as RuleLibrary;
-
+) as LegacyRuleLibrary | EditableRuleLibrary;
+const normalizedRules = normalizeRuleLibrary(rules);
 const model = parseDocx(new Uint8Array(buf));
 const roles = classifyParagraphs(model.paragraphs);
-const report = validateDoc(model, rules);
+const report = validateDoc(model, toLegacyRuleLibrary(normalizedRules));
 
 console.log(`输入文档: ${docxPath}`);
 console.log(`规则库:   ${rulesPath}\n`);
@@ -67,7 +70,7 @@ if (model.sections.length) {
 }
 
 console.log("\n=== 校验报告 ===");
-console.log(`规则库: ${report.ruleName}`);
+console.log(`规则库: ${normalizedRules.name}`);
 console.log(
   `段落总数 ${report.paragraphCount}，已分类 ${report.classifiedCount}`,
 );

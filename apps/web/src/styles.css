@@ -331,3 +331,191 @@ button:disabled {
   padding: 40px;
   font-size: 14px;
 }
+
+/* 顶部视图导航 */
+.nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.nav button.active {
+  background: var(--info);
+  color: #fff;
+  border-color: var(--info);
+}
+
+/* 规则配置页 */
+.rc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.rc-name {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.rc-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.rc-status {
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.rc-status.ok {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.rc-status.bad {
+  background: #fef2f2;
+  color: var(--error);
+  border: 1px solid #fecaca;
+}
+
+.rc-global {
+  margin-bottom: 12px;
+}
+
+.rc-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.rc-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: calc(100vh - 320px);
+  overflow: auto;
+}
+
+.rc-role {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  padding: 8px 12px;
+}
+
+.rc-role.active {
+  border-color: var(--info);
+  background: #eef2ff;
+  color: var(--info);
+  font-weight: 600;
+}
+
+.rc-role-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rc-role.active .rc-role-meta {
+  color: var(--info);
+}
+
+.rc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--error);
+}
+
+.rc-fields {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: calc(100vh - 320px);
+  overflow: auto;
+}
+
+.rc-fields-head {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.rc-field {
+  display: grid;
+  grid-template-columns: 160px 80px 1fr 92px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.rc-field.off {
+  opacity: 0.5;
+}
+
+.rc-field-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.rc-field-label {
+  font-weight: 500;
+}
+
+.rc-field-mode {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rc-field-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.rc-field-sev {
+  min-width: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.rc-field-issues {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.rc-field-issue {
+  font-size: 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--border);
+}
+
+.rc-field-issue.error {
+  border-left-color: var(--error);
+  color: var(--error);
+}
+
+.rc-field-issue.warn {
+  border-left-color: var(--warn);
+  color: var(--warn);
+}
+
+.rc-field-issue.info {
+  border-left-color: var(--info);
+  color: var(--muted);
+}

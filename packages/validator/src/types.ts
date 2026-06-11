@@ -41,6 +41,129 @@ export interface RuleLibrary {
   [k: string]: unknown;
 }
 
+export type LegacyStyleRule = StyleRule;
+export type LegacyRuleLibrary = RuleLibrary;
+
+export type RuleFieldKey =
+  | "fontFamilyCn"
+  | "fontFamilyLatin"
+  | "fontSizePt"
+  | "bold"
+  | "align"
+  | "lineHeightPt"
+  | "spaceBeforePt"
+  | "spaceAfterPt"
+  | "firstLineIndentChars"
+  | "hangingIndentChars"
+  | "leftIndentChars"
+  | "outlineLevel";
+
+export type RuleFieldSeverity = "error" | "warn" | "info";
+export type RuleValueMode = "exact" | "oneOf" | "range" | "unset";
+export type RuleValueUnit = "pt" | "chars" | "enum" | "bool" | "level";
+
+export interface RuleValue {
+  mode: RuleValueMode;
+  exact?: string | number | boolean;
+  oneOf?: Array<string | number | boolean>;
+  min?: number;
+  max?: number;
+  unit?: RuleValueUnit;
+}
+
+export interface RuleField {
+  key: RuleFieldKey;
+  label: string;
+  enabled: boolean;
+  severity: RuleFieldSeverity;
+  value: RuleValue;
+  note?: string;
+}
+
+export interface RoleRuleSet {
+  role: string;
+  label: string;
+  fields: RuleField[];
+}
+
+export interface DocumentRuleSet {
+  paper_size?: string;
+  margin_top_cm?: number;
+  margin_bottom_cm?: number;
+  margin_left_cm?: number;
+  margin_right_cm?: number;
+  header_distance_cm?: number;
+  footer_distance_cm?: number;
+  gutter_cm?: number;
+}
+
+export interface PageNumberRuleSet {
+  front_matter_format?: string;
+  body_format?: string;
+  body_restart_at?: number;
+}
+
+export interface HeaderRuleSet {
+  left_text?: string;
+}
+
+export interface EditableRuleLibrary {
+  id: string;
+  name: string;
+  version: string;
+  basedOn?: string;
+  document?: DocumentRuleSet;
+  pageNumbers?: PageNumberRuleSet;
+  headers?: HeaderRuleSet;
+  roles: RoleRuleSet[];
+}
+
+export interface RuleDraft extends EditableRuleLibrary {
+  status: "draft";
+  updatedAt?: string;
+}
+
+export interface RuleProposalField {
+  key: RuleFieldKey;
+  proposedValue: RuleValue;
+  confidence: number;
+  sampleCount: number;
+  coverage: number;
+  evidence: string[];
+  conflicts?: Array<{
+    value: RuleValue;
+    sampleCount: number;
+  }>;
+}
+
+// ── 规则合法性校验（lint）：对规则库「配置本身」做静态检查，不依赖真实 .docx ──
+// 与 validate.ts（校验文档是否符合规则）区分：lint 校验「规则是否写得合法、自洽」。
+
+export type RuleLintLevel = "error" | "warn" | "info";
+
+/**
+ * 一条规则合法性问题。`role` / `field` 为定位锚点，供前端做字段级/角色级提示：
+ * - 都为空：库级问题（如缺少必填角色）
+ * - 仅 `role`：角色级问题
+ * - `role` + `field`：字段级问题
+ */
+export interface RuleLintItem {
+  level: RuleLintLevel;
+  /** 机器可读的问题码，前端可据此做特定渲染（见 lint.ts 中的常量） */
+  code: string;
+  role?: string;
+  field?: RuleFieldKey;
+  message: string;
+}
+
+export interface RuleLintResult {
+  /** 无 error 即视为可发布（warn / info 不阻断发布） */
+  ok: boolean;
+  errors: RuleLintItem[];
+  warnings: RuleLintItem[];
+  infos: RuleLintItem[];
+}
+
 /** 文档段落被识别到的语义角色，对应 styles 表的 key；'document' 为文档/页面级 */
 export type Role =
   | "document"
@@ -59,7 +182,8 @@ export type Role =
   | "heading3"
   | "body_text"
   | "reference_heading"
-  | "reference_body";
+  | "reference_body"
+  | "table_cell";
 
 export type Severity = "error" | "warn" | "info";
 

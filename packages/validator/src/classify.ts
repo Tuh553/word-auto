@@ -30,6 +30,11 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
   const roles: (Role | null)[] = [];
 
   for (const p of paras) {
+    // 表格单元格段落：独立角色，不参与正文章节状态机
+    if (p.inTable) {
+      roles.push("table_cell");
+      continue;
+    }
     const t = compact(p.text);
     if (!t) {
       roles.push(null);

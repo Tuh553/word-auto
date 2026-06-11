@@ -88,6 +88,8 @@ export interface Paragraph {
   text: string;
   /** 继承解析后的有效格式 */
   effective: EffectiveProps;
+  /** 是否位于表格单元格内（w:tbl 内提取的段落） */
+  inTable?: boolean;
 }
 
 export interface DocDefaults {

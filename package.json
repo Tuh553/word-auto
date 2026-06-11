@@ -6,7 +6,8 @@
   "type": "module",
   "packageManager": "pnpm@10.32.1",
   "scripts": {
-    "check": "pnpm -r --filter ./apps/cli run check"
+    "check": "pnpm -r --filter ./apps/cli run check",
+    "test": "pnpm -r --filter ./packages/validator run test"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

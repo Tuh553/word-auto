@@ -42,7 +42,8 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   const body = root["w:document"]?.["w:body"] ?? {};
   const wps: any[] = body["w:p"] ?? [];
 
-  const paragraphs: Paragraph[] = wps.map((wp, index) => {
+  let nextIndex = 0;
+  const buildParagraph = (wp: any, inTable: boolean): Paragraph => {
     const pPr = wp["w:pPr"];
     const directPara = parseParaProps(pPr);
     const markRun = parseRunProps(pPr?.["w:rPr"], theme);
@@ -54,7 +55,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     const text = runs.map((r) => r.text).join("");
 
     const para: Paragraph = {
-      index,
+      index: nextIndex++,
       styleId: directPara.styleId,
       styleName: directPara.styleId
         ? styles.get(directPara.styleId)?.name
@@ -65,9 +66,29 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       text,
       effective: {},
     };
+    if (inTable) para.inTable = true;
     para.effective = computeEffective(para, styles, docDefaults);
     return para;
-  });
+  };
+
+  // body 直接段落（保持原顺序与索引 0..N-1）
+  const paragraphs: Paragraph[] = wps.map((wp) => buildParagraph(wp, false));
+
+  // 表格内段落：递归 w:tbl > w:tr > w:tc > w:p，追加到末尾并标记 inTable。
+  // 复用同一套构造逻辑，单元格段落同样解析样式继承/字体/有效格式。
+  const collectTableParagraphs = (container: any): void => {
+    for (const tbl of (container["w:tbl"] ?? []) as any[]) {
+      for (const tr of (tbl["w:tr"] ?? []) as any[]) {
+        for (const tc of (tr["w:tc"] ?? []) as any[]) {
+          for (const cp of (tc["w:p"] ?? []) as any[]) {
+            paragraphs.push(buildParagraph(cp, true));
+          }
+          collectTableParagraphs(tc); // 嵌套表格
+        }
+      }
+    }
+  };
+  collectTableParagraphs(body);
 
   // 收集分节页面设置：各分节点在段落 pPr/sectPr，最后一节在 body 末尾 sectPr
   const sectPrs: any[] = [];

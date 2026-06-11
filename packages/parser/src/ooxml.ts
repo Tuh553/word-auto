@@ -167,7 +167,18 @@ export const parseSectPr = (sect: any): SectionProps => {
 
   const m = sect["w:pgMar"];
   if (m) {
-    const map: [keyof SectionProps, string][] = [
+    // key 限定为「值为 number 的字段」联合：用整个 keyof SectionProps 会把
+    // 写入类型与 pageNumberFormat(string) 取交集而坍缩，导致 number 无法赋值。
+    const map: [
+      | "marginTopTwips"
+      | "marginBottomTwips"
+      | "marginLeftTwips"
+      | "marginRightTwips"
+      | "headerTwips"
+      | "footerTwips"
+      | "gutterTwips",
+      string,
+    ][] = [
       ["marginTopTwips", "w:top"],
       ["marginBottomTwips", "w:bottom"],
       ["marginLeftTwips", "w:left"],
