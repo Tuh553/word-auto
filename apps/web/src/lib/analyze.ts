@@ -1,5 +1,5 @@
 import { parseDocx, type DocModel } from "@word-auto/parser";
-import { toLegacyRuleLibrary, validateDoc } from "@word-auto/validator";
+import { validateDoc } from "@word-auto/validator";
 import type {
   EditableRuleLibrary,
   LegacyRuleLibrary,
@@ -19,5 +19,5 @@ export const analyze = (
   rules: LegacyRuleLibrary | EditableRuleLibrary,
 ): AnalyzeResult => {
   const model = parseDocx(new Uint8Array(buf));
-  return { model, report: validateDoc(model, toLegacyRuleLibrary(rules)) };
+  return { model, report: validateDoc(model, rules) };
 };

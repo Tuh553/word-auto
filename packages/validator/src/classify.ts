@@ -11,13 +11,78 @@ const compact = (s: string): string => s.replace(/\s+/g, "");
 const COVER_HINT =
   /^(学生姓名|姓名|指导教师|导师|专业学位类别|专业名称|专业[:：]|研究方向|答辩委员会|主席|委员|授位时间|学号|分类号|密级|学校代码|论文提交日期|论文答辩日期|独创性声明|学位论文使用授权)|大学(博士|硕士)?(专业)?学位论文$/;
 
+const ACK_HEADING =
+  /^(致谢|鸣谢|acknowledg?ments?)$/i;
+const APPENDIX_HEADING =
+  /^(附录[A-Z0-9一二三四五六七八九十]*|appendix[A-Z0-9-]*)$/i;
+const ACHIEVEMENT_HEADING =
+  /^(攻读.*学位期间.*成果|攻读学位期间发表的学术成果|在学期间取得的研究成果)$/;
+const FIGURE_CAPTION =
+  /^(图|figure)\d+(?:[-－—.．]\d+)*[A-Za-z]*[:：]?/i;
+const TABLE_CAPTION =
+  /^(表|table)\d+(?:[-－—.．]\d+)*[A-Za-z]*[:：]?/i;
+const SOURCE_NOTE =
+  /^(资料来源|数据来源|图源|表源|source[:：]|注[:：](资料|数据|图表?)来源)/i;
+const EQUATION_NUMBER =
+  /(?:\(|（)\d+(?:[-－—.．]\d+)*(?:\)|）)$/;
+const MATH_OPERATOR =
+  /[=+\-*/×÷≤≥≠≈∑∫√]/;
+
 type Section =
   | "cover"
   | "cn_abstract"
   | "en_abstract"
   | "toc"
   | "body"
-  | "references";
+  | "references"
+  | "acknowledgement"
+  | "appendix"
+  | "achievement";
+
+type BackMatterSection = Extract<Section, "acknowledgement" | "appendix" | "achievement">;
+
+const headingLevel = (p: Paragraph): 0 | 1 | 2 | null => {
+  const ol = p.effective.outlineLevel;
+  const sn = (p.styleName ?? "").toLowerCase();
+  if (ol === 0 || /heading\s*1|标题\s*1/.test(sn)) return 0;
+  if (ol === 1 || /heading\s*2|标题\s*2/.test(sn)) return 1;
+  if (ol === 2 || /heading\s*3|标题\s*3/.test(sn)) return 2;
+  return null;
+};
+
+const backMatterHeading = (
+  t: string,
+): { role: Role; section: BackMatterSection } | null => {
+  if (ACK_HEADING.test(t)) {
+    return { role: "acknowledgement_heading", section: "acknowledgement" };
+  }
+  if (APPENDIX_HEADING.test(t)) {
+    return { role: "appendix_heading", section: "appendix" };
+  }
+  if (ACHIEVEMENT_HEADING.test(t)) {
+    return { role: "achievement_heading", section: "achievement" };
+  }
+  return null;
+};
+
+const specialBodyRole = (p: Paragraph, t: string): Role | null => {
+  if (FIGURE_CAPTION.test(t) && t.length <= 80) return "figure_caption";
+  if (TABLE_CAPTION.test(t) && t.length <= 80) return "table_caption";
+  if (SOURCE_NOTE.test(t) && t.length <= 120) return "source_note";
+
+  const cjkCount = (t.match(/[一-鿿]/g) ?? []).length;
+  const align = p.effective.alignment;
+  if (
+    EQUATION_NUMBER.test(t) &&
+    MATH_OPERATOR.test(t) &&
+    cjkCount <= 4 &&
+    (align === "center" || align === "right" || t.length <= 80)
+  ) {
+    return "formula_line";
+  }
+
+  return null;
+};
 
 /**
  * 按文档顺序的状态机，给每个段落判定语义角色。
@@ -62,6 +127,12 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       roles.push("reference_heading");
       continue;
     }
+    const backHeading = backMatterHeading(t);
+    if (backHeading) {
+      section = backHeading.section;
+      roles.push(backHeading.role);
+      continue;
+    }
 
     // 2. 封面/扉页区：遇到「摘要」之前的一切（标题页、声明、授权书）整体跳过
     if (section === "cover") {
@@ -95,20 +166,28 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
     }
 
     // 5. 大纲级别（标题）
-    const ol = p.effective.outlineLevel;
-    const sn = (p.styleName ?? "").toLowerCase();
-    if (ol === 0 || /heading\s*1|标题\s*1/.test(sn)) {
+    const level = headingLevel(p);
+    if (level === 0) {
       section = "body";
       roles.push("heading1");
       continue;
     }
-    if (ol === 1 || /heading\s*2|标题\s*2/.test(sn)) {
+    if (level === 1) {
       roles.push("heading2");
       continue;
     }
-    if (ol === 2 || /heading\s*3|标题\s*3/.test(sn)) {
+    if (level === 2) {
       roles.push("heading3");
       continue;
+    }
+
+    // 5b. 特殊正文元素：先分流，避免按正文硬判
+    if (section === "body") {
+      const special = specialBodyRole(p, t);
+      if (special) {
+        roles.push(special);
+        continue;
+      }
     }
 
     // 6. 按当前章节归类正文
@@ -121,6 +200,15 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
         break;
       case "references":
         roles.push("reference_body");
+        break;
+      case "acknowledgement":
+        roles.push("acknowledgement_body");
+        break;
+      case "appendix":
+        roles.push("appendix_body");
+        break;
+      case "achievement":
+        roles.push("achievement_body");
         break;
       case "toc":
         roles.push(null); // 目录条目里非 TOC 样式的内容，暂不校验

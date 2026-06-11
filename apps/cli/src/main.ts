@@ -5,7 +5,6 @@ import type { LineSpacing } from "@word-auto/parser";
 import {
   classifyParagraphs,
   normalizeRuleLibrary,
-  toLegacyRuleLibrary,
   validateDoc,
   type EditableRuleLibrary,
   type LegacyRuleLibrary,
@@ -28,7 +27,7 @@ const rules = JSON.parse(
 const normalizedRules = normalizeRuleLibrary(rules);
 const model = parseDocx(new Uint8Array(buf));
 const roles = classifyParagraphs(model.paragraphs);
-const report = validateDoc(model, toLegacyRuleLibrary(normalizedRules));
+const report = validateDoc(model, normalizedRules);
 
 console.log(`输入文档: ${docxPath}`);
 console.log(`规则库:   ${rulesPath}\n`);

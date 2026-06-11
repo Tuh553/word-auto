@@ -1,9 +1,14 @@
 import { units, type DocModel, type Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
+import { isEditableRuleLibrary } from "./rules.js";
 import type {
+  EditableRuleLibrary,
   Issue,
   Role,
+  RuleField,
+  RuleFieldKey,
   RuleLibrary,
+  RuleValue,
   Severity,
   StyleRule,
   ValidationReport,
@@ -27,12 +32,274 @@ const approx = (a: number, b: number, tol: number): boolean =>
 const preview = (t: string): string =>
   t.replace(/\s+/g, " ").trim().slice(0, 24);
 
+const FIELD_NAMES: Record<RuleFieldKey, string> = {
+  fontFamilyCn: "font_east_asia",
+  fontFamilyLatin: "font_latin",
+  fontSizePt: "size_pt",
+  bold: "bold",
+  align: "alignment",
+  lineHeightPt: "line_spacing_pt",
+  spaceBeforePt: "spacing_before_pt",
+  spaceAfterPt: "spacing_after_pt",
+  firstLineIndentChars: "first_line_indent_chars",
+  hangingIndentChars: "hanging_indent_chars",
+  leftIndentChars: "left_indent_chars",
+  outlineLevel: "outline_level",
+};
+
+const ROLE_RULE_FALLBACKS: Partial<Record<Role, Role[]>> = {
+  acknowledgement_heading: ["back_matter_heading"],
+  acknowledgement_body: ["back_matter_body"],
+  appendix_heading: ["back_matter_heading"],
+  appendix_body: ["back_matter_body"],
+  achievement_heading: ["back_matter_heading"],
+  achievement_body: ["back_matter_body"],
+};
+
+const findRuleForRole = (
+  role: Role,
+  styles: RuleLibrary["styles"] | undefined,
+): StyleRule | undefined => {
+  const direct = styles?.[role];
+  if (direct) return direct;
+  for (const legacyRole of ROLE_RULE_FALLBACKS[role] ?? []) {
+    const fallback = styles?.[legacyRole];
+    if (fallback) return fallback;
+  }
+  return undefined;
+};
+
+const findEditableRoleRule = (
+  role: Role,
+  rules: EditableRuleLibrary,
+) => {
+  const direct = rules.roles.find((item) => item.role === role);
+  if (direct) return direct;
+  for (const legacyRole of ROLE_RULE_FALLBACKS[role] ?? []) {
+    const fallback = rules.roles.find((item) => item.role === legacyRole);
+    if (fallback) return fallback;
+  }
+  return undefined;
+};
+
+const textHasCJK = (text: string): boolean => /[一-鿿]/.test(text);
+const textHasLatin = (text: string): boolean => /[A-Za-z]/.test(text);
+
+const formatScalar = (value: string | number | boolean): string => {
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return String(value);
+};
+
+const compareScalar = (
+  actual: string | number | boolean,
+  expected: string | number | boolean,
+  tolerance = 0.01,
+): boolean => {
+  if (typeof actual === "number" && typeof expected === "number") {
+    return approx(actual, expected, tolerance);
+  }
+  return actual === expected;
+};
+
+const matchesRuleValue = (
+  ruleValue: RuleValue,
+  actual: string | number | boolean | undefined,
+  tolerance = 0.01,
+): boolean => {
+  if (ruleValue.mode === "unset") return true;
+  if (actual == null) return false;
+
+  switch (ruleValue.mode) {
+    case "exact":
+      return ruleValue.exact != null &&
+        compareScalar(actual, ruleValue.exact, tolerance);
+    case "oneOf":
+      return (ruleValue.oneOf ?? []).some((item) => compareScalar(actual, item, tolerance));
+    case "range":
+      if (typeof actual !== "number") return false;
+      if (ruleValue.min != null && actual < ruleValue.min) return false;
+      if (ruleValue.max != null && actual > ruleValue.max) return false;
+      return true;
+  }
+};
+
+const describeRuleValue = (
+  ruleValue: RuleValue,
+  formatter: (value: string | number | boolean) => string,
+): string => {
+  switch (ruleValue.mode) {
+    case "exact":
+      return `应为 ${formatter(ruleValue.exact as string | number | boolean)}`;
+    case "oneOf":
+      return `应为以下之一：${(ruleValue.oneOf ?? []).map(formatter).join(" / ")}`;
+    case "range":
+      if (ruleValue.min != null && ruleValue.max != null) {
+        return `应在 ${formatter(ruleValue.min)} ~ ${formatter(ruleValue.max)} 范围内`;
+      }
+      if (ruleValue.min != null) {
+        return `应不小于 ${formatter(ruleValue.min)}`;
+      }
+      return `应不大于 ${formatter(ruleValue.max as number)}`;
+    case "unset":
+      return "不校验";
+  }
+};
+
+const outlineComparable = (value: number | undefined): number =>
+  value == null ? 10 : value + 1;
+
+const pushEditableIssue = (
+  out: Issue[],
+  p: Paragraph,
+  role: Role,
+  field: RuleField,
+  actual: unknown,
+  message: string,
+): void => {
+  out.push({
+    paraIndex: p.index,
+    role,
+    field: FIELD_NAMES[field.key],
+    expected: field.value,
+    actual,
+    severity: field.severity,
+    message,
+    textPreview: preview(p.text),
+  });
+};
+
+const checkEditablePara = (
+  p: Paragraph,
+  role: Role,
+  rules: EditableRuleLibrary,
+): Issue[] => {
+  const roleRule = findEditableRoleRule(role, rules);
+  if (!roleRule) return [];
+
+  const e = p.effective;
+  const out: Issue[] = [];
+  const hasCJK = textHasCJK(p.text);
+  const hasLatin = textHasLatin(p.text);
+
+  const handleField = (
+    field: RuleField,
+    actualValue: string | number | boolean | undefined,
+    actualText: string,
+    formatter: (value: string | number | boolean) => string,
+    tolerance = 0.01,
+  ): void => {
+    if (!field.enabled || field.value.mode === "unset") return;
+    if (matchesRuleValue(field.value, actualValue, tolerance)) return;
+    pushEditableIssue(
+      out,
+      p,
+      role,
+      field,
+      actualValue ?? actualText,
+      `${field.label}${describeRuleValue(field.value, formatter)}，实际 ${actualText}`,
+    );
+  };
+
+  for (const field of roleRule.fields) {
+    switch (field.key) {
+      case "fontFamilyCn":
+        if (hasCJK && e.fontEastAsia) {
+          handleField(field, e.fontEastAsia, `「${e.fontEastAsia}」`, (value) => `「${value}」`);
+        }
+        break;
+      case "fontFamilyLatin":
+        if (hasLatin && e.fontAscii) {
+          handleField(field, e.fontAscii, `「${e.fontAscii}」`, (value) => `「${value}」`);
+        }
+        break;
+      case "fontSizePt":
+        if (e.sizePt != null) {
+          handleField(field, e.sizePt, `${e.sizePt}pt`, (value) => `${value}pt`);
+        }
+        break;
+      case "bold": {
+        const actual = !!e.bold;
+        handleField(field, actual, `「${actual ? "是" : "否"}」`, (value) =>
+          `「${formatScalar(value)}」`);
+        break;
+      }
+      case "align": {
+        const actual = normAlign(e.alignment) ?? "left";
+        const actualText = e.alignment == null ? "「left（默认）」" : `「${actual}」`;
+        handleField(field, actual, actualText, (value) => `「${value}」`);
+        break;
+      }
+      case "lineHeightPt": {
+        const lineSpacing = e.lineSpacing;
+        const actualValue = lineSpacing?.pt;
+        const actualText = lineSpacing?.pt != null
+          ? `${lineSpacing.pt}pt`
+          : lineSpacing?.multiple != null
+            ? `${lineSpacing.multiple} 倍`
+            : "（未设置）";
+        handleField(field, actualValue, actualText, (value) => `${value}pt`, 0.5);
+        break;
+      }
+      case "spaceBeforePt":
+        if (e.spacingBeforePt != null) {
+          handleField(field, e.spacingBeforePt, `${e.spacingBeforePt}pt`, (value) => `${value}pt`);
+        }
+        break;
+      case "spaceAfterPt":
+        if (e.spacingAfterPt != null) {
+          handleField(field, e.spacingAfterPt, `${e.spacingAfterPt}pt`, (value) => `${value}pt`);
+        }
+        break;
+      case "firstLineIndentChars":
+        if (e.firstLineIndentChars != null) {
+          handleField(
+            field,
+            e.firstLineIndentChars,
+            `${e.firstLineIndentChars} 字符`,
+            (value) => `${value} 字符`,
+            0.1,
+          );
+        }
+        break;
+      case "hangingIndentChars":
+        if (e.hangingIndentChars != null) {
+          handleField(
+            field,
+            e.hangingIndentChars,
+            `${e.hangingIndentChars} 字符`,
+            (value) => `${value} 字符`,
+            0.1,
+          );
+        }
+        break;
+      case "leftIndentChars":
+        if (e.leftIndentChars != null) {
+          handleField(
+            field,
+            e.leftIndentChars,
+            `${e.leftIndentChars} 字符`,
+            (value) => `${value} 字符`,
+            0.1,
+          );
+        }
+        break;
+      case "outlineLevel": {
+        const actual = outlineComparable(e.outlineLevel);
+        handleField(field, actual, `${actual} 级`, (value) => `${value} 级`);
+        break;
+      }
+    }
+  }
+
+  return out;
+};
+
 const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
   const e = p.effective;
   const out: Issue[] = [];
   // 段落含哪类字符，决定查不查对应脚本的字体（纯中文段落不报西文字体，反之亦然）
-  const hasCJK = /[一-鿿]/.test(p.text);
-  const hasLatin = /[A-Za-z]/.test(p.text);
+  const hasCJK = textHasCJK(p.text);
+  const hasLatin = textHasLatin(p.text);
   const push = (
     field: string,
     expected: unknown,
@@ -119,9 +386,12 @@ const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
 };
 
 /** 文档/页面级检测：页边距、页眉页脚距、装订线、纸张 */
-const checkDocument = (model: DocModel, rules: RuleLibrary): Issue[] => {
+const checkDocument = (
+  model: DocModel,
+  rules: RuleLibrary | EditableRuleLibrary,
+): Issue[] => {
   const sec = model.sections.at(-1); // 最后一节为正文主体
-  const doc = rules.document;
+  const doc = isEditableRuleLibrary(rules) ? rules.document : rules.document;
   if (!sec || !doc) return [];
   const out: Issue[] = [];
 
@@ -181,8 +451,11 @@ const checkDocument = (model: DocModel, rules: RuleLibrary): Issue[] => {
 };
 
 /** 分节页码检测：前置部分格式（如大写罗马）、正文格式（阿拉伯）并重新起始 */
-const checkPageNumbers = (model: DocModel, rules: RuleLibrary): Issue[] => {
-  const pn = rules.page_numbers;
+const checkPageNumbers = (
+  model: DocModel,
+  rules: RuleLibrary | EditableRuleLibrary,
+): Issue[] => {
+  const pn = isEditableRuleLibrary(rules) ? rules.pageNumbers : rules.page_numbers;
   if (!pn) return [];
   const out: Issue[] = [];
   const push = (field: string, expected: unknown, actual: unknown, message: string): void => {
@@ -221,7 +494,10 @@ const checkPageNumbers = (model: DocModel, rules: RuleLibrary): Issue[] => {
 };
 
 /** 页眉内容检测：页眉是否包含规定文字（如「重庆大学硕士学位论文」） */
-const checkHeaders = (model: DocModel, rules: RuleLibrary): Issue[] => {
+const checkHeaders = (
+  model: DocModel,
+  rules: RuleLibrary | EditableRuleLibrary,
+): Issue[] => {
   const h = rules.headers;
   if (!h?.left_text) return [];
   const target = h.left_text.replace(/\s+/g, "");
@@ -244,7 +520,7 @@ const checkHeaders = (model: DocModel, rules: RuleLibrary): Issue[] => {
 /** 校验整篇文档 */
 export const validateDoc = (
   model: DocModel,
-  rules: RuleLibrary,
+  rules: RuleLibrary | EditableRuleLibrary,
 ): ValidationReport => {
   const roles = classifyParagraphs(model.paragraphs);
   const issues: Issue[] = [
@@ -258,9 +534,12 @@ export const validateDoc = (
     const role = roles[i];
     if (!role) return;
     classified++;
-    const rule = rules.styles?.[role];
-    if (!rule) return;
-    issues.push(...checkPara(p, role, rule));
+    if (isEditableRuleLibrary(rules)) {
+      issues.push(...checkEditablePara(p, role, rules));
+      return;
+    }
+    const rule = findRuleForRole(role, rules.styles);
+    if (rule) issues.push(...checkPara(p, role, rule));
   });
 
   const summary = { error: 0, warn: 0, info: 0, byRole: {} as Record<string, number> };
@@ -270,7 +549,7 @@ export const validateDoc = (
   }
 
   return {
-    ruleName: rules.meta?.name,
+    ruleName: isEditableRuleLibrary(rules) ? rules.name : rules.meta?.name,
     paragraphCount: model.paragraphs.length,
     classifiedCount: classified,
     issues,

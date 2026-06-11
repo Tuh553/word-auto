@@ -181,8 +181,20 @@ export type Role =
   | "heading2"
   | "heading3"
   | "body_text"
+  | "figure_caption"
+  | "table_caption"
+  | "source_note"
+  | "formula_line"
   | "reference_heading"
   | "reference_body"
+  | "acknowledgement_heading"
+  | "acknowledgement_body"
+  | "appendix_heading"
+  | "appendix_body"
+  | "achievement_heading"
+  | "achievement_body"
+  | "back_matter_heading"
+  | "back_matter_body"
   | "table_cell";
 
 export type Severity = "error" | "warn" | "info";

@@ -6,7 +6,10 @@
                                "en_abstract",
                                "toc",
                                "body",
-                               "references"
+                               "references",
+                               "appendix",
+                               "acknowledgements",
+                               "achievements"
                            ],
                  "version":  "2026-06-09"
              },
@@ -459,6 +462,101 @@
                                           "hanging_indent_chars":  2,
                                           "outline_level":  10
                                       },
+                   "acknowledgement_heading":  {
+                                                    "base_style":  "Heading1",
+                                                    "font_east_asia":  "黑体",
+                                                    "font_latin":  "Times New Roman",
+                                                    "size_pt":  16,
+                                                    "bold":  false,
+                                                    "alignment":  "center",
+                                                    "line_spacing_pt":  20,
+                                                    "spacing_before_pt":  0,
+                                                    "spacing_after_pt":  0,
+                                                    "outline_level":  1
+                                                },
+                   "acknowledgement_body":  {
+                                                 "base_style":  "Normal",
+                                                 "font_east_asia":  "宋体",
+                                                 "font_latin":  "Times New Roman",
+                                                 "size_pt":  12,
+                                                 "bold":  false,
+                                                 "alignment":  "justify",
+                                                 "line_spacing_pt":  20,
+                                                 "spacing_before_pt":  0,
+                                                 "spacing_after_pt":  0,
+                                                 "first_line_indent_chars":  2,
+                                                 "outline_level":  10
+                                             },
+                   "appendix_heading":  {
+                                              "base_style":  "Heading1",
+                                              "font_east_asia":  "黑体",
+                                              "font_latin":  "Times New Roman",
+                                              "size_pt":  16,
+                                              "bold":  false,
+                                              "alignment":  "center",
+                                              "line_spacing_pt":  20,
+                                              "spacing_before_pt":  0,
+                                              "spacing_after_pt":  0,
+                                              "outline_level":  1
+                                          },
+                   "appendix_body":  {
+                                           "base_style":  "Normal",
+                                           "font_east_asia":  "宋体",
+                                           "font_latin":  "Times New Roman",
+                                           "line_spacing_pt":  20,
+                                           "spacing_before_pt":  0,
+                                           "spacing_after_pt":  0,
+                                           "outline_level":  10
+                                       },
+                   "achievement_heading":  {
+                                                 "base_style":  "Heading1",
+                                                 "font_east_asia":  "黑体",
+                                                 "font_latin":  "Times New Roman",
+                                                 "size_pt":  16,
+                                                 "bold":  false,
+                                                 "alignment":  "center",
+                                                 "line_spacing_pt":  20,
+                                                 "spacing_before_pt":  0,
+                                                 "spacing_after_pt":  0,
+                                                 "outline_level":  1
+                                             },
+                   "achievement_body":  {
+                                              "base_style":  "Normal",
+                                              "font_east_asia":  "宋体",
+                                              "font_latin":  "Times New Roman",
+                                              "size_pt":  10.5,
+                                              "bold":  false,
+                                              "alignment":  "justify",
+                                              "line_spacing_pt":  20,
+                                              "spacing_before_pt":  0,
+                                              "spacing_after_pt":  0,
+                                              "hanging_indent_chars":  2,
+                                              "outline_level":  10
+                                          },
+                   "source_note":  {
+                                        "base_style":  "Normal",
+                                        "font_east_asia":  "宋体",
+                                        "font_latin":  "Times New Roman",
+                                        "size_pt":  9,
+                                        "bold":  false,
+                                        "line_spacing_pt":  20,
+                                        "spacing_before_pt":  0,
+                                        "spacing_after_pt":  0,
+                                        "first_line_indent_chars":  2,
+                                        "outline_level":  10
+                                    },
+                   "formula_line":  {
+                                         "base_style":  "Normal",
+                                         "font_east_asia":  "宋体",
+                                         "font_latin":  "Times New Roman",
+                                         "size_pt":  12,
+                                         "bold":  false,
+                                         "alignment":  "center",
+                                         "line_spacing_pt":  20,
+                                         "spacing_before_pt":  0,
+                                         "spacing_after_pt":  0,
+                                         "outline_level":  10
+                                     },
                    "figure_caption":  {
                                           "base_style":  "Normal",
                                           "font_east_asia":  "宋体",

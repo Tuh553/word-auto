@@ -1,32 +1,54 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { analyze, type AnalyzeResult } from "./lib/analyze.js";
-import { TEMPLATES } from "./lib/templates.js";
 import { PreviewPanel } from "./components/PreviewPanel.js";
 import { ReportPanel } from "./components/ReportPanel.js";
 import { RuleConfigPanel } from "./components/RuleConfigPanel.js";
-import type { EditableRuleLibrary, Severity } from "@word-auto/validator";
+import {
+  hasUnpublishedChanges,
+  loadRuleLibraryRecords,
+  parseImportedRuleLibrary,
+  publishDraft,
+  sameDraftAsSaved,
+  saveRuleLibraryRecords,
+  serializeRuleLibrary,
+  stripDraftMeta,
+  touchDraft,
+  type RuleLibraryRecord,
+} from "./lib/ruleLibraries.js";
+import type { Severity } from "@word-auto/validator";
 
 const STEPS = ["上传文件", "选择模板", "配置选项", "检测结果"];
 const ALL_SEV: Severity[] = ["error", "warn", "info"];
 
 export default function App() {
+  const initialLibraries = useMemo(() => loadRuleLibraryRecords(), []);
   const [view, setView] = useState<"detect" | "rules">("detect");
-  // 规则配置页编辑的是内置模板的可编辑副本（草稿）。当前不回灌检测链路，
-  // 待阶段 2 草稿/发布态落地后再打通「发布 → 检测消费」。
-  const [ruleLib, setRuleLib] = useState<EditableRuleLibrary>(() =>
-    structuredClone(TEMPLATES[0].rules),
+  const [libraries, setLibraries] = useState<RuleLibraryRecord[]>(initialLibraries);
+  const [savedLibraries, setSavedLibraries] = useState<RuleLibraryRecord[]>(
+    structuredClone(initialLibraries),
   );
 
   const [step, setStep] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
-  const [templateId, setTemplateId] = useState(TEMPLATES[0].id);
+  const [templateId, setTemplateId] = useState(initialLibraries[0]?.id ?? "");
   const [active, setActive] = useState<Set<Severity>>(new Set(ALL_SEV));
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ruleMessage, setRuleMessage] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const currentLibrary = libraries.find((item) => item.id === templateId) ?? libraries[0];
+  const savedLibrary = savedLibraries.find((item) => item.id === currentLibrary?.id);
+  const draftDirty = currentLibrary
+    ? !sameDraftAsSaved(currentLibrary, savedLibrary)
+    : false;
+  const unpublishedChanges = currentLibrary
+    ? hasUnpublishedChanges(currentLibrary)
+    : false;
 
   const pickFile = async (f: File) => {
     if (!f.name.toLowerCase().endsWith(".docx")) {
@@ -39,10 +61,9 @@ export default function App() {
   };
 
   const run = () => {
-    if (!buffer) return;
+    if (!buffer || !currentLibrary) return;
     try {
-      const tpl = TEMPLATES.find((t) => t.id === templateId)!;
-      setResult(analyze(buffer, tpl.rules));
+      setResult(analyze(buffer, currentLibrary.published));
       setError(null);
       setSelectedText(null);
       setStep(3);
@@ -75,6 +96,104 @@ export default function App() {
     setSelectedText(null);
   };
 
+  const updateLibrary = (
+    updater: (record: RuleLibraryRecord) => RuleLibraryRecord,
+  ) => {
+    if (!currentLibrary) return;
+    setLibraries((prev) =>
+      prev.map((item) => (item.id === currentLibrary.id ? updater(item) : item)),
+    );
+  };
+
+  const persistLibraries = (next: RuleLibraryRecord[]) => {
+    setLibraries(next);
+    setSavedLibraries(structuredClone(next));
+    saveRuleLibraryRecords(next);
+  };
+
+  const downloadJson = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const saveDraft = () => {
+    if (!currentLibrary) return;
+    if (!draftDirty) {
+      setRuleMessage("当前没有未保存的草稿变更");
+      return;
+    }
+
+    const next = libraries.map((item) =>
+      item.id === currentLibrary.id ? touchDraft(item) : item,
+    );
+    persistLibraries(next);
+    setRuleMessage("草稿已保存到本地浏览器");
+  };
+
+  const handlePublish = () => {
+    if (!currentLibrary) return;
+    if (!unpublishedChanges) {
+      setRuleMessage("草稿与已发布版本一致，无需重复发布");
+      return;
+    }
+
+    try {
+      const next = libraries.map((item) =>
+        item.id === currentLibrary.id ? publishDraft(item) : item,
+      );
+      const publishedCurrent = next.find((item) => item.id === currentLibrary.id);
+      persistLibraries(next);
+
+      if (publishedCurrent && buffer && result) {
+        setResult(analyze(buffer, publishedCurrent.published));
+        setRuleMessage(`已发布 ${publishedCurrent.published.version}，并回灌到当前检测结果`);
+      } else if (publishedCurrent) {
+        setRuleMessage(`已发布 ${publishedCurrent.published.version}`);
+      }
+    } catch (e) {
+      setRuleMessage((e as Error).message);
+    }
+  };
+
+  const handleImport = async (fileToImport: File) => {
+    try {
+      const text = await fileToImport.text();
+      const nextRecord = parseImportedRuleLibrary(
+        text,
+        libraries.map((item) => item.id),
+      );
+      const next = [...libraries, nextRecord];
+      persistLibraries(next);
+      setTemplateId(nextRecord.id);
+      setRuleMessage(`已导入模板「${nextRecord.published.name}」`);
+    } catch (e) {
+      setRuleMessage((e as Error).message);
+    }
+  };
+
+  const handleExportDraft = () => {
+    if (!currentLibrary) return;
+    downloadJson(
+      `${currentLibrary.id}.draft.json`,
+      serializeRuleLibrary(currentLibrary.draft),
+    );
+    setRuleMessage("草稿 JSON 已导出");
+  };
+
+  const handleExportPublished = () => {
+    if (!currentLibrary) return;
+    downloadJson(
+      `${currentLibrary.id}.published.json`,
+      serializeRuleLibrary(currentLibrary.published),
+    );
+    setRuleMessage("生效规则 JSON 已导出");
+  };
+
   return (
     <div className="app">
       <h1>论文排版合规检测</h1>
@@ -94,8 +213,41 @@ export default function App() {
         </button>
       </nav>
 
-      {view === "rules" && (
-        <RuleConfigPanel lib={ruleLib} onChange={setRuleLib} />
+      {view === "rules" && currentLibrary && (
+        <RuleConfigPanel
+          draft={currentLibrary.draft}
+          published={currentLibrary.published}
+          publishedUpdatedAt={currentLibrary.publishedUpdatedAt}
+          draftDirty={draftDirty}
+          unpublishedChanges={unpublishedChanges}
+          libraryOptions={libraries.map((item) => ({
+            id: item.id,
+            name: item.published.name,
+            version: item.published.version,
+          }))}
+          statusMessage={ruleMessage}
+          onSelectLibrary={(id) => {
+            setTemplateId(id);
+            setRuleMessage(null);
+          }}
+          onChange={(draft) => {
+            updateLibrary((record) => ({
+              ...record,
+              draft: {
+                ...record.draft,
+                ...stripDraftMeta(draft),
+                status: "draft",
+                updatedAt: record.draft.updatedAt,
+              },
+            }));
+            setRuleMessage(null);
+          }}
+          onSaveDraft={saveDraft}
+          onPublish={handlePublish}
+          onImport={() => importRef.current?.click()}
+          onExportDraft={handleExportDraft}
+          onExportPublished={handleExportPublished}
+        />
       )}
 
       {view === "detect" && (
@@ -170,14 +322,25 @@ export default function App() {
               </label>
               <select
                 value={templateId}
-                onChange={(e) => setTemplateId(e.target.value)}
+                onChange={(e) => {
+                  setTemplateId(e.target.value);
+                  setError(null);
+                }}
               >
-                {TEMPLATES.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
+                {libraries.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.published.name}
                   </option>
                 ))}
               </select>
+              {currentLibrary && (
+                <div className="template-hint">
+                  检测始终使用已发布版本 {currentLibrary.published.version}
+                  {hasUnpublishedChanges(currentLibrary)
+                    ? "；当前草稿尚未发布"
+                    : "；当前草稿已与发布版同步"}
+                </div>
+              )}
               <div className="btns">
                 <button onClick={() => setStep(0)}>上一步</button>
                 <button className="primary" onClick={() => setStep(2)}>
@@ -235,6 +398,18 @@ export default function App() {
           )}
         </>
       )}
+
+      <input
+        ref={importRef}
+        type="file"
+        accept=".json"
+        hidden
+        onChange={(e) => {
+          const selected = e.target.files?.[0];
+          if (selected) void handleImport(selected);
+          e.currentTarget.value = "";
+        }}
+      />
     </div>
   );
 }
