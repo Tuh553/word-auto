@@ -28,6 +28,11 @@ import {
   type RuleProposal,
   type Severity,
 } from "@word-auto/validator";
+import {
+  findFirstNavigableIssue,
+  type ReportGroupBy,
+  type ReportSortBy,
+} from "./lib/reportGroups.js";
 
 const STEPS = ["上传文件", "选择模板", "配置选项", "检测结果"];
 const ALL_SEV: Severity[] = ["error", "warn", "info"];
@@ -45,6 +50,8 @@ export default function App() {
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
   const [templateId, setTemplateId] = useState(initialLibraries[0]?.id ?? "");
   const [active, setActive] = useState<Set<Severity>>(new Set(ALL_SEV));
+  const [reportGroupBy, setReportGroupBy] = useState<ReportGroupBy>("section");
+  const [reportSortBy, setReportSortBy] = useState<ReportSortBy>("paragraph");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
@@ -74,9 +81,15 @@ export default function App() {
   const run = () => {
     if (!buffer || !currentLibrary) return;
     try {
-      setResult(analyze(buffer, currentLibrary.published));
+      const nextResult = analyze(buffer, currentLibrary.published);
+      setResult(nextResult);
       setError(null);
-      setSelectedText(null);
+      const firstIssue = findFirstNavigableIssue(
+        nextResult.report.issues.filter((issue) => active.has(issue.severity)),
+      );
+      setSelectedText(
+        firstIssue ? nextResult.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null,
+      );
       setStep(3);
     } catch (e) {
       setError(getFriendlyAnalyzeErrorMessage(e));
@@ -161,7 +174,14 @@ export default function App() {
       persistLibraries(next);
 
       if (publishedCurrent && buffer && result) {
-        setResult(analyze(buffer, publishedCurrent.published));
+        const nextResult = analyze(buffer, publishedCurrent.published);
+        setResult(nextResult);
+        const firstIssue = findFirstNavigableIssue(
+          nextResult.report.issues.filter((issue) => active.has(issue.severity)),
+        );
+        setSelectedText(
+          firstIssue ? nextResult.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null,
+        );
         setRuleMessage(`已发布 ${publishedCurrent.published.version}，并回灌到当前检测结果`);
       } else if (publishedCurrent) {
         setRuleMessage(`已发布 ${publishedCurrent.published.version}`);
@@ -445,7 +465,11 @@ export default function App() {
                 <ReportPanel
                   report={result.report}
                   active={active}
+                  groupBy={reportGroupBy}
+                  sortBy={reportSortBy}
                   onToggle={toggle}
+                  onGroupByChange={setReportGroupBy}
+                  onSortByChange={setReportSortBy}
                   onSelect={onSelect}
                 />
               </div>
