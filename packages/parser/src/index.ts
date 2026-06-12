@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { ParseError, isParseError } from "./errors.js";
 import {
   attr,
   parseParaProps,
@@ -8,11 +9,82 @@ import {
 } from "./ooxml.js";
 import { computeEffective } from "./resolve.js";
 import { parseStyles } from "./styles.js";
-import { parseTheme } from "./theme.js";
-import type { DocModel, Paragraph, Run, SectionProps } from "./types.js";
+import { parseTheme, type ThemeFonts } from "./theme.js";
+import type {
+  DocDefaults,
+  DocModel,
+  Paragraph,
+  Run,
+  SectionProps,
+  StyleDef,
+} from "./types.js";
 
 export * from "./types.js";
+export * from "./errors.js";
 export * as units from "./units.js";
+
+const CFBF_MAGIC = Uint8Array.from([
+  0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1,
+]);
+const ZIP_MAGIC_PREFIX = Uint8Array.from([0x50, 0x4b]);
+
+const hasPrefix = (buf: Uint8Array, prefix: Uint8Array): boolean => {
+  if (buf.length < prefix.length) return false;
+  return prefix.every((byte, index) => buf[index] === byte);
+};
+
+const isZipSignature = (buf: Uint8Array): boolean => {
+  if (!hasPrefix(buf, ZIP_MAGIC_PREFIX) || buf.length < 4) return false;
+  const sig3 = buf[2];
+  const sig4 = buf[3];
+  return (
+    (sig3 === 0x03 && sig4 === 0x04) ||
+    (sig3 === 0x05 && sig4 === 0x06) ||
+    (sig3 === 0x07 && sig4 === 0x08)
+  );
+};
+
+const failParse = (code: ParseError["code"], message: string): never => {
+  throw new ParseError(code, message);
+};
+
+const unzipDocx = (buf: Uint8Array): Record<string, Uint8Array> => {
+  try {
+    return unzipSync(buf);
+  } catch (error) {
+    if (!isZipSignature(buf)) {
+      failParse("NOT_ZIP", "文件不是有效的 ZIP / OOXML 压缩包");
+    }
+    const detail = error instanceof Error ? error.message : String(error);
+    failParse("CORRUPT", `ZIP 解压失败，文件可能已损坏：${detail}`);
+  }
+  throw new Error("unreachable");
+};
+
+const parseDocumentParts = (
+  read: (path: string) => string | undefined,
+  docXml: string,
+): {
+  theme: ThemeFonts;
+  styles: Map<string, StyleDef>;
+  docDefaults: DocDefaults;
+  root: any;
+} => {
+  try {
+    const theme = parseTheme(read("word/theme/theme1.xml") ?? "<a:theme/>");
+    const { styles, docDefaults } = parseStyles(
+      read("word/styles.xml") ?? "<w:styles/>",
+      theme,
+    );
+    const root = parseXml(docXml);
+    return { theme, styles, docDefaults, root };
+  } catch (error) {
+    if (isParseError(error)) throw error;
+    const detail = error instanceof Error ? error.message : String(error);
+    failParse("CORRUPT", `文档 XML 解析失败，文件可能已损坏：${detail}`);
+  }
+  throw new Error("unreachable");
+};
 
 /** 提取一个 run 内的文本（w:t 可能是字符串、带 xml:space 的对象，或数组） */
 const extractText = (r: any): string => {
@@ -25,20 +97,31 @@ const extractText = (r: any): string => {
 
 /** 解析 .docx 二进制为文档模型 */
 export const parseDocx = (buf: Uint8Array): DocModel => {
-  const files = unzipSync(buf);
+  if (hasPrefix(buf, CFBF_MAGIC)) {
+    failParse("LEGACY_DOC", "检测到旧版 .doc 二进制文档（OLE 复合文档），当前仅支持 .docx");
+  }
+
+  const files = unzipDocx(buf);
+
+  if (files.EncryptedPackage || files.EncryptionInfo) {
+    failParse("ENCRYPTED", "检测到受密码保护的 Office 加密包，当前不支持解析");
+  }
+
   const read = (p: string): string | undefined =>
     files[p] ? strFromU8(files[p]) : undefined;
 
-  const theme = parseTheme(read("word/theme/theme1.xml") ?? "<a:theme/>");
-  const { styles, docDefaults } = parseStyles(
-    read("word/styles.xml") ?? "<w:styles/>",
-    theme,
-  );
-
   const docXml = read("word/document.xml");
-  if (!docXml) throw new Error("word/document.xml not found in docx");
+  if (!docXml) {
+    failParse("NOT_DOCX", "压缩包中缺少 word/document.xml，不是有效的 .docx");
+  }
+  const docXmlText = docXml!;
 
-  const root = parseXml(docXml);
+  const { theme, styles, docDefaults, root } = parseDocumentParts(read, docXmlText);
+
+  if (!root["w:document"]?.["w:body"]) {
+    failParse("NOT_DOCX", "word/document.xml 不是有效的 Word OOXML 文档结构");
+  }
+
   const body = root["w:document"]?.["w:body"] ?? {};
   const wps: any[] = body["w:p"] ?? [];
 

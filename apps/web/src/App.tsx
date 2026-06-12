@@ -1,5 +1,9 @@
 import { useMemo, useRef, useState } from "react";
-import { analyze, type AnalyzeResult } from "./lib/analyze.js";
+import {
+  analyze,
+  getFriendlyAnalyzeErrorMessage,
+  type AnalyzeResult,
+} from "./lib/analyze.js";
 import { PreviewPanel } from "./components/PreviewPanel.js";
 import { ReportPanel } from "./components/ReportPanel.js";
 import { RuleConfigPanel } from "./components/RuleConfigPanel.js";
@@ -62,10 +66,6 @@ export default function App() {
   const currentProposal = currentLibrary ? proposals[currentLibrary.id] ?? null : null;
 
   const pickFile = async (f: File) => {
-    if (!f.name.toLowerCase().endsWith(".docx")) {
-      setError("请上传 .docx 文件（旧版 .doc 暂不支持）");
-      return;
-    }
     setError(null);
     setFile(f);
     setBuffer(await f.arrayBuffer());
@@ -79,7 +79,7 @@ export default function App() {
       setSelectedText(null);
       setStep(3);
     } catch (e) {
-      setError("检测失败：" + (e as Error).message);
+      setError(getFriendlyAnalyzeErrorMessage(e));
     }
   };
 
@@ -189,11 +189,6 @@ export default function App() {
 
   const handleExtractProposal = async (candidateFile: File) => {
     if (!currentLibrary) return;
-    if (!candidateFile.name.toLowerCase().endsWith(".docx")) {
-      setRuleMessage("候选提取只支持 .docx 文件");
-      return;
-    }
-
     try {
       const model = parseDocx(new Uint8Array(await candidateFile.arrayBuffer()));
       const proposal = extractRuleProposal(model, { sourceName: candidateFile.name });
@@ -202,7 +197,7 @@ export default function App() {
         `已从「${candidateFile.name}」提取 ${proposal.roles.length} 个角色候选，可接受到当前草稿`,
       );
     } catch (e) {
-      setRuleMessage("候选提取失败：" + (e as Error).message);
+      setRuleMessage("候选提取失败：" + getFriendlyAnalyzeErrorMessage(e));
     }
   };
 
@@ -348,12 +343,12 @@ export default function App() {
                   if (f) void pickFile(f);
                 }}
               >
-                <div style={{ fontSize: 16 }}>点击或拖拽 .docx 文件到此处</div>
-                <div className="hint">文件不会离开你的浏览器</div>
+                <div style={{ fontSize: 16 }}>点击或拖拽 Word 文档到此处</div>
+                <div className="hint">推荐上传 .docx；异常文件会给出明确提示，文件不会离开你的浏览器</div>
                 <input
                   ref={inputRef}
                   type="file"
-                  accept=".docx"
+                  accept=".doc,.docx"
                   hidden
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -473,7 +468,7 @@ export default function App() {
       <input
         ref={proposalRef}
         type="file"
-        accept=".docx"
+        accept=".doc,.docx"
         hidden
         onChange={(e) => {
           const selected = e.target.files?.[0];

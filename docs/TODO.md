@@ -12,6 +12,8 @@
 - 金标准回归：基于 `templates/source/*.docx` 固化 parser 解析、validator 分类与校验基线。
 - parser 结构信号：已识别 `w:drawing`、OMML、`w:object` 的存在性与所在段落定位，
   并接入图题注 / 公式编号行分类降噪。
+- Web/Parser 错误分流：已区分非 zip、加密 docx、损坏 zip、旧版 `.doc`、非 OOXML 结构，
+  并在前端映射为明确中文提示。
 - 规则闭环：字段值编辑、`exact` / `oneOf` / `range` / `unset`、草稿保存、发布、发布后回灌检测。
 - 多模板 MVP：内置模板、自定义规则库 JSON 导入/导出、模板切换。
 - 模板候选 MVP：上传 `.docx` -> parser + classify -> 候选统计 -> 接受到草稿 -> 发布 -> 检测消费新规则。
@@ -51,7 +53,6 @@
 ## P2：Web 体验与交付
 
 1. Web Worker：解析与校验移出主线程，避免大文档阻塞 UI。
-2. 错误分流：区分非 docx、加密 docx、损坏 zip、不支持的旧 `.doc`，给明确提示。
 3. 预览联动：默认定位到首个问题，报告与预览双向滚动，高亮支持 run 级区间。
 4. 批量检测：一次上传多篇 `.docx`，输出汇总与单篇下钻。
 5. 带批注 docx 导出：纯 OOXML 生成批注，不改写正文。
