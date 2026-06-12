@@ -43,19 +43,20 @@ docx 的格式是多层继承，校验必须解析出"有效格式"：
 ```bash
 pnpm install
 pnpm --filter @word-auto/web run dev
-pnpm --filter @word-auto/cli run check
-# 或指定文件： tsx apps/cli/src/main.ts <docx 路径> <规则库 json 路径>
+pnpm --filter @word-auto/cli exec tsx src/main.ts "<docx 路径>" --rules "<规则库 json 路径>"
+# 可选：追加 --out "<报告文件路径>" 写入文件，否则打印到 stdout
 pnpm run ci
 ```
 
-默认读取 `E:/Claude code/docs` 里的 demo 文档与规则库，输出
-`apps/cli/output/report.json`。
+CLI 不再内置任何机器相关的默认路径。`<docx>` 为必填位置参数，规则库必须显式通过
+`--rules <path>` 传入；可用 `-h` / `--help` 查看帮助。
 
 > 注意：pnpm 的脚本入口是 `pnpm run ci`；`pnpm ci` 是未实现的 pnpm 内置命令。
 
 ## 当前能力
 
 - 解析：段落文本、样式继承、有效字体/字号/加粗/对齐/行距/首行缩进/大纲级别
+- 结构信号：识别段落内 `w:drawing`、OMML 公式、`w:object` 嵌入对象，并保留所在段落定位
 - 角色识别：按章节状态机判定段落语义（摘要标题/正文、关键词、目录标题、
   各级标题、正文、参考文献、后置章节、表格段落、特殊正文元素）
 - 校验：字体、字号、加粗、对齐、行距、首行缩进，支持 `exact` / `oneOf` / `range` / `unset`
@@ -69,6 +70,8 @@ pnpm run ci
 - 兼容带单位测量值（`85.05pt`/`3cm` 等），不止整数 twips
 - 表格内段落提取：递归 `w:tbl>w:tr>w:tc>w:p`，标记 `inTable` / 角色 `table_cell`
 - 特殊正文元素规则：图题注、表题注、资料来源、公式编号行已接入独立角色与默认规则
+- 结构信号联动分类：图题注可利用 drawing 邻接信号，公式编号行可利用 OMML/对象信号，
+  降低被误判为普通正文的概率
 - 行距"缺失"提示：段落未显式设置行距时给出 info 级提示
 - 规则库可编辑模型、旧规则兼容层、规则合法性校验 `lintRuleLibrary`
 - web：四步检测流程、docx-preview 预览、文本匹配高亮、规则配置页、字段值编辑、
@@ -80,5 +83,5 @@ pnpm run ci
 
 ## 剩余 TODO
 
-集中维护在 [`docs/TODO.md`](./docs/TODO.md)。当前重点是解析结构信号增强、检测可解释性、
+集中维护在 [`docs/TODO.md`](./docs/TODO.md)。当前重点是编号/域/页眉页脚等解析增强、检测可解释性、
 模板候选质量提升、Web 性能与交付物导出。仍然只做检测，不改写正文；自动套版属于远期高风险阶段。
