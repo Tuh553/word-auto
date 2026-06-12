@@ -134,6 +134,35 @@ test("parseImportedRuleLibrary：支持 BOM JSON 并避免 id 冲突", () => {
   assert.equal(imported.draft.status, "draft");
 });
 
+test("parseImportedRuleLibrary：保留 source.provenance 供检测报告消费", () => {
+  const imported = parseImportedRuleLibrary(
+    JSON.stringify({
+      id: "with-source",
+      name: "导入模板",
+      version: "1.0.0",
+      source: {
+        provenance: {
+          body: { index: 10, text: "正文 中文字体为宋体，小四号。" },
+        },
+      },
+      styles: {
+        body_text: {
+          size_pt: 12,
+        },
+      },
+    }),
+    [],
+  );
+
+  const publishedBody = imported.published.source?.provenance?.body;
+  const draftBody = imported.draft.source?.provenance?.body;
+
+  assert.equal(typeof publishedBody, "object");
+  assert.equal(typeof draftBody, "object");
+  assert.equal((publishedBody as { text?: string }).text, "正文 中文字体为宋体，小四号。");
+  assert.equal((draftBody as { text?: string }).text, "正文 中文字体为宋体，小四号。");
+});
+
 test("模板候选闭环：提取 -> 接受到草稿 -> 发布 -> 检测消费新规则", () => {
   const model = mkModel();
   const proposal = extractRuleProposal(model, { sourceName: "sample.docx" });

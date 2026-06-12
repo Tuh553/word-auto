@@ -63,6 +63,15 @@ export function ReportPanel({ report, active, onToggle, onSelect }: Props) {
             </div>
             <div className="msg">{it.message}</div>
             <div className="text">「{it.textPreview}」</div>
+            {it.provenance ? (
+              <details
+                className="provenance"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <summary>规范依据</summary>
+                <div>{it.provenance}</div>
+              </details>
+            ) : null}
           </div>
         ))
       )}

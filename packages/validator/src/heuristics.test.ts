@@ -245,3 +245,38 @@ test("可编辑规则：严重级别与字段模式进入报告", () => {
     ],
   );
 });
+
+test("issue 透传命中规则的 provenance：正文与页面设置可回溯原始规范依据", () => {
+  const model: DocModel = {
+    paragraphs: [
+      mkPara("摘要"),
+      mkPara("这是摘要正文"),
+      mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
+      mkPara("正文内容", { alignment: "left", sizePt: 10 }),
+    ],
+    styles: new Map(),
+    docDefaults: {},
+    sections: [{ marginTopTwips: 1000 }],
+    headers: [],
+  };
+  const rules: RuleLibrary = {
+    source: {
+      provenance: {
+        page_setup_comment: { text: "页面设置 A4纸，上边距3厘米。" },
+        body: { text: "正文 中文字体为宋体，小四号，两端对齐。" },
+      },
+    },
+    document: { margin_top_cm: 3 },
+    styles: { body_text: { size_pt: 12, alignment: "justify" } },
+  };
+
+  const report = validateDoc(model, rules);
+  const marginIssue = report.issues.find((issue) => issue.field === "margin_top_cm");
+  const bodyIssue = report.issues.find((issue) => issue.role === "body_text" && issue.field === "size_pt");
+
+  assert.equal(marginIssue?.provenance, "页面设置 A4纸，上边距3厘米。");
+  assert.equal(bodyIssue?.provenance, "正文 中文字体为宋体，小四号，两端对齐。");
+});
+
+test("provenance 缺失时保持空值，不影响 issue 产出", () => {
+  const report = validateDoc(mkModel([mkPara("摘要"), mkPara("这是摘要正文"), mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }), mkPara("正文内容", { alignment: "left", sizePt: 10 })]), { source: { provenance: { heading1: { text: "一级标题依据" } } }, styles: { body_text: { size_pt: 12 } } });

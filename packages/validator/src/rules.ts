@@ -8,6 +8,7 @@ import type {
   RuleField,
   RuleFieldKey,
   RuleLibrary,
+  RuleSourceMetadata,
   StyleRule,
 } from "./types.js";
 
@@ -198,6 +199,14 @@ const normalizePageNumbers = (pn: LegacyRuleLibrary["page_numbers"]): PageNumber
 const normalizeHeaders = (headers: LegacyRuleLibrary["headers"]): HeaderRuleSet | undefined =>
   headers ? { left_text: headers.left_text } : undefined;
 
+const normalizeSource = (
+  source: LegacyRuleLibrary["source"] | EditableRuleLibrary["source"],
+): RuleSourceMetadata | undefined =>
+  source ? {
+    ...source,
+    provenance: source.provenance ? { ...source.provenance } : undefined,
+  } : undefined;
+
 export const isEditableRuleLibrary = (input: unknown): input is EditableRuleLibrary =>
   typeof input === "object" &&
   input !== null &&
@@ -212,6 +221,7 @@ export const normalizeRuleLibrary = (
     id: input.meta?.name?.toLowerCase().replace(/\s+/g, "-") ?? "rule-library",
     name: input.meta?.name ?? "未命名规则库",
     version: input.meta?.version ?? "0.0.0",
+    source: normalizeSource(input.source),
     document: normalizeDocument(input.document),
     pageNumbers: normalizePageNumbers(input.page_numbers),
     headers: normalizeHeaders(input.headers),
@@ -233,6 +243,7 @@ export const toLegacyRuleLibrary = (
       name: input.name,
       version: input.version,
     },
+    source: normalizeSource(input.source),
     document: input.document,
     page_numbers: input.pageNumbers,
     headers: input.headers ? { ...input.headers } : undefined,

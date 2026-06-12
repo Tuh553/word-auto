@@ -16,8 +16,23 @@ export interface StyleRule {
   outline_level?: number;
 }
 
+export interface ProvenanceEntry {
+  index?: number;
+  text?: string;
+  [k: string]: unknown;
+}
+
+export interface RuleSourceMetadata {
+  template_path?: string;
+  note?: string;
+  extracted_by?: string;
+  provenance?: Record<string, string | ProvenanceEntry | undefined>;
+  [k: string]: unknown;
+}
+
 export interface RuleLibrary {
   meta?: { name?: string; version?: string };
+  source?: RuleSourceMetadata;
   document?: {
     paper_size?: string;
     margin_top_cm?: number;
@@ -112,6 +127,7 @@ export interface EditableRuleLibrary {
   name: string;
   version: string;
   basedOn?: string;
+  source?: RuleSourceMetadata;
   document?: DocumentRuleSet;
   pageNumbers?: PageNumberRuleSet;
   headers?: HeaderRuleSet;
@@ -230,6 +246,7 @@ export interface Issue {
   severity: Severity;
   message: string;
   textPreview: string;
+  provenance?: string;
 }
 
 export interface ValidationReport {

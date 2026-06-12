@@ -4,6 +4,7 @@ import { isEditableRuleLibrary } from "./rules.js";
 import type {
   EditableRuleLibrary,
   Issue,
+  ProvenanceEntry,
   Role,
   RuleField,
   RuleFieldKey,
@@ -56,6 +57,39 @@ const ROLE_RULE_FALLBACKS: Partial<Record<Role, Role[]>> = {
   achievement_body: ["back_matter_body"],
 };
 
+const ROLE_PROVENANCE_KEYS: Partial<Record<Role, string[]>> = {
+  abstract_title_cn: ["cn_abstract_title"],
+  abstract_body_cn: ["cn_abstract_body"],
+  keywords_cn: ["cn_keywords"],
+  abstract_title_en: ["en_abstract_title"],
+  abstract_body_en: ["en_abstract_body"],
+  keywords_en: ["en_keywords"],
+  toc_title: ["toc"],
+  toc1: ["toc"],
+  toc2: ["toc"],
+  toc3: ["toc"],
+  heading1: ["heading1"],
+  heading2: ["heading2"],
+  heading3: ["heading3"],
+  body_text: ["body"],
+  reference_heading: ["references"],
+  reference_body: ["references"],
+};
+
+const FIELD_PROVENANCE_KEYS: Record<string, string[]> = {
+  paper_size: ["page_setup_comment"],
+  margin_top_cm: ["page_setup_comment"],
+  margin_bottom_cm: ["page_setup_comment"],
+  margin_left_cm: ["page_setup_comment"],
+  margin_right_cm: ["page_setup_comment"],
+  header_distance_cm: ["page_setup_comment"],
+  footer_distance_cm: ["page_setup_comment"],
+  gutter_cm: ["page_setup_comment"],
+  page_number_front: ["page_setup_comment"],
+  page_number_body: ["page_setup_comment"],
+  header_text: ["page_setup_comment"],
+};
+
 const findRuleForRole = (
   role: Role,
   styles: RuleLibrary["styles"] | undefined,
@@ -81,6 +115,45 @@ const findEditableRoleRule = (
   }
   return undefined;
 };
+
+const readProvenanceText = (
+  entry: string | ProvenanceEntry | undefined,
+): string | undefined => {
+  if (typeof entry === "string") {
+    const text = entry.trim();
+    return text || undefined;
+  }
+  if (entry && typeof entry.text === "string") {
+    const text = entry.text.trim();
+    return text || undefined;
+  }
+  return undefined;
+};
+
+const findProvenanceText = (
+  rules: RuleLibrary | EditableRuleLibrary,
+  keys: string[],
+): string | undefined => {
+  const provenance = rules.source?.provenance;
+  if (!provenance) return undefined;
+  for (const key of keys) {
+    const text = readProvenanceText(provenance[key]);
+    if (text) return text;
+  }
+  return undefined;
+};
+
+const getRoleProvenance = (
+  rules: RuleLibrary | EditableRuleLibrary,
+  role: Role,
+): string | undefined =>
+  findProvenanceText(rules, ROLE_PROVENANCE_KEYS[role] ?? []);
+
+const getFieldProvenance = (
+  rules: RuleLibrary | EditableRuleLibrary,
+  field: string,
+): string | undefined =>
+  findProvenanceText(rules, FIELD_PROVENANCE_KEYS[field] ?? []);
 
 const textHasCJK = (text: string): boolean => /[一-鿿]/.test(text);
 const textHasLatin = (text: string): boolean => /[A-Za-z]/.test(text);
@@ -155,6 +228,7 @@ const pushEditableIssue = (
   field: RuleField,
   actual: unknown,
   message: string,
+  provenance?: string,
 ): void => {
   out.push({
     paraIndex: p.index,
@@ -165,6 +239,7 @@ const pushEditableIssue = (
     severity: field.severity,
     message,
     textPreview: preview(p.text),
+    provenance,
   });
 };
 
@@ -180,6 +255,7 @@ const checkEditablePara = (
   const out: Issue[] = [];
   const hasCJK = textHasCJK(p.text);
   const hasLatin = textHasLatin(p.text);
+  const provenance = getRoleProvenance(rules, role);
 
   const handleField = (
     field: RuleField,
@@ -197,6 +273,7 @@ const checkEditablePara = (
       field,
       actualValue ?? actualText,
       `${field.label}${describeRuleValue(field.value, formatter)}，实际 ${actualText}`,
+      provenance,
     );
   };
 
@@ -294,7 +371,12 @@ const checkEditablePara = (
   return out;
 };
 
-const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
+const checkPara = (
+  p: Paragraph,
+  role: Role,
+  rule: StyleRule,
+  provenance?: string,
+): Issue[] => {
   const e = p.effective;
   const out: Issue[] = [];
   // 段落含哪类字符，决定查不查对应脚本的字体（纯中文段落不报西文字体，反之亦然）
@@ -316,6 +398,7 @@ const checkPara = (p: Paragraph, role: Role, rule: StyleRule): Issue[] => {
       severity,
       message,
       textPreview: preview(p.text),
+      provenance,
     });
   };
 
@@ -410,6 +493,7 @@ const checkDocument = (
       severity: "error",
       message,
       textPreview: "页面设置",
+      provenance: getFieldProvenance(rules, field),
     });
   };
 
@@ -459,7 +543,17 @@ const checkPageNumbers = (
   if (!pn) return [];
   const out: Issue[] = [];
   const push = (field: string, expected: unknown, actual: unknown, message: string): void => {
-    out.push({ paraIndex: -1, role: "document", field, expected, actual, severity: "error", message, textPreview: "页码" });
+    out.push({
+      paraIndex: -1,
+      role: "document",
+      field,
+      expected,
+      actual,
+      severity: "error",
+      message,
+      textPreview: "页码",
+      provenance: getFieldProvenance(rules, field),
+    });
   };
 
   // 规则页码格式词汇 → OOXML pgNumType@fmt
@@ -513,6 +607,7 @@ const checkHeaders = (
       severity: "warn",
       message: `页眉应包含「${h.left_text}」`,
       textPreview: "页眉",
+      provenance: getFieldProvenance(rules, "header_text"),
     },
   ];
 };
@@ -539,7 +634,7 @@ export const validateDoc = (
       return;
     }
     const rule = findRuleForRole(role, rules.styles);
-    if (rule) issues.push(...checkPara(p, role, rule));
+    if (rule) issues.push(...checkPara(p, role, rule, getRoleProvenance(rules, role)));
   });
 
   const summary = { error: 0, warn: 0, info: 0, byRole: {} as Record<string, number> };

@@ -28,6 +28,7 @@ const toEditableLibrary = (
     name: normalized.name,
     version: normalized.version,
     basedOn: normalized.basedOn,
+    source: normalized.source,
     document: normalized.document,
     pageNumbers: normalized.pageNumbers,
     headers: normalized.headers,

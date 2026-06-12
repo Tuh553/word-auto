@@ -15,15 +15,15 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 | 模块 | 说明 |
 | --- | --- |
 | `packages/parser` | docx→文档模型；样式继承；主题字体；`sectPr` 页面设置；带单位测量值；分节页码；页眉文本；**表格内段落提取（`inTable` / `table_cell`）**；**段落结构信号定位（`w:drawing` / OMML / `w:object`）**；**解析错误分流（`NOT_ZIP` / `ENCRYPTED` / `LEGACY_DOC` / `CORRUPT` / `NOT_DOCX`）** |
-| `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色**）；规则比对；按脚本降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；页眉内容；行距缺失提示；**图题注 drawing 邻接 / 公式对象信号联动分类**；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；**模板候选提取 `extractRuleProposal`**；单元测试（`node:test`，33 例） |
+| `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色**）；规则比对；按脚本降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；页眉内容；行距缺失提示；**图题注 drawing 邻接 / 公式对象信号联动分类**；**issue 透传规则依据 `source.provenance`**；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；**模板候选提取 `extractRuleProposal`**；单元测试（`node:test`，35 例） |
 | `apps/cli` | PoC：报告 + 页面/页码实测；`parseArgs` 参数解析；`--help` / `--rules` / `--out`；中文错误输出；非零退出码；规则库 BOM strip |
-| `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 文本匹配高亮（见下，已攻克渲染问题）；规则配置页；字段值编辑；`mode` 切换；草稿保存/发布；发布后回灌检测；多模板切换；自定义规则库 JSON 导入/导出；模板候选面板；**上传/候选提取错误分流中文提示** |
+| `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 文本匹配高亮（见下，已攻克渲染问题）；规则配置页；字段值编辑；`mode` 切换；草稿保存/发布；发布后回灌检测；多模板切换；自定义规则库 JSON 导入/导出；模板候选面板；**报告项可展开查看规范依据 provenance**；**上传/候选提取错误分流中文提示** |
 | 标准模板 | `templates/source/*.docx`，校准依据 + 检测金标准 |
 | 部署/CI | `.github/workflows/deploy.yml`（push main 自动 GitHub Pages）；`.github/workflows/quality.yml`（PR/push 运行 type-check、test、build） |
 
 验证结果（2026-06-12）：
 - `pnpm typecheck`：通过（parser / validator / cli / web）
-- `pnpm test`：通过（parser 11/11，validator 33/33，web 5/5）
+- `pnpm test`：通过（parser 11/11，validator 35/35，web 8/8）
 - `pnpm -r build`：通过
 - `pnpm run ci`：通过（串联 typecheck → test → build）
 - CLI smoke：
@@ -55,7 +55,7 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 完整 TODO 已整理到 [`docs/TODO.md`](docs/TODO.md)。当前优先级摘要：
 
 1. parser 深化：页眉/页脚结构化解析、`numbering.xml`、域 / 题注 / 交叉引用 / 脚注尾注。
-2. 报告可信度：接入规则依据 `source.provenance`、修复建议、角色识别置信度、问题分组。
+2. 报告可信度：修复建议、角色识别置信度、问题分组。
 3. 模板候选增强：多样本聚合、候选 diff、证据下钻、评分校准。
 4. 表格增强：当前已提取表格段落，但未保留表格与正文的全局交错顺序；表格专属规则/降噪待做。
 5. Web 体验：Web Worker、默认定位首个问题、报告与预览双向滚动、高亮 run 级区间、批量检测、带批注 docx 导出。
