@@ -1,5 +1,6 @@
 import { units, type DocModel, type Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
+import { computeFixHint } from "./fixhints.js";
 import { isEditableRuleLibrary } from "./rules.js";
 import type {
   EditableRuleLibrary,
@@ -643,11 +644,14 @@ export const validateDoc = (
     summary.byRole[it.role] = (summary.byRole[it.role] ?? 0) + 1;
   }
 
+  // 统一为每条问题补齐修复建议与可修复性（只在此一处处理，避免散落各 push 点）
+  const decorated = issues.map((it) => ({ ...it, ...computeFixHint(it) }));
+
   return {
     ruleName: isEditableRuleLibrary(rules) ? rules.name : rules.meta?.name,
     paragraphCount: model.paragraphs.length,
     classifiedCount: classified,
-    issues,
+    issues: decorated,
     summary,
   };
 };

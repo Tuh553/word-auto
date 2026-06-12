@@ -131,6 +131,14 @@ export function ReportPanel({
                 </div>
                 <div className="msg">{it.message}</div>
                 <div className="text">「{it.textPreview}」</div>
+                {it.suggestion ? (
+                  <div className="fix-hint">
+                    <span className={`fix-tag ${it.fixability ?? "manual"}`}>
+                      {it.fixability === "auto" ? "可自动修复" : "需手动处理"}
+                    </span>
+                    <span className="fix-text">{it.suggestion}</span>
+                  </div>
+                ) : null}
                 {it.provenance ? (
                   <details
                     className="provenance"

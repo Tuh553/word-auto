@@ -338,3 +338,34 @@ test("provenance 缺失时保持空值，不影响 issue 产出", () => {
   assert.equal(report.issues[0]?.field, "size_pt");
   assert.equal(report.issues[0]?.provenance, undefined);
 });
+
+test("validateDoc 产出的 issue 带修复建议与可修复性", () => {
+  const model = mkModel([
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
+    mkPara("正文内容", { alignment: "left", sizePt: 10 }),
+  ]);
+  const rules: RuleLibrary = {
+    document: { margin_top_cm: 3 },
+    styles: {
+      body_text: { size_pt: 12 },
+    },
+  };
+
+  const model2: DocModel = {
+    ...model,
+    sections: [{ marginTopTwips: 1000 }],
+  };
+
+  const report = validateDoc(model2, rules);
+  const sizeIssue = report.issues.find((it) => it.field === "size_pt");
+  const marginIssue = report.issues.find((it) => it.field === "margin_top_cm");
+
+  // 段落样式问题：可自动修复，建议带目标值
+  assert.equal(sizeIssue?.fixability, "auto");
+  assert.match(sizeIssue?.suggestion ?? "", /12pt/);
+  // 页面级问题：需手动处理
+  assert.equal(marginIssue?.fixability, "manual");
+  assert.ok((marginIssue?.suggestion ?? "").length > 0);
+});

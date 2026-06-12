@@ -247,6 +247,10 @@ export interface Issue {
   message: string;
   textPreview: string;
   provenance?: string;
+  /** 可操作的人话修复指引（如「请将该段落字号调整为 12pt」） */
+  suggestion?: string;
+  /** 可修复性：auto=工具可机械改写对应 OOXML 属性；manual=需人工确认/处理 */
+  fixability?: "auto" | "manual";
 }
 
 export interface ValidationReport {

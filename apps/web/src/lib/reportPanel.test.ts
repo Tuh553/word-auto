@@ -21,6 +21,8 @@ const mkReport = (provenance?: string): ValidationReport => ({
       message: "字号应为 12pt，实际 10.5pt",
       textPreview: "正文内容",
       provenance,
+      suggestion: "请将该段落字号调整为 12pt",
+      fixability: "auto",
     },
   ],
   summary: {
@@ -68,6 +70,23 @@ test("ReportPanel：issue 无 provenance 时不渲染依据区块", () => {
 
   assert.equal(html.includes("规范依据"), false);
   assert.equal(html.includes("<details"), false);
+});
+
+test("ReportPanel：渲染修复建议文案与可修复性标签", () => {
+  const html = renderToStaticMarkup(createElement(ReportPanel, {
+    report: mkReport(),
+    active: ALL_SEVERITIES,
+    groupBy: DEFAULT_GROUP_BY,
+    sortBy: DEFAULT_SORT_BY,
+    onToggle: () => {},
+    onGroupByChange: () => {},
+    onSortByChange: () => {},
+    onSelect: () => {},
+  }));
+
+  assert.match(html, /请将该段落字号调整为 12pt/);
+  assert.match(html, /可自动修复/);
+  assert.match(html, /fix-tag auto/);
 });
 
 test("ReportPanel：渲染分组与排序控件，并按语义章节输出分组标题", () => {

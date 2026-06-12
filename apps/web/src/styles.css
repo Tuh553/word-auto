@@ -361,6 +361,36 @@ button:disabled {
   margin-top: 4px;
 }
 
+.fix-hint {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.fix-tag {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.fix-tag.auto {
+  background: #e6f4ea;
+  color: #1e7e34;
+}
+
+.fix-tag.manual {
+  background: #fdecea;
+  color: #b71c1c;
+}
+
+.fix-text {
+  color: var(--fg, inherit);
+}
+
 .provenance {
   margin-top: 8px;
   font-size: 12px;
