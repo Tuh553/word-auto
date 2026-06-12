@@ -2,6 +2,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { ParseError, isParseError } from "./errors.js";
 import {
   attr,
+  collectParagraphStructure,
   parseParaProps,
   parseRunProps,
   parseSectPr,
@@ -136,6 +137,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       props: parseRunProps(r["w:rPr"], theme),
     }));
     const text = runs.map((r) => r.text).join("");
+    const structure = collectParagraphStructure(wp);
 
     const para: Paragraph = {
       index: nextIndex++,
@@ -147,6 +149,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       markRun,
       runs,
       text,
+      structure,
       effective: {},
     };
     if (inTable) para.inTable = true;

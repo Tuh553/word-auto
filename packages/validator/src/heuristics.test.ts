@@ -10,7 +10,10 @@ const mkPara = (
     styleName?: string;
     alignment?: string;
     sizePt?: number;
-  inTable?: boolean;
+    inTable?: boolean;
+    drawingCount?: number;
+    mathCount?: number;
+    embeddedObjectCount?: number;
   } = {},
 ): Paragraph => ({
   index: 0,
@@ -20,6 +23,11 @@ const mkPara = (
   markRun: {},
   runs: [{ text, props: {} }],
   text,
+  structure: {
+    drawingCount: opts.drawingCount ?? 0,
+    mathCount: opts.mathCount ?? 0,
+    embeddedObjectCount: opts.embeddedObjectCount ?? 0,
+  },
   effective: {
     outlineLevel: opts.outlineLevel,
     alignment: opts.alignment,
@@ -96,6 +104,26 @@ test("特殊正文元素：图注/表注/资料来源/公式编号从 body_text 
     "figure_caption",
     "table_caption",
     "source_note",
+    "formula_line",
+  ]);
+});
+
+test("结构信号增强：drawing 邻接图题注、对象公式编号行不再落回 body_text", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0 }),
+    mkPara("", { drawingCount: 1 }),
+    mkPara("续图1-1 系统架构图", { alignment: "center" }),
+    mkPara("（3-2）", { alignment: "center", embeddedObjectCount: 1 }),
+  ];
+
+  assert.deepEqual(classifyParagraphs(paras), [
+    "abstract_title_cn",
+    "abstract_body_cn",
+    "heading1",
+    null,
+    "figure_caption",
     "formula_line",
   ]);
 });
@@ -180,6 +208,7 @@ test("可编辑规则：oneOf / range / unset 直接回灌检测", () => {
           sizePt: 12,
           lineSpacing: exactLineSpacing(20),
         },
+        structure: { drawingCount: 0, mathCount: 0, embeddedObjectCount: 0 },
       },
     ]);
   const rules: EditableRuleLibrary = {
@@ -216,6 +245,7 @@ test("可编辑规则：严重级别与字段模式进入报告", () => {
           sizePt: 9,
           lineSpacing: autoLineSpacing(1.5),
         },
+        structure: { drawingCount: 0, mathCount: 0, embeddedObjectCount: 0 },
       },
     ]);
   const rules: EditableRuleLibrary = {
@@ -256,7 +286,9 @@ test("issue 透传命中规则的 provenance：正文与页面设置可回溯原
     ],
     styles: new Map(),
     docDefaults: {},
-    sections: [{ marginTopTwips: 1000 }],
+    sections: [{
+      marginTopTwips: 1000,
+    }],
     headers: [],
   };
   const rules: RuleLibrary = {
@@ -266,8 +298,12 @@ test("issue 透传命中规则的 provenance：正文与页面设置可回溯原
         body: { text: "正文 中文字体为宋体，小四号，两端对齐。" },
       },
     },
-    document: { margin_top_cm: 3 },
-    styles: { body_text: { size_pt: 12, alignment: "justify" } },
+    document: {
+      margin_top_cm: 3,
+    },
+    styles: {
+      body_text: { size_pt: 12, alignment: "justify" },
+    },
   };
 
   const report = validateDoc(model, rules);
@@ -279,4 +315,26 @@ test("issue 透传命中规则的 provenance：正文与页面设置可回溯原
 });
 
 test("provenance 缺失时保持空值，不影响 issue 产出", () => {
-  const report = validateDoc(mkModel([mkPara("摘要"), mkPara("这是摘要正文"), mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }), mkPara("正文内容", { alignment: "left", sizePt: 10 })]), { source: { provenance: { heading1: { text: "一级标题依据" } } }, styles: { body_text: { size_pt: 12 } } });
+  const model = mkModel([
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
+    mkPara("正文内容", { alignment: "left", sizePt: 10 }),
+  ]);
+  const rules: RuleLibrary = {
+    source: {
+      provenance: {
+        heading1: { text: "一级标题依据" },
+      },
+    },
+    styles: {
+      body_text: { size_pt: 12 },
+    },
+  };
+
+  const report = validateDoc(model, rules);
+
+  assert.equal(report.issues.length, 1);
+  assert.equal(report.issues[0]?.field, "size_pt");
+  assert.equal(report.issues[0]?.provenance, undefined);
+});

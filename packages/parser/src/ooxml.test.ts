@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseParaProps, parseRunProps, parseSectPr } from "./ooxml.js";
+import {
+  collectParagraphStructure,
+  parseParaProps,
+  parseRunProps,
+  parseSectPr,
+} from "./ooxml.js";
 
 test("parseRunProps：主题字体引用回填实际字体", () => {
   const props = parseRunProps(
@@ -80,5 +85,41 @@ test("parseSectPr：解析页边距、纸张与页码格式", () => {
     gutterTwips: 567,
     pageNumberFormat: "upperRoman",
     pageNumberStart: 1,
+  });
+});
+
+test("collectParagraphStructure：递归识别 drawing / OMML / 嵌入对象", () => {
+  const structure = collectParagraphStructure({
+    "w:r": [
+      {
+        "mc:AlternateContent": {
+          "mc:Fallback": {
+            "w:drawing": {
+              "wp:inline": {},
+            },
+          },
+        },
+      },
+      {
+        "m:oMathPara": {
+          "m:oMath": {
+            "m:r": [{ "m:t": "x" }],
+          },
+        },
+      },
+      {
+        "w:object": {
+          "o:OLEObject": {
+            "@_Type": "Embed",
+          },
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(structure, {
+    drawingCount: 1,
+    mathCount: 2,
+    embeddedObjectCount: 1,
   });
 });

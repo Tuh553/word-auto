@@ -73,6 +73,16 @@ export interface Run {
   props: RunProps;
 }
 
+/** 段落内可用于分类/降噪的结构信号 */
+export interface ParagraphStructure {
+  /** 段落内 `w:drawing` 的出现次数（图片/图形等 DrawingML） */
+  drawingCount: number;
+  /** 段落内 OMML 公式节点（`m:oMath` / `m:oMathPara`）出现次数 */
+  mathCount: number;
+  /** 段落内嵌入对象容器（如 `w:object`）出现次数 */
+  embeddedObjectCount: number;
+}
+
 export interface Paragraph {
   index: number;
   /** 段落引用的样式 id */
@@ -86,6 +96,8 @@ export interface Paragraph {
   runs: Run[];
   /** 拼接后的纯文本 */
   text: string;
+  /** 段落级结构信号：辅助识别图题注、公式行等特殊正文元素 */
+  structure: ParagraphStructure;
   /** 继承解析后的有效格式 */
   effective: EffectiveProps;
   /** 是否位于表格单元格内（w:tbl 内提取的段落） */

@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import { resolveThemeFont, type ThemeFonts } from "./theme.js";
 import type {
   LineSpacing,
+  ParagraphStructure,
   ParaProps,
   RunProps,
   SectionProps,
@@ -47,6 +48,44 @@ const makeLineSpacing = (line: number, rule: string): LineSpacing => {
   }
   // 默认 auto：line 单位为 1/240 行 → 倍数
   return { value: line / 240, rule: "auto", multiple: line / 240 };
+};
+
+const emptyStructure = (): ParagraphStructure => ({
+  drawingCount: 0,
+  mathCount: 0,
+  embeddedObjectCount: 0,
+});
+
+/** 递归收集段落内的结构信号，供 classify 做特殊正文元素识别。 */
+export const collectParagraphStructure = (
+  node: any,
+  acc: ParagraphStructure = emptyStructure(),
+): ParagraphStructure => {
+  if (node == null || typeof node !== "object") return acc;
+  if (Array.isArray(node)) {
+    for (const item of node) collectParagraphStructure(item, acc);
+    return acc;
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    switch (key) {
+      case "w:drawing":
+        acc.drawingCount += Array.isArray(value) ? value.length : 1;
+        break;
+      case "m:oMath":
+      case "m:oMathPara":
+        acc.mathCount += Array.isArray(value) ? value.length : 1;
+        break;
+      case "w:object":
+        acc.embeddedObjectCount += Array.isArray(value) ? value.length : 1;
+        break;
+      default:
+        break;
+    }
+    collectParagraphStructure(value, acc);
+  }
+
+  return acc;
 };
 
 /**

@@ -15,6 +15,9 @@ const BASELINE = {
   paragraphCount: 443,
   sectionCount: 14,
   tableParagraphCount: 173,
+  drawingParagraphIndexes: [0, 4, 22, 41, 59, 72, 136, 139, 150],
+  embeddedObjectParagraphIndexes: [136],
+  mathParagraphIndexes: [],
   firstSection: {
     pageWidthTwips: 11906,
     pageHeightTwips: 16838,
@@ -53,6 +56,24 @@ test("parseDocx：标准模板解析基线保持稳定", () => {
   assert.equal(
     model.paragraphs.filter((item) => item.inTable).length,
     BASELINE.tableParagraphCount,
+  );
+  assert.deepEqual(
+    model.paragraphs
+      .filter((item) => item.structure.drawingCount > 0)
+      .map((item) => item.index),
+    BASELINE.drawingParagraphIndexes,
+  );
+  assert.deepEqual(
+    model.paragraphs
+      .filter((item) => item.structure.embeddedObjectCount > 0)
+      .map((item) => item.index),
+    BASELINE.embeddedObjectParagraphIndexes,
+  );
+  assert.deepEqual(
+    model.paragraphs
+      .filter((item) => item.structure.mathCount > 0)
+      .map((item) => item.index),
+    BASELINE.mathParagraphIndexes,
   );
   assert.deepEqual(model.sections[0], BASELINE.firstSection);
   assert.deepEqual(model.headers.map(compactHeader), BASELINE.headerTitles);

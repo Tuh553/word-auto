@@ -19,6 +19,7 @@ const ACHIEVEMENT_HEADING =
   /^(攻读.*学位期间.*成果|攻读学位期间发表的学术成果|在学期间取得的研究成果)$/;
 const FIGURE_CAPTION =
   /^(图|figure)\d+(?:[-－—.．]\d+)*[A-Za-z]*[:：]?/i;
+const FIGURE_CAPTION_RELAXED = /^(续?图|figure)/i;
 const TABLE_CAPTION =
   /^(表|table)\d+(?:[-－—.．]\d+)*[A-Za-z]*[:：]?/i;
 const SOURCE_NOTE =
@@ -65,16 +66,37 @@ const backMatterHeading = (
   return null;
 };
 
-const specialBodyRole = (p: Paragraph, t: string): Role | null => {
+const hasDrawing = (p: Paragraph | undefined): boolean =>
+  (p?.structure.drawingCount ?? 0) > 0;
+
+const hasFormulaStructure = (p: Paragraph): boolean =>
+  (p.structure.mathCount ?? 0) > 0 || (p.structure.embeddedObjectCount ?? 0) > 0;
+
+const specialBodyRole = (
+  paras: Paragraph[],
+  index: number,
+  p: Paragraph,
+  t: string,
+): Role | null => {
+  const align = p.effective.alignment;
+  const adjacentDrawing = hasDrawing(paras[index - 1]) || hasDrawing(paras[index + 1]);
+
   if (FIGURE_CAPTION.test(t) && t.length <= 80) return "figure_caption";
+  if (
+    adjacentDrawing &&
+    FIGURE_CAPTION_RELAXED.test(t) &&
+    t.length <= 80 &&
+    (align === "center" || align === "left" || align === "right")
+  ) {
+    return "figure_caption";
+  }
   if (TABLE_CAPTION.test(t) && t.length <= 80) return "table_caption";
   if (SOURCE_NOTE.test(t) && t.length <= 120) return "source_note";
 
   const cjkCount = (t.match(/[一-鿿]/g) ?? []).length;
-  const align = p.effective.alignment;
   if (
     EQUATION_NUMBER.test(t) &&
-    MATH_OPERATOR.test(t) &&
+    (MATH_OPERATOR.test(t) || hasFormulaStructure(p)) &&
     cjkCount <= 4 &&
     (align === "center" || align === "right" || t.length <= 80)
   ) {
@@ -94,7 +116,8 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
   let section: Section = "cover";
   const roles: (Role | null)[] = [];
 
-  for (const p of paras) {
+  for (let i = 0; i < paras.length; i += 1) {
+    const p = paras[i];
     // 表格单元格段落：独立角色，不参与正文章节状态机
     if (p.inTable) {
       roles.push("table_cell");
@@ -183,7 +206,7 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
 
     // 5b. 特殊正文元素：先分流，避免按正文硬判
     if (section === "body") {
-      const special = specialBodyRole(p, t);
+      const special = specialBodyRole(paras, i, p, t);
       if (special) {
         roles.push(special);
         continue;

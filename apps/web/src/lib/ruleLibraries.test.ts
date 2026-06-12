@@ -24,6 +24,7 @@ const mkPara = (
   markRun: {},
   runs: [{ text, props: {} }],
   text,
+  structure: { drawingCount: 0, mathCount: 0, embeddedObjectCount: 0 },
   effective: {
     outlineLevel: opts.outlineLevel,
     alignment: opts.alignment,
