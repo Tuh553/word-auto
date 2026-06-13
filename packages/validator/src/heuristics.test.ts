@@ -42,6 +42,7 @@ const mkModel = (paragraphs: Paragraph[]): DocModel => ({
   docDefaults: {},
   sections: [],
   headers: [],
+  numbering: { abstractNums: new Map(), nums: new Map() },
 });
 
 const exactLineSpacing = (pt: number): LineSpacing => ({
@@ -146,6 +147,7 @@ test("校验命中新规则：特殊元素与后置章节按专属角色校验",
     docDefaults: {},
     sections: [],
     headers: [],
+    numbering: { abstractNums: new Map(), nums: new Map() },
   };
   const rules: RuleLibrary = {
     styles: {
@@ -182,6 +184,7 @@ test("旧规则兼容：后置部分旧泛化规则仍能覆盖新角色", () =>
     docDefaults: {},
     sections: [],
     headers: [],
+    numbering: { abstractNums: new Map(), nums: new Map() },
   };
   const rules: RuleLibrary = {
     styles: {
@@ -290,6 +293,7 @@ test("issue 透传命中规则的 provenance：正文与页面设置可回溯原
       marginTopTwips: 1000,
     }],
     headers: [],
+    numbering: { abstractNums: new Map(), nums: new Map() },
   };
   const rules: RuleLibrary = {
     source: {

@@ -75,6 +75,7 @@ test("extractRuleProposal：聚合候选值、覆盖率、冲突与可信提示"
     docDefaults: {},
     sections: [],
     headers: [],
+    numbering: { abstractNums: new Map(), nums: new Map() },
   };
 
   const proposal = extractRuleProposal(model, { sourceName: "sample.docx" });

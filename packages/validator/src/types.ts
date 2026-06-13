@@ -205,6 +205,7 @@ export interface RuleLintResult {
 /** 文档段落被识别到的语义角色，对应 styles 表的 key；'document' 为文档/页面级 */
 export type Role =
   | "document"
+  | "heading"
   | "abstract_title_cn"
   | "abstract_body_cn"
   | "keywords_cn"
@@ -233,10 +234,40 @@ export type Role =
   | "achievement_body"
   | "back_matter_heading"
   | "back_matter_body"
-  | "table_cell";
+  | "table_cell"
+  | "unknown";
 
 export type Severity = "error" | "warn" | "info";
 
+/** 带角色的已分类段落 */
+export interface ClassifiedParagraph {
+  para: import("@word-auto/parser").Paragraph;
+  role: Role | null;
+}
+
+/** 校验问题类型 */
+export type IssueType = "paragraph" | "document";
+
+/** 校验问题（段落级或文档级） */
+export interface ValidationIssue {
+  type: IssueType;
+  paragraphIndex?: number;
+  role: Role;
+  field: string;
+  expected: unknown;
+  actual: unknown;
+  severity: Severity;
+  message: string;
+  textPreview?: string;
+  provenance?: string;
+  /** 可操作的人话修复指引 */
+  suggestion?: string;
+  /** 可修复性：auto=工具可机械改写；manual=需人工确认 */
+  canAutoFix: boolean;
+  fixHint?: string;
+}
+
+/** 旧 Issue 类型（向后兼容） */
 export interface Issue {
   paraIndex: number;
   role: Role;

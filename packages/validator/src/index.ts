@@ -3,6 +3,20 @@ export { classifyParagraphs } from "./classify.js";
 export { validateDoc } from "./validate.js";
 export { computeFixHint, type FixHint, type Fixability } from "./fixhints.js";
 export {
+  checkHeadingSequence,
+  checkFigureCaptionSequence,
+  checkTableCaptionSequence,
+  checkNumberingSequence,
+} from "./numbering-check.js";
+export {
+  recognizeList,
+  recognizeAllLists,
+  groupLists,
+  type ListType,
+  type ListItem,
+  type ListGroup,
+} from "./list-recognition.js";
+export {
   FIELD_LABELS,
   ROLE_LABELS,
   RULE_FIELD_ORDER,

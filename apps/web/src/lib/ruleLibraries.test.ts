@@ -43,6 +43,7 @@ const mkModel = (): DocModel => ({
   docDefaults: {},
   sections: [],
   headers: [],
+  numbering: { abstractNums: new Map(), nums: new Map() },
 });
 
 const mkRecord = (): RuleLibraryRecord => ({

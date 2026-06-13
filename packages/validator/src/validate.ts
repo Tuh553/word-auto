@@ -1,6 +1,7 @@
 import { units, type DocModel, type Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
 import { computeFixHint } from "./fixhints.js";
+import { checkNumberingSequence } from "./numbering-check.js";
 import { isEditableRuleLibrary } from "./rules.js";
 import type {
   EditableRuleLibrary,
@@ -619,23 +620,49 @@ export const validateDoc = (
   rules: RuleLibrary | EditableRuleLibrary,
 ): ValidationReport => {
   const roles = classifyParagraphs(model.paragraphs);
+  const classified = roles.map((role, i) => ({
+    para: model.paragraphs[i],
+    role: role ?? null,
+  }));
+
   const issues: Issue[] = [
     ...checkDocument(model, rules),
     ...checkPageNumbers(model, rules),
     ...checkHeaders(model, rules),
   ];
-  let classified = 0;
+
+  // 编号连续性检测（转换为 Issue 格式）
+  const numberingIssues = checkNumberingSequence(model, classified);
+  for (const vi of numberingIssues) {
+    if (vi.type === "paragraph" && vi.paragraphIndex !== undefined) {
+      const para = model.paragraphs[vi.paragraphIndex];
+      issues.push({
+        paraIndex: vi.paragraphIndex,
+        role: vi.role,
+        field: vi.field,
+        expected: vi.expected,
+        actual: vi.actual,
+        severity: vi.severity,
+        message: vi.message,
+        textPreview: para?.text.slice(0, 24) ?? "",
+        suggestion: vi.fixHint,
+        fixability: vi.canAutoFix ? "auto" : "manual",
+      });
+    }
+  }
+
+  let classifiedCount = 0;
 
   model.paragraphs.forEach((p, i) => {
-    const role = roles[i];
-    if (!role) return;
-    classified++;
+    const cp = classified[i];
+    if (!cp.role) return;
+    classifiedCount++;
     if (isEditableRuleLibrary(rules)) {
-      issues.push(...checkEditablePara(p, role, rules));
+      issues.push(...checkEditablePara(p, cp.role, rules));
       return;
     }
-    const rule = findRuleForRole(role, rules.styles);
-    if (rule) issues.push(...checkPara(p, role, rule, getRoleProvenance(rules, role)));
+    const rule = findRuleForRole(cp.role, rules.styles);
+    if (rule) issues.push(...checkPara(p, cp.role, rule, getRoleProvenance(rules, cp.role)));
   });
 
   const summary = { error: 0, warn: 0, info: 0, byRole: {} as Record<string, number> };
@@ -650,7 +677,7 @@ export const validateDoc = (
   return {
     ruleName: isEditableRuleLibrary(rules) ? rules.name : rules.meta?.name,
     paragraphCount: model.paragraphs.length,
-    classifiedCount: classified,
+    classifiedCount,
     issues: decorated,
     summary,
   };

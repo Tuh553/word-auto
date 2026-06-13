@@ -36,6 +36,10 @@ const ISSUE_DIST_BASELINE: Record<string, number> = {
   "acknowledgement_body:font_east_asia": 1,
   "acknowledgement_body:size_pt": 1,
   "acknowledgement_body:first_line_indent_chars": 2,
+  // 编号连续性检测（新增）
+  "heading2:heading_sequence": 2,
+  "heading3:heading_sequence": 2,
+  "table_caption:caption_sequence": 1,
 };
 
 test("标准模板校验基线：发布规则消费结果保持一致", () => {
@@ -49,9 +53,9 @@ test("标准模板校验基线：发布规则消费结果保持一致", () => {
     dist[key] = (dist[key] ?? 0) + 1;
   }
 
-  assert.equal(report.issues.length, 86);
+  assert.equal(report.issues.length, 91);
   assert.deepEqual(report.summary, {
-    error: 10,
+    error: 15,
     warn: 70,
     info: 6,
     byRole: {
@@ -60,10 +64,11 @@ test("标准模板校验基线：发布规则消费结果保持一致", () => {
       abstract_body_en: 2,
       keywords_en: 2,
       body_text: 43,
-      heading2: 6,
-      heading3: 6,
+      heading2: 8,
+      heading3: 8,
       formula_line: 3,
       reference_body: 3,
+      table_caption: 1,
       appendix_body: 9,
       acknowledgement_body: 8,
     },

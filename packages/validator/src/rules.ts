@@ -13,6 +13,8 @@ import type {
 } from "./types.js";
 
 export const ROLE_LABELS: Record<Exclude<Role, "document">, string> = {
+  heading: "标题（通用）",
+  unknown: "未识别",
   abstract_title_cn: "中文摘要标题",
   abstract_body_cn: "中文摘要正文",
   keywords_cn: "中文关键词",

@@ -1,0 +1,92 @@
+[
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 125,
+    "summary": "章节变化时未重置 lastMajor，导致跨章节图题注检测错误",
+    "failure_scenario": "第1章有图1-1，第2章首个图2-1 → lastMajor=1未重置 → 触发'主编号变化'分支误报'期望1-2'而非'期望2-1'"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 231,
+    "summary": "表题注章节变化时未重置 lastMajor（与图题注相同bug）",
+    "failure_scenario": "第1章有表1-1，第2章首个表2-1 → lastMajor=1未重置 → 检测逻辑与图题注相同缺陷"
+  },
+  {
+    "file": "apps/web/src/lib/reportGroups.ts",
+    "line": 137,
+    "summary": "ROLE_ORDER 重复键：acknowledgement_heading/body 覆盖 reference_heading/body 的排序值",
+    "failure_scenario": "acknowledgement_heading: 21 与 reference_heading: 21 冲突 → 报告中致谢与参考文献章节排序混乱"
+  },
+  {
+    "file": "packages/validator/src/validate.ts",
+    "line": 621,
+    "summary": "classified 数组对 undefined 角色强制回退为 'body_text'，但主校验循环跳过 undefined",
+    "failure_scenario": "未分类段落 → 编号检测当作 body_text 处理 → 样式检测直接跳过 → 同一段落在不同校验器中可见性不一致"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 111,
+    "summary": "checkFigureCaptionSequence 和 checkTableCaptionSequence 存在 97% 重复代码",
+    "failure_scenario": "208行代码中仅3处字符串不同（'图'/'表'），维护时需同步修改两处，已导致两处继承相同bug"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 21,
+    "summary": "extractNumber 热路径中每次调用创建5个正则对象（未预编译）",
+    "failure_scenario": "文档200个标题 → 1000次正则对象创建 → 性能开销累积，应提取为模块级常量"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 149,
+    "summary": "两级编号初始值 lastMajor=0，导致首个题注语义混淆",
+    "failure_scenario": "文档首个图为'图1-2' → lastMajor=0 → 报错'主编号变化后次编号应从1开始'，但实际是'首个题注次编号应为1'，错误消息误导用户"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 1069,
+    "summary": "多级编号提取'最后一级'而非'当前级别'，3+级标题会错误",
+    "failure_scenario": "'1.2.3.4'提取返回4，但若 outlineLevel=2 应返回3（第二级的编号），当前实现对3+级嵌套错误"
+  },
+  {
+    "file": "packages/validator/src/validate.ts",
+    "line": 635,
+    "summary": "ValidationIssue 转换为 Issue 时使用 'as any' 绕过类型检查",
+    "failure_scenario": "若 ValidationIssue.role 为非标准值 → 强转为 Role → 运行时 ROLE_LABELS 映射失败"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 1106,
+    "summary": "标题序号检测在跨级跳跃时可能误报",
+    "failure_scenario": "标题序列'1级:1 → 3级:1 → 1级:2 → 3级:2' → 3级:2被判跳号（期望1），但3级:1历史已被删除级别清空"
+  },
+  {
+    "file": "packages/validator/src/validate.ts",
+    "line": 635,
+    "summary": "ValidationIssue 到 Issue 转换丢失 provenance 字段",
+    "failure_scenario": "编号检测问题无规则来源信息 → UI 无法显示'该问题来自哪条规则' → 与样式检测问题的溯源不一致"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 122,
+    "summary": "章节跟踪逻辑在图/表检测中重复实现",
+    "failure_scenario": "checkFigure 和 checkTable 的章节跟踪代码（119-126行 vs 225-232行）完全相同，应提取为 trackChapterChanges 辅助函数"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 7,
+    "summary": "中文数字映射表仅支持1-10，不支持'十一'、'二十'等组合",
+    "failure_scenario": "'第十一章'无法识别 → 返回 null → 章节跟踪失败 → 依赖章节编号的检测（如图表两级编号）失效"
+  },
+  {
+    "file": "packages/validator/src/numbering-check.ts",
+    "line": 258,
+    "summary": "表题注单级编号未重置 lastMinor，混合使用单/两级编号时状态残留",
+    "failure_scenario": "表1-1 → 表2（单级，未清 lastMinor=1）→ 表3-1（lastMinor=1而非期望的0）→ 检测逻辑状态不一致"
+  },
+  {
+    "file": "packages/parser/src/numbering.ts",
+    "line": 80,
+    "summary": "XML节点数组标准化逻辑重复4次",
+    "failure_scenario": "ensureArray(node) 模式在第80/105/143/157行重复，应提取为共享工具函数，已有 theme.ts:26 类似实现"
+  }
+]

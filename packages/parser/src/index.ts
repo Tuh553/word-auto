@@ -1,6 +1,10 @@
 import { strFromU8, unzipSync } from "fflate";
 import { ParseError, isParseError } from "./errors.js";
 import {
+  parseNumbering,
+  extractParagraphNumbering,
+} from "./numbering.js";
+import {
   attr,
   collectParagraphStructure,
   parseParaProps,
@@ -14,6 +18,7 @@ import { parseTheme, type ThemeFonts } from "./theme.js";
 import type {
   DocDefaults,
   DocModel,
+  NumberingDefinitions,
   Paragraph,
   Run,
   SectionProps,
@@ -22,6 +27,7 @@ import type {
 
 export * from "./types.js";
 export * from "./errors.js";
+export * from "./numbering.js";
 export * as units from "./units.js";
 
 const CFBF_MAGIC = Uint8Array.from([
@@ -69,6 +75,7 @@ const parseDocumentParts = (
   theme: ThemeFonts;
   styles: Map<string, StyleDef>;
   docDefaults: DocDefaults;
+  numbering: NumberingDefinitions;
   root: any;
 } => {
   try {
@@ -77,8 +84,11 @@ const parseDocumentParts = (
       read("word/styles.xml") ?? "<w:styles/>",
       theme,
     );
+    const numbering = parseNumbering(
+      read("word/numbering.xml") ?? "<w:numbering/>",
+    );
     const root = parseXml(docXml);
-    return { theme, styles, docDefaults, root };
+    return { theme, styles, docDefaults, numbering, root };
   } catch (error) {
     if (isParseError(error)) throw error;
     const detail = error instanceof Error ? error.message : String(error);
@@ -117,7 +127,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   }
   const docXmlText = docXml!;
 
-  const { theme, styles, docDefaults, root } = parseDocumentParts(read, docXmlText);
+  const { theme, styles, docDefaults, numbering, root } = parseDocumentParts(read, docXmlText);
 
   if (!root["w:document"]?.["w:body"]) {
     failParse("NOT_DOCX", "word/document.xml 不是有效的 Word OOXML 文档结构");
@@ -138,6 +148,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     }));
     const text = runs.map((r) => r.text).join("");
     const structure = collectParagraphStructure(wp);
+    const numRef = extractParagraphNumbering(pPr);
 
     const para: Paragraph = {
       index: nextIndex++,
@@ -151,6 +162,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       text,
       structure,
       effective: {},
+      numbering: numRef,
     };
     if (inTable) para.inTable = true;
     para.effective = computeEffective(para, styles, docDefaults);
@@ -197,5 +209,5 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     }
   }
 
-  return { paragraphs, styles, docDefaults, sections, headers };
+  return { paragraphs, styles, docDefaults, sections, headers, numbering };
 };

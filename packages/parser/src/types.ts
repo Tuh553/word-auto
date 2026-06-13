@@ -83,6 +83,14 @@ export interface ParagraphStructure {
   embeddedObjectCount: number;
 }
 
+/** 段落的编号引用（从 pPr/numPr 提取） */
+export interface ParagraphNumbering {
+  /** 编号实例 ID（关联到 numbering.xml 的 num） */
+  numId: string;
+  /** 当前段落使用的级别（0-8，对应 Word 的 1-9 级） */
+  ilvl: number;
+}
+
 export interface Paragraph {
   index: number;
   /** 段落引用的样式 id */
@@ -102,6 +110,8 @@ export interface Paragraph {
   effective: EffectiveProps;
   /** 是否位于表格单元格内（w:tbl 内提取的段落） */
   inTable?: boolean;
+  /** 编号引用（如果段落参与自动编号） */
+  numbering?: ParagraphNumbering;
 }
 
 export interface DocDefaults {
@@ -126,6 +136,40 @@ export interface SectionProps {
   pageNumberStart?: number;
 }
 
+/** 编号级别定义（来自 numbering.xml） */
+export interface NumberingLevel {
+  /** 级别索引（0-8 对应 Word 的 1-9 级） */
+  ilvl: number;
+  /** 起始值（默认 1） */
+  start: number;
+  /** 格式类型 */
+  numFmt: string;
+  /** 编号文本模板（如 "%1."、"第%1章"、"%1.%2.%3"） */
+  lvlText: string;
+  /** 重启规则：每个上级编号变化时重启此级（如 3.1 → 3.2 → 4.1）；0=不重启 */
+  lvlRestart?: number;
+}
+
+/** 抽象编号定义（abstractNum） */
+export interface AbstractNumbering {
+  abstractNumId: string;
+  multiLevelType?: "multilevel" | "singleLevel" | "hybridMultilevel";
+  levels: NumberingLevel[];
+}
+
+/** 编号实例（num） */
+export interface NumberingInstance {
+  numId: string;
+  abstractNumId: string;
+  lvlOverride?: Map<number, { start?: number }>;
+}
+
+/** numbering.xml 解析结果 */
+export interface NumberingDefinitions {
+  abstractNums: Map<string, AbstractNumbering>;
+  nums: Map<string, NumberingInstance>;
+}
+
 export interface DocModel {
   paragraphs: Paragraph[];
   styles: Map<string, StyleDef>;
@@ -134,4 +178,6 @@ export interface DocModel {
   sections: SectionProps[];
   /** 各页眉（header*.xml）的纯文本，用于页眉内容检测 */
   headers: string[];
+  /** 编号定义（来自 numbering.xml） */
+  numbering: NumberingDefinitions;
 }
