@@ -73,6 +73,23 @@ export interface Run {
   props: RunProps;
 }
 
+export interface Field {
+  /** 域类型：REF / SEQ / PAGEREF / PAGE / HYPERLINK 等 */
+  type: string;
+  /** 完整域指令文本 */
+  instruction: string;
+  /** 域显示结果文本 */
+  displayText: string;
+  /** REF / PAGEREF 引用的书签 */
+  bookmark?: string;
+  /** SEQ 序列名，如 Figure / Table / Equation */
+  sequence?: string;
+  /** 域起始 run 索引（复杂域为 begin run，简单域为首个结果 run） */
+  startRunIndex: number;
+  /** 域结束 run 索引（复杂域为 end run，简单域为最后一个结果 run） */
+  endRunIndex: number;
+}
+
 /** 段落内可用于分类/降噪的结构信号 */
 export interface ParagraphStructure {
   /** 段落内 `w:drawing` 的出现次数（图片/图形等 DrawingML） */
@@ -104,6 +121,8 @@ export interface Paragraph {
   runs: Run[];
   /** 拼接后的纯文本 */
   text: string;
+  /** 段落中的结构化域结果（复杂域 + 简单域） */
+  fields?: Field[];
   /** 段落级结构信号：辅助识别图题注、公式行等特殊正文元素 */
   structure: ParagraphStructure;
   /** 继承解析后的有效格式 */

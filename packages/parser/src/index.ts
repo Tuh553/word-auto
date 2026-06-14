@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { ParseError, isParseError } from "./errors.js";
+import { collectParagraphRunData, parseParagraphFields } from "./fields.js";
 import { parseHeaderFooterPart } from "./headerFooter.js";
 import {
   parseNumbering,
@@ -142,12 +143,13 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     const pPr = wp["w:pPr"];
     const directPara = parseParaProps(pPr);
     const markRun = parseRunProps(pPr?.["w:rPr"], theme);
-    const runsRaw: any[] = wp["w:r"] ?? [];
+    const { runs: runsRaw } = collectParagraphRunData(wp);
     const runs: Run[] = runsRaw.map((r) => ({
       text: extractText(r),
       props: parseRunProps(r["w:rPr"], theme),
     }));
     const text = runs.map((r) => r.text).join("");
+    const fields = parseParagraphFields(wp);
     const structure = collectParagraphStructure(wp);
     const numRef = extractParagraphNumbering(pPr);
 
@@ -161,6 +163,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       markRun,
       runs,
       text,
+      fields: fields.length > 0 ? fields : undefined,
       structure,
       effective: {},
       numbering: numRef,

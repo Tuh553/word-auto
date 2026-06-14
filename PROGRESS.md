@@ -14,7 +14,7 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 
 | 模块 | 说明 |
 | --- | --- |
-| `packages/parser` | docx→文档模型；样式继承；主题字体；`sectPr` 页面设置；带单位测量值；分节页码；**结构化页眉/页脚解析（左/中/右基础位置 + `PAGE` 页码域）**；**`numbering.xml` 自动编号解析（abstractNum / num / numPr）**；**表格内段落提取（`inTable` / `table_cell`）**；**段落结构信号定位（`w:drawing` / OMML / `w:object`）**；**解析错误分流（`NOT_ZIP` / `ENCRYPTED` / `LEGACY_DOC` / `CORRUPT` / `NOT_DOCX`）** |
+| `packages/parser` | docx→文档模型；样式继承；主题字体；`sectPr` 页面设置；带单位测量值；分节页码；**结构化页眉/页脚解析（左/中/右基础位置 + `PAGE` 页码域）**；**段落域解析（复杂域 / 简单域，输出 `REF` / `SEQ` / `PAGEREF` / `PAGE` / `HYPERLINK` 等类型、显示文本与 run 区间）**；**`numbering.xml` 自动编号解析（abstractNum / num / numPr）**；**表格内段落提取（`inTable` / `table_cell`）**；**段落结构信号定位（`w:drawing` / OMML / `w:object`）**；**解析错误分流（`NOT_ZIP` / `ENCRYPTED` / `LEGACY_DOC` / `CORRUPT` / `NOT_DOCX`）** |
 | `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色**）；规则比对；按脚本降噪；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；**基于结构化左侧页眉的页眉内容检测**；行距缺失提示；**标题题序连续性检测**；**图表题注连号校验**；**列表识别**；**图题注 drawing 邻接 / 公式对象信号联动分类**；**issue 透传规则依据 `source.provenance`**；**issue 修复建议 + 可修复性 `computeFixHint`（auto / manual）**；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；**模板候选提取 `extractRuleProposal`**；单元测试（`node:test`，62 例） |
 | `apps/cli` | PoC：报告 + 页面/页码实测；`parseArgs` 参数解析；`--help` / `--rules` / `--out`；中文错误输出；非零退出码；规则库 BOM strip |
 | `apps/web` | React+Vite 纯前端；四步流程；docx-preview 预览 + 文本匹配高亮（见下，已攻克渲染问题）；规则配置页；字段值编辑；`mode` 切换；草稿保存/发布；发布后回灌检测；多模板切换；自定义规则库 JSON 导入/导出；模板候选面板；**报告项可展开查看规范依据 provenance**；**报告项展示修复建议与可修复性标签**；**报告支持按语义章节 / 角色 / 严重级 / 字段分组与组内排序，并默认定位首个问题**；**上传/候选提取错误分流中文提示** |
@@ -23,7 +23,7 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 
 验证结果（2026-06-14）：
 - `pnpm typecheck`：通过（parser / validator / cli / web）
-- `pnpm test`：通过（parser 13/13，validator 62/62，web 13/13；总计 88/88）
+- `pnpm test`：通过（parser 17/17，validator 62/62，web 13/13；总计 92/92）
 - `pnpm -r build`：通过
 - `pnpm run ci`：通过（串联 typecheck → test → build）
 - CLI smoke：
@@ -54,7 +54,7 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 
 完整 TODO 已整理到 [`docs/TODO.md`](docs/TODO.md)。当前优先级摘要：
 
-1. parser 深化：域 / 题注 / 交叉引用 / 脚注尾注。
+1. parser 深化：基于已完成域解析继续做题注 / 交叉引用关联、脚注尾注。
 2. 报告可信度：角色识别置信度、统计型文档检测。
 3. 模板候选增强：多样本聚合、候选 diff、证据下钻、评分校准。
 4. 表格增强：当前已提取表格段落，但未保留表格与正文的全局交错顺序；表格专属规则/降噪待做。
@@ -69,6 +69,7 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 - 校验字体要按段落 hasCJK/hasLatin 降噪。
 - 测量值可能带单位（pt/cm/mm/in），不只整数 twips——用 `measureToTwips`。
 - 页眉/页脚已基础结构化；左/右识别支持对齐、制表符和长空白分隔，但字号/下划线等样式检测仍待扩展。
+- 当前标准模板未包含正文域样本；域解析回归主要靠 synthetic docx + “真实模板 0 field 回归” 双重校验。
 - 自动编号已解析并接入连续性检测；后续涉及编号语义时要同步更新编号金标准测试。
 - OMML / 嵌入对象当前只做**存在性与段落定位**，还未展开公式语义与对象内部文本。
 - docx-preview 不做自动分页(只认显式分页符)、且对固定行距可能算出极小行高——已在 PreviewPanel 修补。
