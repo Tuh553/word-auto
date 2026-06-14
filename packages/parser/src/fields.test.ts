@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { strToU8, zipSync } from "fflate";
-import { parseParagraphFields } from "./fields.js";
+import { parseParagraphBookmarks, parseParagraphFields } from "./fields.js";
 import { parseDocx } from "./index.js";
 import { parseXml } from "./ooxml.js";
 
@@ -75,6 +75,21 @@ test("parseParagraphFields：支持嵌套复杂域", () => {
   ]);
 });
 
+test("parseParagraphBookmarks：提取段落内书签起点", () => {
+  const wp = parseParagraphXml(`
+    <w:p>
+      <w:bookmarkStart w:id="7" w:name="_RefFigure1"/>
+      <w:r><w:t>图 </w:t></w:r>
+      <w:bookmarkEnd w:id="7"/>
+    </w:p>
+  `);
+
+  assert.deepEqual(parseParagraphBookmarks(wp), [{
+    id: "7",
+    name: "_RefFigure1",
+  }]);
+});
+
 test("parseDocx：简单域写入 Paragraph.fields 与可见文本", () => {
   const model = parseDocx(makeDocx(`
     <w:p>
@@ -98,6 +113,7 @@ test("parseDocx：简单域写入 Paragraph.fields 与可见文本", () => {
 test("parseDocx：覆盖题注、交叉引用与页码域", () => {
   const model = parseDocx(makeDocx(`
     <w:p>
+      <w:bookmarkStart w:id="1" w:name="_RefFigure1"/>
       <w:r><w:t>图 </w:t></w:r>
       <w:r><w:fldChar w:fldCharType="begin"/></w:r>
       <w:r><w:instrText xml:space="preserve"> SEQ Figure \\* ARABIC </w:instrText></w:r>
@@ -105,6 +121,7 @@ test("parseDocx：覆盖题注、交叉引用与页码域", () => {
       <w:r><w:t>1</w:t></w:r>
       <w:r><w:fldChar w:fldCharType="end"/></w:r>
       <w:r><w:t> 研究装置</w:t></w:r>
+      <w:bookmarkEnd w:id="1"/>
     </w:p>
     <w:p>
       <w:r><w:t>见图 </w:t></w:r>
@@ -151,4 +168,8 @@ test("parseDocx：覆盖题注、交叉引用与页码域", () => {
       },
     ],
   );
+  assert.deepEqual(model.paragraphs[0]?.bookmarks, [{
+    id: "1",
+    name: "_RefFigure1",
+  }]);
 });

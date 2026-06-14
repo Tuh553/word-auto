@@ -1,6 +1,7 @@
 // 编号连续性检测：标题题序、图表题注连号
 
 import type { DocModel } from "@word-auto/parser";
+import { buildCaptionReferenceGraph } from "./caption-links.js";
 import type { ClassifiedParagraph, ValidationIssue } from "./types.js";
 
 // 预编译正则表达式（模块级常量，避免重复创建）
@@ -125,6 +126,13 @@ const checkCaptionSequence = (
   captionLabel: "图" | "表",
 ): ValidationIssue[] => {
   const issues: ValidationIssue[] = [];
+  const kind = captionRole === "figure_caption" ? "figure" : "table";
+  const graph = buildCaptionReferenceGraph(classified);
+  const captionNumbers = new Map(
+    graph.captions
+      .filter((caption) => caption.kind === kind && caption.numberParts.length > 0)
+      .map((caption) => [caption.paragraphIndex, caption.numberParts] as const),
+  );
   let lastMajor = 0;
   let lastMinor = 0;
   let currentChapter: number | null = null;
@@ -143,7 +151,7 @@ const checkCaptionSequence = (
 
     if (cp.role !== captionRole) continue;
 
-    const nums = extractCaptionNumber(cp.para.text);
+    const nums = captionNumbers.get(cp.para.index) ?? extractCaptionNumber(cp.para.text);
     if (!nums) continue;
 
     const [major, minor] = nums;
@@ -243,6 +251,7 @@ export const checkNumberingSequence = (
   model: DocModel,
   classified: ClassifiedParagraph[],
 ): ValidationIssue[] => {
+  void model;
   return [
     ...checkHeadingSequence(classified),
     ...checkFigureCaptionSequence(classified),

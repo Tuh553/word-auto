@@ -1,5 +1,5 @@
 import { attr } from "./ooxml.js";
-import type { Field } from "./types.js";
+import type { Bookmark, Field } from "./types.js";
 
 const toArray = <T>(value: T | T[] | undefined): T[] => {
   if (value == null) return [];
@@ -47,6 +47,31 @@ const collectRuns = (node: unknown, out: any[] = []): any[] => {
     }
     collectRuns(value, out);
   }
+  return out;
+};
+
+const collectBookmarkStarts = (node: unknown, out: Bookmark[] = []): Bookmark[] => {
+  if (node == null || typeof node !== "object") return out;
+  if (Array.isArray(node)) {
+    for (const item of node) collectBookmarkStarts(item, out);
+    return out;
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "w:bookmarkStart") {
+      for (const bookmarkStart of toArray(value as any)) {
+        const name = attr(bookmarkStart, "w:name");
+        if (!name) continue;
+        out.push({
+          id: attr(bookmarkStart, "w:id"),
+          name,
+        });
+      }
+      continue;
+    }
+    collectBookmarkStarts(value, out);
+  }
+
   return out;
 };
 
@@ -208,4 +233,17 @@ export const parseParagraphFields = (wp: any): Field[] => {
   return fields.length > 0
     ? fields.sort((a, b) => a.startRunIndex - b.startRunIndex || a.endRunIndex - b.endRunIndex)
     : [];
+};
+
+export const parseParagraphBookmarks = (wp: any): Bookmark[] => {
+  const bookmarks = collectBookmarkStarts(wp);
+  if (bookmarks.length === 0) return [];
+
+  const seen = new Set<string>();
+  return bookmarks.filter((bookmark) => {
+    const key = `${bookmark.id ?? ""}:${bookmark.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };

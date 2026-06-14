@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Paragraph } from "@word-auto/parser";
+import type { Bookmark, Field, Paragraph } from "@word-auto/parser";
 import {
   checkHeadingSequence,
   checkFigureCaptionSequence,
@@ -10,7 +10,7 @@ import type { ClassifiedParagraph } from "./types.js";
 
 const mkPara = (
   text: string,
-  opts: { outlineLevel?: number; index?: number } = {},
+  opts: { outlineLevel?: number; index?: number; fields?: Field[]; bookmarks?: Bookmark[] } = {},
 ): Paragraph => ({
   index: opts.index ?? 0,
   styleId: undefined,
@@ -19,6 +19,8 @@ const mkPara = (
   markRun: {},
   runs: [{ text, props: {} }],
   text,
+  bookmarks: opts.bookmarks,
+  fields: opts.fields,
   structure: { drawingCount: 0, mathCount: 0, embeddedObjectCount: 0 },
   effective: { outlineLevel: opts.outlineLevel },
 });
@@ -26,7 +28,7 @@ const mkPara = (
 const mkClassified = (
   text: string,
   role: string,
-  opts: { outlineLevel?: number; index?: number } = {},
+  opts: { outlineLevel?: number; index?: number; fields?: Field[]; bookmarks?: Bookmark[] } = {},
 ): ClassifiedParagraph => ({
   para: mkPara(text, opts),
   role: role as any,
@@ -177,6 +179,42 @@ test("图题注连号检测：主编号变化后次编号未重置", () => {
   assert.equal(issues[0].message.includes("应从 1 开始"), true);
   assert.equal(issues[1].paragraphIndex, 3);
   assert.equal(issues[1].message.includes("应从 1 开始"), true);
+});
+
+test("图题注连号检测：优先使用 SEQ 域编号而不是段落正则", () => {
+  const classified = [
+    mkClassified("第一章 绪论", "heading", { outlineLevel: 0, index: 0 }),
+    mkClassified("图 X 研究框架", "figure_caption", {
+      index: 1,
+      bookmarks: [{ name: "_RefFigure1" }],
+      fields: [{
+        type: "SEQ",
+        instruction: "SEQ Figure \\* ARABIC",
+        displayText: "1-1",
+        sequence: "Figure",
+        startRunIndex: 1,
+        endRunIndex: 5,
+      }],
+    }),
+    mkClassified("图 X 技术路线", "figure_caption", {
+      index: 2,
+      bookmarks: [{ name: "_RefFigure2" }],
+      fields: [{
+        type: "SEQ",
+        instruction: "SEQ Figure \\* ARABIC",
+        displayText: "1-3",
+        sequence: "Figure",
+        startRunIndex: 1,
+        endRunIndex: 5,
+      }],
+    }),
+  ];
+
+  const issues = checkFigureCaptionSequence(classified);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].paragraphIndex, 2);
+  assert.equal(issues[0].actual, "1-3");
+  assert.equal(issues[0].expected, "1-2");
 });
 
 test("表题注连号检测：正常连续", () => {

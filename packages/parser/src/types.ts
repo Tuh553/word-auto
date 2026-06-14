@@ -73,6 +73,13 @@ export interface Run {
   props: RunProps;
 }
 
+export interface Bookmark {
+  /** 书签 ID（w:id），可用于与 bookmarkEnd 对应；当前主要保留作调试信息 */
+  id?: string;
+  /** 书签名称（如 _Ref12345678） */
+  name: string;
+}
+
 export interface Field {
   /** 域类型：REF / SEQ / PAGEREF / PAGE / HYPERLINK 等 */
   type: string;
@@ -121,6 +128,8 @@ export interface Paragraph {
   runs: Run[];
   /** 拼接后的纯文本 */
   text: string;
+  /** 段落内定义的书签起点（w:bookmarkStart） */
+  bookmarks?: Bookmark[];
   /** 段落中的结构化域结果（复杂域 + 简单域） */
   fields?: Field[];
   /** 段落级结构信号：辅助识别图题注、公式行等特殊正文元素 */

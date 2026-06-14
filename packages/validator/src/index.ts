@@ -3,6 +3,9 @@ export { classifyParagraphs } from "./classify.js";
 export { validateDoc } from "./validate.js";
 export { computeFixHint, type FixHint, type Fixability } from "./fixhints.js";
 export {
+  buildCaptionReferenceGraph,
+} from "./caption-links.js";
+export {
   checkHeadingSequence,
   checkFigureCaptionSequence,
   checkTableCaptionSequence,

@@ -1,3 +1,5 @@
+import type { Field, Paragraph } from "@word-auto/parser";
+
 // 规则库类型（对应 chongqing-thesis-phase1.json）。只声明校验用得到的字段，其余宽松放行。
 
 export interface StyleRule {
@@ -241,8 +243,41 @@ export type Severity = "error" | "warn" | "info";
 
 /** 带角色的已分类段落 */
 export interface ClassifiedParagraph {
-  para: import("@word-auto/parser").Paragraph;
+  para: Paragraph;
   role: Role | null;
+}
+
+export type CaptionKind = "figure" | "table" | "equation";
+
+export interface CaptionTarget {
+  kind: CaptionKind;
+  role: Role;
+  paragraphIndex: number;
+  fieldIndex: number;
+  sequenceName: string;
+  numberText: string;
+  numberParts: number[];
+  bookmarkNames: string[];
+  field: Field;
+}
+
+export interface CaptionReference {
+  type: "REF" | "PAGEREF";
+  paragraphIndex: number;
+  role: Role | null;
+  fieldIndex: number;
+  bookmark: string;
+  displayText: string;
+  bookmarkExists: boolean;
+  targetCaption?: CaptionTarget;
+  field: Field;
+}
+
+export interface CaptionReferenceGraph {
+  captions: CaptionTarget[];
+  references: CaptionReference[];
+  bookmarks: Set<string>;
+  captionsByBookmark: Map<string, CaptionTarget>;
 }
 
 /** 校验问题类型 */

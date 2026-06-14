@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from "fflate";
 import { ParseError, isParseError } from "./errors.js";
-import { collectParagraphRunData, parseParagraphFields } from "./fields.js";
+import { collectParagraphRunData, parseParagraphBookmarks, parseParagraphFields } from "./fields.js";
 import { parseHeaderFooterPart } from "./headerFooter.js";
 import {
   parseNumbering,
@@ -149,6 +149,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       props: parseRunProps(r["w:rPr"], theme),
     }));
     const text = runs.map((r) => r.text).join("");
+    const bookmarks = parseParagraphBookmarks(wp);
     const fields = parseParagraphFields(wp);
     const structure = collectParagraphStructure(wp);
     const numRef = extractParagraphNumbering(pPr);
@@ -163,6 +164,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       markRun,
       runs,
       text,
+      bookmarks: bookmarks.length > 0 ? bookmarks : undefined,
       fields: fields.length > 0 ? fields : undefined,
       structure,
       effective: {},
