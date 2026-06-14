@@ -1,0 +1,129 @@
+import { attr, parseXml } from "./ooxml.js";
+import type { NoteDefinition, NoteReference, NoteType } from "./types.js";
+
+const toArray = <T>(value: T | T[] | undefined): T[] => {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+const readTextNode = (node: unknown): string => {
+  if (node == null) return "";
+  if (Array.isArray(node)) return node.map(readTextNode).join("");
+  if (typeof node === "string") return node;
+  if (typeof node === "object") {
+    const text = (node as Record<string, unknown>)["#text"];
+    return typeof text === "string" ? text : "";
+  }
+  return "";
+};
+
+const collectParagraphNodes = (node: unknown, out: any[] = []): any[] => {
+  if (node == null || typeof node !== "object") return out;
+  if (Array.isArray(node)) {
+    for (const item of node) collectParagraphNodes(item, out);
+    return out;
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "w:p") {
+      out.push(...toArray(value as any));
+      continue;
+    }
+    collectParagraphNodes(value, out);
+  }
+  return out;
+};
+
+const collectParagraphText = (node: unknown): string => {
+  if (node == null || typeof node !== "object") return "";
+  if (Array.isArray(node)) return node.map(collectParagraphText).join("");
+
+  let text = "";
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "w:t") {
+      text += readTextNode(value);
+      continue;
+    }
+    text += collectParagraphText(value);
+  }
+  return text;
+};
+
+const isRegularNote = (node: any): boolean => {
+  const type = attr(node, "w:type");
+  return type == null || type === "";
+};
+
+const rootTagFor = (type: NoteType): string =>
+  type === "footnote" ? "w:footnotes" : "w:endnotes";
+
+const itemTagFor = (type: NoteType): string =>
+  type === "footnote" ? "w:footnote" : "w:endnote";
+
+export const parseNoteDefinitions = (
+  xmlText: string,
+  type: NoteType,
+): NoteDefinition[] => {
+  const root = parseXml(xmlText);
+  const part = root[rootTagFor(type)] ?? {};
+  const items = toArray(part[itemTagFor(type)] as any);
+
+  const definitions: NoteDefinition[] = [];
+  for (const item of items) {
+    const id = attr(item, "w:id");
+    if (!id || !isRegularNote(item)) continue;
+
+    const paragraphs = collectParagraphNodes(item)
+      .map((paragraph) => collectParagraphText(paragraph).trim())
+      .filter(Boolean);
+
+    definitions.push({
+      id,
+      type,
+      content: paragraphs.join("\n"),
+    });
+  }
+  return definitions;
+};
+
+export const buildNoteDefinitionLookup = (
+  definitions: NoteDefinition[],
+): Map<string, NoteDefinition> =>
+  new Map(definitions.map((definition) => [definition.id, definition]));
+
+export const parseParagraphNotes = (
+  runs: any[],
+  lookups: Record<NoteType, Map<string, NoteDefinition>>,
+): NoteReference[] => {
+  const references: NoteReference[] = [];
+
+  runs.forEach((run, runIndex) => {
+    for (const ref of toArray(run["w:footnoteReference"] as any)) {
+      const id = attr(ref, "w:id");
+      if (!id) continue;
+      const definition = lookups.footnote.get(id);
+      references.push({
+        id,
+        type: "footnote",
+        runIndex,
+        ...(definition ? { content: definition.content } : {}),
+        hasDefinition: definition != null,
+      });
+    }
+
+    for (const ref of toArray(run["w:endnoteReference"] as any)) {
+      const id = attr(ref, "w:id");
+      if (!id) continue;
+      const definition = lookups.endnote.get(id);
+      references.push({
+        id,
+        type: "endnote",
+        runIndex,
+        ...(definition ? { content: definition.content } : {}),
+        hasDefinition: definition != null,
+      });
+    }
+  });
+
+  return references;
+};

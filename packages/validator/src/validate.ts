@@ -1,6 +1,7 @@
 import { units, type DocModel, type Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
 import { computeFixHint } from "./fixhints.js";
+import { checkNoteConsistency } from "./notes-check.js";
 import { checkNumberingSequence } from "./numbering-check.js";
 import { checkCaptionReferenceValidity } from "./reference-check.js";
 import { isEditableRuleLibrary } from "./rules.js";
@@ -645,6 +646,7 @@ export const validateDoc = (
   const structuredIssues = [
     ...checkNumberingSequence(model, classified),
     ...checkCaptionReferenceValidity(classified),
+    ...checkNoteConsistency(model, classified),
   ];
   for (const vi of structuredIssues) {
     if (vi.type === "paragraph" && vi.paragraphIndex !== undefined) {
@@ -658,6 +660,22 @@ export const validateDoc = (
         severity: vi.severity,
         message: vi.message,
         textPreview: para?.text.slice(0, 24) ?? "",
+        suggestion: vi.fixHint,
+        fixability: vi.canAutoFix ? "auto" : "manual",
+      });
+      continue;
+    }
+    if (vi.type === "document") {
+      issues.push({
+        paraIndex: -1,
+        role: vi.role,
+        field: vi.field,
+        expected: vi.expected,
+        actual: vi.actual,
+        severity: vi.severity,
+        message: vi.message,
+        textPreview: vi.textPreview ?? "",
+        provenance: vi.provenance,
         suggestion: vi.fixHint,
         fixability: vi.canAutoFix ? "auto" : "manual",
       });

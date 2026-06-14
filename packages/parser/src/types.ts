@@ -73,6 +73,27 @@ export interface Run {
   props: RunProps;
 }
 
+export type NoteType = "footnote" | "endnote";
+
+/** 文档内脚注/尾注定义（来自 footnotes.xml / endnotes.xml） */
+export interface NoteDefinition {
+  id: string;
+  type: NoteType;
+  /** 注释正文，按段落拼接 */
+  content: string;
+}
+
+/** 段落中的脚注/尾注引用位置 */
+export interface NoteReference {
+  id: string;
+  type: NoteType;
+  /** 引用标记所在 run 索引 */
+  runIndex: number;
+  /** 若能在定义部件中找到对应注释，则回填正文 */
+  content?: string;
+  hasDefinition: boolean;
+}
+
 export interface Bookmark {
   /** 书签 ID（w:id），可用于与 bookmarkEnd 对应；当前主要保留作调试信息 */
   id?: string;
@@ -132,6 +153,8 @@ export interface Paragraph {
   bookmarks?: Bookmark[];
   /** 段落中的结构化域结果（复杂域 + 简单域） */
   fields?: Field[];
+  /** 段落中的脚注/尾注引用 */
+  notes?: NoteReference[];
   /** 段落级结构信号：辅助识别图题注、公式行等特殊正文元素 */
   structure: ParagraphStructure;
   /** 继承解析后的有效格式 */
@@ -249,6 +272,8 @@ export interface DocModel {
   headerParts?: HeaderFooterPart[];
   /** 结构化页脚部件；包含 PAGE 页码域的基础识别 */
   footerParts?: HeaderFooterPart[];
+  /** 文档内脚注/尾注定义 */
+  noteDefinitions?: NoteDefinition[];
   /** 编号定义（来自 numbering.xml） */
   numbering: NumberingDefinitions;
 }

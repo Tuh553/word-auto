@@ -15,6 +15,9 @@ const BASELINE = {
   paragraphCount: 443,
   sectionCount: 14,
   tableParagraphCount: 173,
+  noteDefinitionCount: 1,
+  noteReferenceParagraphIndexes: [125],
+  firstNoteContent: "① 脚注文本脚注文本脚注文本脚注文本",
   drawingParagraphIndexes: [0, 4, 22, 41, 59, 72, 136, 139, 150],
   embeddedObjectParagraphIndexes: [136],
   mathParagraphIndexes: [],
@@ -57,6 +60,14 @@ test("parseDocx：标准模板解析基线保持稳定", () => {
     model.paragraphs.filter((item) => item.inTable).length,
     BASELINE.tableParagraphCount,
   );
+  assert.equal(model.noteDefinitions?.length ?? 0, BASELINE.noteDefinitionCount);
+  assert.deepEqual(
+    model.paragraphs
+      .filter((item) => (item.notes?.length ?? 0) > 0)
+      .map((item) => item.index),
+    BASELINE.noteReferenceParagraphIndexes,
+  );
+  assert.equal(model.noteDefinitions?.[0]?.content, BASELINE.firstNoteContent);
   assert.deepEqual(
     model.paragraphs
       .filter((item) => item.structure.drawingCount > 0)

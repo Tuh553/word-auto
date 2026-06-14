@@ -9,6 +9,9 @@ export {
   checkCaptionReferenceValidity,
 } from "./reference-check.js";
 export {
+  checkNoteConsistency,
+} from "./notes-check.js";
+export {
   checkHeadingSequence,
   checkFigureCaptionSequence,
   checkTableCaptionSequence,

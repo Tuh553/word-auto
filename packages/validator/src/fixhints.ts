@@ -170,6 +170,16 @@ export const computeFixHint = (
         fixability: "manual",
       };
     }
+    case "note_reference":
+      return {
+        suggestion: "请在 Word 中检查该脚注/尾注引用，补回对应定义或删除失效引用后再更新注释编号",
+        fixability: "manual",
+      };
+    case "note_definition":
+      return {
+        suggestion: "请核对这些脚注/尾注定义是否仍需保留；若正文已无引用，请删除孤立注释或重新插入引用",
+        fixability: "manual",
+      };
   }
 
   if (field in DOC_FIELD_LABELS) {

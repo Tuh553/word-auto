@@ -3,6 +3,11 @@ import { ParseError, isParseError } from "./errors.js";
 import { collectParagraphRunData, parseParagraphBookmarks, parseParagraphFields } from "./fields.js";
 import { parseHeaderFooterPart } from "./headerFooter.js";
 import {
+  buildNoteDefinitionLookup,
+  parseNoteDefinitions,
+  parseParagraphNotes,
+} from "./notes.js";
+import {
   parseNumbering,
   extractParagraphNumbering,
 } from "./numbering.js";
@@ -77,6 +82,7 @@ const parseDocumentParts = (
   theme: ThemeFonts;
   styles: Map<string, StyleDef>;
   docDefaults: DocDefaults;
+  noteDefinitions: ReturnType<typeof parseNoteDefinitions>;
   numbering: NumberingDefinitions;
   root: any;
 } => {
@@ -89,8 +95,18 @@ const parseDocumentParts = (
     const numbering = parseNumbering(
       read("word/numbering.xml") ?? "<w:numbering/>",
     );
+    const noteDefinitions = [
+      ...parseNoteDefinitions(
+        read("word/footnotes.xml") ?? "<w:footnotes/>",
+        "footnote",
+      ),
+      ...parseNoteDefinitions(
+        read("word/endnotes.xml") ?? "<w:endnotes/>",
+        "endnote",
+      ),
+    ];
     const root = parseXml(docXml);
-    return { theme, styles, docDefaults, numbering, root };
+    return { theme, styles, docDefaults, noteDefinitions, numbering, root };
   } catch (error) {
     if (isParseError(error)) throw error;
     const detail = error instanceof Error ? error.message : String(error);
@@ -129,7 +145,14 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   }
   const docXmlText = docXml!;
 
-  const { theme, styles, docDefaults, numbering, root } = parseDocumentParts(read, docXmlText);
+  const { theme, styles, docDefaults, noteDefinitions, numbering, root } = parseDocumentParts(
+    read,
+    docXmlText,
+  );
+  const noteLookups = {
+    footnote: buildNoteDefinitionLookup(noteDefinitions.filter((item) => item.type === "footnote")),
+    endnote: buildNoteDefinitionLookup(noteDefinitions.filter((item) => item.type === "endnote")),
+  };
 
   if (!root["w:document"]?.["w:body"]) {
     failParse("NOT_DOCX", "word/document.xml 不是有效的 Word OOXML 文档结构");
@@ -151,6 +174,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     const text = runs.map((r) => r.text).join("");
     const bookmarks = parseParagraphBookmarks(wp);
     const fields = parseParagraphFields(wp);
+    const notes = parseParagraphNotes(runsRaw, noteLookups);
     const structure = collectParagraphStructure(wp);
     const numRef = extractParagraphNumbering(pPr);
 
@@ -166,6 +190,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
       text,
       bookmarks: bookmarks.length > 0 ? bookmarks : undefined,
       fields: fields.length > 0 ? fields : undefined,
+      notes: notes.length > 0 ? notes : undefined,
       structure,
       effective: {},
       numbering: numRef,
@@ -241,6 +266,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     footers,
     headerParts,
     footerParts,
+    noteDefinitions,
     numbering,
   };
 };

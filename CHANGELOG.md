@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **标题题序连续性检测**：自动检测各级标题编号连续性（1→2→3），支持中文数字（第一章→第二章）和多级编号（1.1→1.2），章节变化时自动重置下级计数器
 - **图表题注连号校验**：检测图题注和表题注编号连续性，支持单级编号（图1→图2）和两级编号（图1-1→图1-2→图2-1），主编号变化时检测次编号重置
 - **题注交叉引用有效性校验**：基于既有 `caption-reference graph` 检测 `REF` / `PAGEREF` 缺失书签与非题注目标书签，并输出结构化 issue
+- **脚注 / 尾注解析与基础校验**：解析 `footnotes.xml` / `endnotes.xml` 注释定义，回填段落引用位置与正文，并检测失效引用 / 孤立定义
 - **列表识别**：基于 numFmt 判断有序/无序列表（bullet→无序，decimal/roman→有序），支持多级嵌套和列表项分组
 - **页眉/页脚结构化解析**：解析 `header*.xml` / `footer*.xml`，输出左/中/右基础位置、页脚纯文本与 `PAGE` 页码域识别，保留旧 `headers` 纯文本兼容字段
 - **代码审查报告**：通过 Claude Code 内置代码审查（extra-high effort，9个角度），发现并修复 7 个关键问题（详见 `code-review-findings.json`）

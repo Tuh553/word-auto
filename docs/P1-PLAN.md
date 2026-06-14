@@ -136,11 +136,11 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 段落内通过 `w:footnoteReference`/`w:endnoteReference` 引用。
 
 **任务清单**：
-- [ ] 实现 `packages/parser/src/notes.ts`：
-  - [ ] 解析 `word/footnotes.xml`：提取脚注 ID 与内容段落
-  - [ ] 解析 `word/endnotes.xml`：提取尾注 ID 与内容段落
-  - [ ] 解析段落内 `w:footnoteReference`/`w:endnoteReference`：记录引用位置
-- [ ] 扩展 `Paragraph` 类型：
+- [x] 实现 `packages/parser/src/notes.ts`：
+  - [x] 解析 `word/footnotes.xml`：提取脚注 ID 与内容段落
+  - [x] 解析 `word/endnotes.xml`：提取尾注 ID 与内容段落
+  - [x] 解析段落内 `w:footnoteReference`/`w:endnoteReference`：记录引用位置
+- [x] 扩展 `Paragraph` 类型：
   ```typescript
   interface Note {
     id: string;             // 脚注/尾注 ID
@@ -154,17 +154,26 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
     notes?: Note[];         // 段落内的脚注/尾注引用
   }
   ```
-- [ ] validator 接入：
-  - [ ] 统计脚注/尾注数量
+- [x] validator 接入：
+  - [x] 统计脚注/尾注数量与引用/定义一致性
   - [ ] 校验脚注/尾注格式（可选规则：字体、字号）
-- [ ] 金标准测试：
-  - [ ] `packages/parser/src/notes.test.ts`：脚注解析、尾注解析
-  - [ ] 验证引用位置准确性
+- [x] 金标准测试：
+  - [x] `packages/parser/src/notes.test.ts`：脚注解析、尾注解析
+  - [x] 验证引用位置准确性
 
 **产出**：
 - `packages/parser/src/notes.ts`（脚注尾注解析）
 - `packages/parser/src/notes.test.ts`（单元测试）
 - 脚注尾注结构化数据
+
+**实现状态（2026-06-14）**：
+- parser 已新增独立 `notes.ts`：解析 `footnotes.xml` / `endnotes.xml` 常规注释定义，
+  忽略 separator / continuation 等特殊项，并将正文按段落拼接。
+- `Paragraph.notes` 已记录 `footnote` / `endnote` 的 `id`、`runIndex`、`content` 与
+  `hasDefinition`，`DocModel.noteDefinitions` 保留整篇文档的注释定义列表。
+- validator 已新增基础一致性校验：正文引用缺定义时报段落级 error；定义存在但正文未引用时报
+  document 级 info。样式级脚注规则仍留待后续扩展。
+- synthetic 测试覆盖脚注、尾注、缺失定义；标准模板基线已固化真实 1 条脚注样本的定义、正文和引用位置。
 
 **验收标准**：
 - 能识别标准模板中所有脚注/尾注及引用位置
