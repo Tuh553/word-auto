@@ -373,3 +373,56 @@ test("validateDoc 产出的 issue 带修复建议与可修复性", () => {
   assert.equal(marginIssue?.fixability, "manual");
   assert.ok((marginIssue?.suggestion ?? "").length > 0);
 });
+
+test("页眉内容检测：优先匹配结构化左侧页眉", () => {
+  const model: DocModel = {
+    ...mkModel([]),
+    headerParts: [
+      {
+        kind: "header",
+        path: "word/header1.xml",
+        text: "重庆大学硕士学位论文 第一章 绪论",
+        leftText: "重庆大学硕士学位论文",
+        centerText: "",
+        rightText: "第一章 绪论",
+        hasPageNumber: false,
+        paragraphs: [],
+      },
+    ],
+  };
+  const rules: RuleLibrary = {
+    headers: { left_text: "重庆大学硕士学位论文" },
+    styles: {},
+  };
+
+  const report = validateDoc(model, rules);
+
+  assert.equal(report.issues.length, 0);
+});
+
+test("页眉内容检测：目标文字只在右侧时不算左侧页眉合格", () => {
+  const model: DocModel = {
+    ...mkModel([]),
+    headerParts: [
+      {
+        kind: "header",
+        path: "word/header1.xml",
+        text: "第一章 绪论 重庆大学硕士学位论文",
+        leftText: "第一章 绪论",
+        centerText: "",
+        rightText: "重庆大学硕士学位论文",
+        hasPageNumber: false,
+        paragraphs: [],
+      },
+    ],
+  };
+  const rules: RuleLibrary = {
+    headers: { left_text: "重庆大学硕士学位论文" },
+    styles: {},
+  };
+
+  const report = validateDoc(model, rules);
+
+  assert.equal(report.issues.length, 1);
+  assert.equal(report.issues[0]?.field, "header_text");
+});

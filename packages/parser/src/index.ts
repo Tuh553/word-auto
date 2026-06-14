@@ -1,11 +1,11 @@
 import { strFromU8, unzipSync } from "fflate";
 import { ParseError, isParseError } from "./errors.js";
+import { parseHeaderFooterPart } from "./headerFooter.js";
 import {
   parseNumbering,
   extractParagraphNumbering,
 } from "./numbering.js";
 import {
-  attr,
   collectParagraphStructure,
   parseParaProps,
   parseRunProps,
@@ -18,6 +18,7 @@ import { parseTheme, type ThemeFonts } from "./theme.js";
 import type {
   DocDefaults,
   DocModel,
+  HeaderFooterPart,
   NumberingDefinitions,
   Paragraph,
   Run,
@@ -197,17 +198,44 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   if (body["w:sectPr"]) sectPrs.push(body["w:sectPr"]);
   const sections: SectionProps[] = sectPrs.map(parseSectPr);
 
-  // 提取各页眉纯文本（header*.xml）
-  const headers: string[] = [];
-  for (const name of Object.keys(files)) {
-    if (/^word\/header\d+\.xml$/.test(name)) {
-      const xml = strFromU8(files[name]);
-      const text = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
-        .map((m) => m[1])
-        .join("");
-      if (text.trim()) headers.push(text);
+  const readHeaderFooterParts = (
+    kind: HeaderFooterPart["kind"],
+  ): HeaderFooterPart[] => {
+    const pattern = kind === "header"
+      ? /^word\/header\d+\.xml$/
+      : /^word\/footer\d+\.xml$/;
+    const parts: HeaderFooterPart[] = [];
+    for (const name of Object.keys(files)) {
+      if (!pattern.test(name)) continue;
+      try {
+        parts.push(parseHeaderFooterPart(strFromU8(files[name]), name, kind));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        failParse("CORRUPT", `${name} XML 解析失败，文件可能已损坏：${detail}`);
+      }
     }
-  }
+    return parts;
+  };
 
-  return { paragraphs, styles, docDefaults, sections, headers, numbering };
+  const headerParts = readHeaderFooterParts("header");
+  const footerParts = readHeaderFooterParts("footer");
+  // 兼容旧调用：保留 header*.xml / footer*.xml 的纯文本投影。
+  const headers = headerParts
+    .map((part) => part.text)
+    .filter((text) => text.trim());
+  const footers = footerParts
+    .map((part) => part.text)
+    .filter((text) => text.trim());
+
+  return {
+    paragraphs,
+    styles,
+    docDefaults,
+    sections,
+    headers,
+    footers,
+    headerParts,
+    footerParts,
+    numbering,
+  };
 };

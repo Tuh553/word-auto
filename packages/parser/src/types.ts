@@ -170,6 +170,43 @@ export interface NumberingDefinitions {
   nums: Map<string, NumberingInstance>;
 }
 
+/** 页眉/页脚内容所在的基础位置。 */
+export type HeaderFooterAlignment = "left" | "center" | "right";
+
+/** 页眉/页脚段落内的内容片段。 */
+export interface HeaderFooterSegment {
+  /** 普通文本或页码域结果 */
+  kind: "text" | "pageNumber";
+  /** 片段展示文本；页码域无结果文本时可为空 */
+  text: string;
+  /** 基于段落对齐、制表符或长空白推断的位置 */
+  alignment: HeaderFooterAlignment;
+  /** 域代码，如 PAGE */
+  instruction?: string;
+}
+
+export interface HeaderFooterParagraph {
+  text: string;
+  leftText: string;
+  centerText: string;
+  rightText: string;
+  alignment: HeaderFooterAlignment;
+  hasPageNumber: boolean;
+  segments: HeaderFooterSegment[];
+}
+
+/** 一个 header*.xml / footer*.xml 部件的结构化解析结果。 */
+export interface HeaderFooterPart {
+  kind: "header" | "footer";
+  path: string;
+  text: string;
+  leftText: string;
+  centerText: string;
+  rightText: string;
+  hasPageNumber: boolean;
+  paragraphs: HeaderFooterParagraph[];
+}
+
 export interface DocModel {
   paragraphs: Paragraph[];
   styles: Map<string, StyleDef>;
@@ -178,6 +215,12 @@ export interface DocModel {
   sections: SectionProps[];
   /** 各页眉（header*.xml）的纯文本，用于页眉内容检测 */
   headers: string[];
+  /** 各页脚（footer*.xml）的纯文本，兼容文档级页码/页脚检测扩展 */
+  footers?: string[];
+  /** 结构化页眉部件；新逻辑应优先使用该字段，headers 仅保留兼容 */
+  headerParts?: HeaderFooterPart[];
+  /** 结构化页脚部件；包含 PAGE 页码域的基础识别 */
+  footerParts?: HeaderFooterPart[];
   /** 编号定义（来自 numbering.xml） */
   numbering: NumberingDefinitions;
 }

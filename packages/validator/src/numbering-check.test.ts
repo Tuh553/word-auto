@@ -87,6 +87,19 @@ test("标题题序连续性检测：章节变化后下级重置", () => {
   assert.equal(issues.length, 0);
 });
 
+test("标题题序连续性检测：数字加空格的一级标题可重置下级", () => {
+  const classified = [
+    mkClassified("1 绪论", "heading1", { outlineLevel: 0, index: 0 }),
+    mkClassified("1.1 背景", "heading2", { outlineLevel: 1, index: 1 }),
+    mkClassified("1.2 意义", "heading2", { outlineLevel: 1, index: 2 }),
+    mkClassified("2 标题", "heading1", { outlineLevel: 0, index: 3 }),
+    mkClassified("2.1 国内研究", "heading2", { outlineLevel: 1, index: 4 }),
+  ];
+
+  const issues = checkHeadingSequence(classified);
+  assert.equal(issues.length, 0);
+});
+
 test("图题注连号检测：单级编号正常", () => {
   const classified = [
     mkClassified("图 1 研究框架", "figure_caption", { index: 0 }),
@@ -118,6 +131,18 @@ test("图题注连号检测：两级编号正常", () => {
     mkClassified("图 1-2 技术路线", "figure_caption", { index: 2 }),
     mkClassified("第二章 文献综述", "heading", { outlineLevel: 0, index: 3 }),
     mkClassified("图 2-1 理论模型", "figure_caption", { index: 4 }),
+  ];
+
+  const issues = checkFigureCaptionSequence(classified);
+  assert.equal(issues.length, 0);
+});
+
+test("图题注连号检测：章节跟踪支持 heading1 角色", () => {
+  const classified = [
+    mkClassified("1 绪论", "heading1", { outlineLevel: 0, index: 0 }),
+    mkClassified("图 1-1 研究框架", "figure_caption", { index: 1 }),
+    mkClassified("2 标题", "heading1", { outlineLevel: 0, index: 2 }),
+    mkClassified("图 2-1 理论模型", "figure_caption", { index: 3 }),
   ];
 
   const issues = checkFigureCaptionSequence(classified);

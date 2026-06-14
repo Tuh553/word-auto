@@ -77,4 +77,9 @@ test("parseDocx：标准模板解析基线保持稳定", () => {
   );
   assert.deepEqual(model.sections[0], BASELINE.firstSection);
   assert.deepEqual(model.headers.map(compactHeader), BASELINE.headerTitles);
+  assert.deepEqual(
+    model.headerParts?.map((part) => part.rightText).filter(Boolean),
+    BASELINE.headerTitles,
+  );
+  assert.ok(model.footerParts?.some((part) => part.hasPageNumber));
 });

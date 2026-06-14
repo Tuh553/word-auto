@@ -7,7 +7,7 @@ import type { ClassifiedParagraph, ValidationIssue } from "./types.js";
 const RE_CHINESE_CHAPTER = /^第?([一二三四五六七八九十]+)[章节条款]/;
 const RE_ARABIC_CHAPTER = /^第?\s*(\d+)\s*[章节条款]/;
 const RE_MULTI_LEVEL = /^(\d+(?:\.\d+)+)[.、\s]/;
-const RE_SINGLE_LEVEL = /^(\d+)[.、]\s*/;
+const RE_SINGLE_LEVEL = /^(\d+)(?:[.、]\s*|\s+(?=\S))/;
 const RE_PAREN = /^\((\d+)\)|^（(\d+)）/;
 const RE_CAPTION = /^[图表]\s*(\d+)(?:[-.](\d+))?/;
 
@@ -132,7 +132,7 @@ const checkCaptionSequence = (
   for (const cp of classified) {
     if (!cp.role) continue; // 跳过未分类段落
     // 跟踪章节变化（一级标题）
-    if (cp.role === "heading" && cp.para.effective.outlineLevel === 0) {
+    if (cp.role.startsWith("heading") && cp.para.effective.outlineLevel === 0) {
       const chapterNum = extractNumber(cp.para.text);
       if (chapterNum !== null) {
         currentChapter = chapterNum;

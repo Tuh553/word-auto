@@ -14,6 +14,7 @@ export const xmlParser = new XMLParser({
   attributeNamePrefix: "@_",
   parseAttributeValue: false,
   parseTagValue: false,
+  trimValues: false,
   // 强制这些节点始终为数组，避免“单个 vs 多个”分支
   isArray: (name) =>
     ["w:p", "w:r", "w:style", "w:tbl", "w:tr", "w:tc"].includes(name),

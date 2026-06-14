@@ -597,15 +597,24 @@ const checkHeaders = (
   const h = rules.headers;
   if (!h?.left_text) return [];
   const target = h.left_text.replace(/\s+/g, "");
-  const found = model.headers.some((t) => t.replace(/\s+/g, "").includes(target));
+  const structuredHeaders = model.headerParts ?? [];
+  const candidateTexts = structuredHeaders.length > 0
+    ? structuredHeaders.map((part) => part.leftText)
+    : model.headers;
+  const found = candidateTexts.some((t) => t.replace(/\s+/g, "").includes(target));
   if (found) return [];
+  const actual = structuredHeaders.length > 0
+    ? structuredHeaders
+        .map((part) => part.leftText || "(左侧无文字)")
+        .join(" / ")
+    : model.headers.join(" / ");
   return [
     {
       paraIndex: -1,
       role: "document",
       field: "header_text",
       expected: h.left_text,
-      actual: model.headers.join(" / ") || "(无页眉文字)",
+      actual: actual || "(无页眉文字)",
       severity: "warn",
       message: `页眉应包含「${h.left_text}」`,
       textPreview: "页眉",
