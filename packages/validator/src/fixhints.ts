@@ -157,6 +157,19 @@ export const computeFixHint = (
         suggestion: `请在页眉中加入文字「${String(issue.expected ?? "")}」`,
         fixability: "manual",
       };
+    case "caption_reference": {
+      const actual = String(issue.actual ?? "");
+      if (actual.includes("不存在")) {
+        return {
+          suggestion: "请在 Word 中更新该交叉引用，改为指向现有图/表/公式题注，或补回对应书签后再更新域",
+          fixability: "manual",
+        };
+      }
+      return {
+        suggestion: "请核对该交叉引用的目标，确保它指向图/表/公式题注而不是普通书签",
+        fixability: "manual",
+      };
+    }
   }
 
   if (field in DOC_FIELD_LABELS) {

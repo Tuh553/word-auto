@@ -2,6 +2,7 @@ import { units, type DocModel, type Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
 import { computeFixHint } from "./fixhints.js";
 import { checkNumberingSequence } from "./numbering-check.js";
+import { checkCaptionReferenceValidity } from "./reference-check.js";
 import { isEditableRuleLibrary } from "./rules.js";
 import type {
   EditableRuleLibrary,
@@ -640,9 +641,12 @@ export const validateDoc = (
     ...checkHeaders(model, rules),
   ];
 
-  // 编号连续性检测（转换为 Issue 格式）
-  const numberingIssues = checkNumberingSequence(model, classified);
-  for (const vi of numberingIssues) {
+  // 结构化编号 / 域引用检测（转换为 Issue 格式）
+  const structuredIssues = [
+    ...checkNumberingSequence(model, classified),
+    ...checkCaptionReferenceValidity(classified),
+  ];
+  for (const vi of structuredIssues) {
     if (vi.type === "paragraph" && vi.paragraphIndex !== undefined) {
       const para = model.paragraphs[vi.paragraphIndex];
       issues.push({

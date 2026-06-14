@@ -6,6 +6,9 @@ export {
   buildCaptionReferenceGraph,
 } from "./caption-links.js";
 export {
+  checkCaptionReferenceValidity,
+} from "./reference-check.js";
+export {
   checkHeadingSequence,
   checkFigureCaptionSequence,
   checkTableCaptionSequence,

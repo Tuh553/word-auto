@@ -80,6 +80,7 @@ const FIELD_LABELS: Record<string, string> = {
   page_number_front: "前置部分页码",
   page_number_body: "正文页码",
   header_text: "页眉内容",
+  caption_reference: "交叉引用",
 };
 
 const SECTION_LABELS = {

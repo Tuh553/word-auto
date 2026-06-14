@@ -99,7 +99,7 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 - [ ] validator 增强：基于域的连号检测
   - [ ] 替代当前 `packages/validator/src/numbering-check.ts` 的正则解析
   - [x] 检测题注编号连续性（基于 `SEQ` 域优先，支持多级编号；无域时仍保留正则兜底）
-  - [ ] 检测交叉引用有效性（`REF` 引用的书签是否存在）
+  - [x] 检测交叉引用有效性（`REF` / `PAGEREF` 缺失书签、非题注目标书签）
 - [ ] 金标准测试：
   - [x] 验证题注域识别准确性
   - [x] 验证交叉引用关联准确性
@@ -116,8 +116,9 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
   `SEQ`、正文 `REF` / `PAGEREF` 与书签之间的结构化关联数据。
 - `packages/validator/src/numbering-check.ts` 已优先消费图 / 表题注的 `SEQ` 域编号；
   无域样本仍保留原正则兜底，避免标准模板基线回退。
-- 当前尚未把“交叉引用书签失效”正式接成 `validateDoc` issue；该能力已有区分
-  `bookmarkExists=false` 与“书签存在但不是题注”的底层数据，可在下一步直接接 validator。
+- validator 已新增 `REF` / `PAGEREF` 引用有效性校验，并将“书签不存在”与
+  “书签存在但目标不是图 / 表 / 公式题注”输出为结构化 `issue`。
+- 图 / 表题注连号检测已明确以 `SEQ` 域编号为主，段落正则仅作为无域样本兜底。
 
 **验收标准**：
 - 能识别标准模板中所有图题注、表题注、交叉引用

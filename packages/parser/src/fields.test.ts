@@ -110,7 +110,7 @@ test("parseDocx：简单域写入 Paragraph.fields 与可见文本", () => {
   }]);
 });
 
-test("parseDocx：覆盖题注、交叉引用与页码域", () => {
+test("parseDocx：覆盖题注、REF/PAGEREF 交叉引用与页码域", () => {
   const model = parseDocx(makeDocx(`
     <w:p>
       <w:bookmarkStart w:id="1" w:name="_RefFigure1"/>
@@ -129,6 +129,14 @@ test("parseDocx：覆盖题注、交叉引用与页码域", () => {
       <w:r><w:instrText xml:space="preserve"> REF _RefFigure1 \\h </w:instrText></w:r>
       <w:r><w:fldChar w:fldCharType="separate"/></w:r>
       <w:r><w:t>1</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>详见第 </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> PAGEREF _RefFigure1 \\h </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>3</w:t></w:r>
       <w:r><w:fldChar w:fldCharType="end"/></w:r>
     </w:p>
     <w:p>
@@ -155,6 +163,14 @@ test("parseDocx：覆盖题注、交叉引用与页码域", () => {
         type: "REF",
         instruction: "REF _RefFigure1 \\h",
         displayText: "1",
+        bookmark: "_RefFigure1",
+        startRunIndex: 1,
+        endRunIndex: 5,
+      },
+      {
+        type: "PAGEREF",
+        instruction: "PAGEREF _RefFigure1 \\h",
+        displayText: "3",
         bookmark: "_RefFigure1",
         startRunIndex: 1,
         endRunIndex: 5,

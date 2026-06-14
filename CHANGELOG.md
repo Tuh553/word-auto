@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - **numbering.xml 自动编号解析**：实现完整的 OOXML numbering.xml 解析，支持抽象编号定义（abstractNum）、编号实例（num）和段落编号引用（numPr）
 - **标题题序连续性检测**：自动检测各级标题编号连续性（1→2→3），支持中文数字（第一章→第二章）和多级编号（1.1→1.2），章节变化时自动重置下级计数器
 - **图表题注连号校验**：检测图题注和表题注编号连续性，支持单级编号（图1→图2）和两级编号（图1-1→图1-2→图2-1），主编号变化时检测次编号重置
+- **题注交叉引用有效性校验**：基于既有 `caption-reference graph` 检测 `REF` / `PAGEREF` 缺失书签与非题注目标书签，并输出结构化 issue
 - **列表识别**：基于 numFmt 判断有序/无序列表（bullet→无序，decimal/roman→有序），支持多级嵌套和列表项分组
 - **页眉/页脚结构化解析**：解析 `header*.xml` / `footer*.xml`，输出左/中/右基础位置、页脚纯文本与 `PAGE` 页码域识别，保留旧 `headers` 纯文本兼容字段
 - **代码审查报告**：通过 Claude Code 内置代码审查（extra-high effort，9个角度），发现并修复 7 个关键问题（详见 `code-review-findings.json`）
@@ -24,7 +25,8 @@ All notable changes to this project will be documented in this file.
   - `ValidationIssue` 的 `role` 字段收窄为严格 `Role` 类型
 - **页眉内容检测迁移**：`headers.left_text` 优先匹配结构化左侧页眉，仅在旧模型没有结构化页眉时回退纯文本
 - **校验流程集成**：`validateDoc` 自动调用编号连续性检测，编号问题统一输出到 `ValidationReport`
-- **测试基线更新**：测试用例从 65 个增加到 88 个，标准模板当前检测问题从 86 个增至 87 个（保留 1 个表题注连号问题，修正跨章标题题序误报）
+- **题注连号策略明确**：图 / 表题注优先消费 `SEQ` 域编号，段落正则仅作为无域样本兜底
+- **测试基线更新**：新增 parser `PAGEREF` synthetic 用例与 validator 引用有效性用例，标准模板当前仍保留 1 个表题注连号问题
 - **数据流统一**：`classified` 数组与主校验循环对 undefined 角色的处理逻辑统一（均跳过）
 
 ### Fixed
