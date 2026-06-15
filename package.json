@@ -8,13 +8,21 @@
   "scripts": {
     "build": "pnpm -r --if-present --filter @word-auto/parser --filter @word-auto/validator --filter @word-auto/cli --filter @word-auto/web run build",
     "check": "pnpm -r --filter ./apps/cli run check",
-    "ci": "pnpm typecheck && pnpm test && pnpm build",
+    "ci": "pnpm typecheck && pnpm lint && pnpm knip && pnpm jscpd && pnpm test && pnpm build",
+    "lint": "eslint . --max-warnings 28",
+    "knip": "knip",
+    "jscpd": "jscpd packages apps",
     "test": "pnpm -r --if-present --filter @word-auto/parser --filter @word-auto/validator --filter @word-auto/web run test",
     "typecheck": "pnpm -r --if-present --filter @word-auto/parser --filter @word-auto/validator --filter @word-auto/cli --filter @word-auto/web run typecheck"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
+    "eslint": "^10.5.0",
+    "jscpd": "^5.0.9",
+    "knip": "^6.16.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.61.0"
   }
 }

@@ -72,6 +72,44 @@ run 用 `w:asciiTheme`/`w:eastAsiaTheme` 等主题引用而非显式字体名时
 - 对齐归一：OOXML `both`/`distribute` → `justify`，`start`/`end` → `left`/`right`。
 - 严重级别：字体/字号 = error；加粗/对齐/行距/缩进 = warn。
 
+## 质量门禁与防劣化约定
+
+CI（`.github/workflows/quality.yml`）与 `pnpm run ci` 在 `typecheck`/`test`/`build`
+之外加了三道静态门禁。**功能靠 test，结构靠这三道**——两者正交，缺一类会在"全绿"下
+持续劣化。本地提交前自查：`pnpm lint && pnpm knip && pnpm jscpd`（或整体 `pnpm run ci`）。
+
+| 门禁 | 工具 | 拦什么 | 严格度 |
+| --- | --- | --- | --- |
+| `pnpm jscpd` | jscpd | 复制粘贴 | `.jscpd.json` `threshold:0`，出现重复即红 |
+| `pnpm knip` | knip | 未用导出/依赖/文件 | 发现即红 |
+| `pnpm lint` | eslint | 复杂度/体量/反模式 | error 阻断；结构债务走 `--max-warnings` 棘轮 |
+
+### 给 agent 的硬约定
+
+1. **复用优先，禁止复制 helper。** 通用 OOXML 操作集中在 `parser/src/ooxml.ts`：
+   `attr` / `parseXml` / `toArray` / `readTextNode` / `collectNodeText` /
+   `collectParagraphNodes`。新解析模块要 `import` 它们，**不要再在本地抄一份**——
+   jscpd `threshold:0` 会直接拦下（`fields.ts`/`notes.ts` 曾各抄一份，已收敛）。
+2. **YAGNI，不留无消费者的代码。** 不加当前没人读的导出/字段。knip 会拦未用的
+   **导出**；但 interface 的**多余字段**（如曾经的 `NoteReference.content`）knip
+   抓不到，需自己 review 时砍掉。
+3. **童子军法则。** 在某模块加功能前，先清掉该模块已有的重复/坏味道，再加；
+   否则重复只会越滚越多。
+4. **复杂度/体量预算（新代码必须达标）：** 函数 complexity ≤ 15、≤ 80 行；
+   文件 ≤ 400 行；参数 ≤ 5；嵌套 ≤ 4 层。超了就拆函数/拆文件，别硬塞。
+5. **OOXML 动态节点用 `any` 是允许的设计选择**（`no-explicit-any` 设 off），
+   不必为它纠结；但业务层类型该精确还得精确。
+
+### 棘轮维护（结构债务只减不增）
+
+现存复杂度/体量超标是历史存量，设为 **warn** 并由 `package.json` 的
+`"lint": "eslint . --max-warnings <N>"` 锁定上限（当前 `N=28`）：
+
+- 新增任何结构 warning → 总数 > N → CI 红，逼停劣化。
+- 每清理一批存量，**同步下调 N**（只减不增），让上限贴着现实收紧。
+- 某规则的存量清零后，把它从 `warn` 升 `error`。
+- 远期可开 type-checked 规则（typescript-eslint `projectService`）治理 `any`。
+
 ## 下一步（按价值/风险排序）
 
 1. 多模板支持：web 上传自定义规则库 JSON（去 BOM + 校验 styles）。

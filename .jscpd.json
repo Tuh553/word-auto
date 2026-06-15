@@ -1,0 +1,12 @@
+{
+  "threshold": 0,
+  "minTokens": 50,
+  "reporters": ["console", "threshold"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+  "gitignore": true
+}
