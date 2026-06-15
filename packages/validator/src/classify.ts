@@ -41,6 +41,24 @@ type Section =
   | "achievement";
 
 type BackMatterSection = Extract<Section, "acknowledgement" | "appendix" | "achievement">;
+type BodySection = Extract<Section, "cn_abstract" | "en_abstract" | "references" | BackMatterSection | "toc" | "body">;
+type SectionRole = { role: Role; section: Section };
+
+const TOC_ROLE_BY_STYLE_ID: Record<string, Role> = {
+  toc1: "toc1",
+  toc2: "toc2",
+  toc3: "toc3",
+};
+
+const BODY_ROLE_BY_SECTION: Partial<Record<BodySection, Role | null>> = {
+  cn_abstract: "abstract_body_cn",
+  en_abstract: "abstract_body_en",
+  references: "reference_body",
+  acknowledgement: "acknowledgement_body",
+  appendix: "appendix_body",
+  achievement: "achievement_body",
+  toc: null,
+};
 
 const headingLevel = (p: Paragraph): 0 | 1 | 2 | null => {
   const ol = p.effective.outlineLevel;
@@ -72,6 +90,40 @@ const hasDrawing = (p: Paragraph | undefined): boolean =>
 const hasFormulaStructure = (p: Paragraph): boolean =>
   (p.structure.mathCount ?? 0) > 0 || (p.structure.embeddedObjectCount ?? 0) > 0;
 
+const isAlignedCaption = (alignment: Paragraph["effective"]["alignment"]): boolean =>
+  alignment === "center" || alignment === "left" || alignment === "right";
+
+const isFigureCaption = (text: string): boolean =>
+  FIGURE_CAPTION.test(text) && text.length <= 80;
+
+const isRelaxedFigureCaption = (
+  text: string,
+  adjacentDrawing: boolean,
+  alignment: Paragraph["effective"]["alignment"],
+): boolean =>
+  adjacentDrawing &&
+  FIGURE_CAPTION_RELAXED.test(text) &&
+  text.length <= 80 &&
+  isAlignedCaption(alignment);
+
+const isTableCaption = (text: string): boolean =>
+  TABLE_CAPTION.test(text) && text.length <= 80;
+
+const isSourceNote = (text: string): boolean =>
+  SOURCE_NOTE.test(text) && text.length <= 120;
+
+const isEquationLine = (
+  text: string,
+  p: Paragraph,
+  alignment: Paragraph["effective"]["alignment"],
+): boolean => {
+  const cjkCount = (text.match(/[一-鿿]/g) ?? []).length;
+  return EQUATION_NUMBER.test(text) &&
+    (MATH_OPERATOR.test(text) || hasFormulaStructure(p)) &&
+    cjkCount <= 4 &&
+    (alignment === "center" || alignment === "right" || text.length <= 80);
+};
+
 const specialBodyRole = (
   paras: Paragraph[],
   index: number,
@@ -81,29 +133,42 @@ const specialBodyRole = (
   const align = p.effective.alignment;
   const adjacentDrawing = hasDrawing(paras[index - 1]) || hasDrawing(paras[index + 1]);
 
-  if (FIGURE_CAPTION.test(t) && t.length <= 80) return "figure_caption";
-  if (
-    adjacentDrawing &&
-    FIGURE_CAPTION_RELAXED.test(t) &&
-    t.length <= 80 &&
-    (align === "center" || align === "left" || align === "right")
-  ) {
-    return "figure_caption";
-  }
-  if (TABLE_CAPTION.test(t) && t.length <= 80) return "table_caption";
-  if (SOURCE_NOTE.test(t) && t.length <= 120) return "source_note";
-
-  const cjkCount = (t.match(/[一-鿿]/g) ?? []).length;
-  if (
-    EQUATION_NUMBER.test(t) &&
-    (MATH_OPERATOR.test(t) || hasFormulaStructure(p)) &&
-    cjkCount <= 4 &&
-    (align === "center" || align === "right" || t.length <= 80)
-  ) {
-    return "formula_line";
-  }
-
+  if (isFigureCaption(t) || isRelaxedFigureCaption(t, adjacentDrawing, align)) return "figure_caption";
+  if (isTableCaption(t)) return "table_caption";
+  if (isSourceNote(t)) return "source_note";
+  if (isEquationLine(t, p, align)) return "formula_line";
   return null;
+};
+
+const sectionHeadingRole = (text: string): SectionRole | null => {
+  if (text === "摘要") return { role: "abstract_title_cn", section: "cn_abstract" };
+  if (/^abstract$/i.test(text)) return { role: "abstract_title_en", section: "en_abstract" };
+  if (text === "目录") return { role: "toc_title", section: "toc" };
+  if (text === "参考文献") return { role: "reference_heading", section: "references" };
+  return backMatterHeading(text);
+};
+
+const tocRole = (styleId?: string): Role | null =>
+  TOC_ROLE_BY_STYLE_ID[(styleId ?? "").toLowerCase()] ?? null;
+
+const keywordRole = (text: string): Role | null => {
+  if (/^关键词/.test(text)) return "keywords_cn";
+  if (/^key\s*words/i.test(text)) return "keywords_en";
+  return null;
+};
+
+const outlineRole = (p: Paragraph): SectionRole | null => {
+  const level = headingLevel(p);
+  if (level === 0) return { role: "heading1", section: "body" };
+  if (level === 1) return { role: "heading2", section: "body" };
+  if (level === 2) return { role: "heading3", section: "body" };
+  return null;
+};
+
+const bodyRoleForSection = (section: BodySection, text: string): Role | null => {
+  if (section !== "body") return BODY_ROLE_BY_SECTION[section] ?? null;
+  if (COVER_HINT.test(text) && text.length < 25) return null;
+  return "body_text";
 };
 
 /**
@@ -129,82 +194,37 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       continue;
     }
 
-    // 1. 章节标题关键词（任何时候都能切换章节，是离开封面区的边界）
-    if (t === "摘要") {
-      section = "cn_abstract";
-      roles.push("abstract_title_cn");
-      continue;
-    }
-    if (/^abstract$/i.test(t)) {
-      section = "en_abstract";
-      roles.push("abstract_title_en");
-      continue;
-    }
-    if (t === "目录") {
-      section = "toc";
-      roles.push("toc_title");
-      continue;
-    }
-    if (t === "参考文献") {
-      section = "references";
-      roles.push("reference_heading");
-      continue;
-    }
-    const backHeading = backMatterHeading(t);
-    if (backHeading) {
-      section = backHeading.section;
-      roles.push(backHeading.role);
+    const sectionHeading = sectionHeadingRole(t);
+    if (sectionHeading) {
+      section = sectionHeading.section;
+      roles.push(sectionHeading.role);
       continue;
     }
 
-    // 2. 封面/扉页区：遇到「摘要」之前的一切（标题页、声明、授权书）整体跳过
     if (section === "cover") {
       roles.push(null);
       continue;
     }
 
-    // 3. 目录条目（TOC1/2/3 样式）
-    const sid = (p.styleId ?? "").toLowerCase();
-    if (sid === "toc1") {
-      roles.push("toc1");
-      continue;
-    }
-    if (sid === "toc2") {
-      roles.push("toc2");
-      continue;
-    }
-    if (sid === "toc3") {
-      roles.push("toc3");
+    const toc = tocRole(p.styleId);
+    if (toc) {
+      roles.push(toc);
       continue;
     }
 
-    // 4. 关键词行
-    if (/^关键词/.test(t)) {
-      roles.push("keywords_cn");
-      continue;
-    }
-    if (/^key\s*words/i.test(t)) {
-      roles.push("keywords_en");
+    const keyword = keywordRole(t);
+    if (keyword) {
+      roles.push(keyword);
       continue;
     }
 
-    // 5. 大纲级别（标题）
-    const level = headingLevel(p);
-    if (level === 0) {
-      section = "body";
-      roles.push("heading1");
-      continue;
-    }
-    if (level === 1) {
-      roles.push("heading2");
-      continue;
-    }
-    if (level === 2) {
-      roles.push("heading3");
+    const outline = outlineRole(p);
+    if (outline) {
+      section = outline.section;
+      roles.push(outline.role);
       continue;
     }
 
-    // 5b. 特殊正文元素：先分流，避免按正文硬判
     if (section === "body") {
       const special = specialBodyRole(paras, i, p, t);
       if (special) {
@@ -213,37 +233,7 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       }
     }
 
-    // 6. 按当前章节归类正文
-    switch (section) {
-      case "cn_abstract":
-        roles.push("abstract_body_cn");
-        break;
-      case "en_abstract":
-        roles.push("abstract_body_en");
-        break;
-      case "references":
-        roles.push("reference_body");
-        break;
-      case "acknowledgement":
-        roles.push("acknowledgement_body");
-        break;
-      case "appendix":
-        roles.push("appendix_body");
-        break;
-      case "achievement":
-        roles.push("achievement_body");
-        break;
-      case "toc":
-        roles.push(null); // 目录条目里非 TOC 样式的内容，暂不校验
-        break;
-      default:
-        // 正文兜底：短段落且命中封面特征字段（异常排版的封面信息）也跳过
-        if (COVER_HINT.test(t) && t.length < 25) {
-          roles.push(null);
-        } else {
-          roles.push("body_text");
-        }
-    }
+    roles.push(bodyRoleForSection(section, t));
   }
 
   return roles;

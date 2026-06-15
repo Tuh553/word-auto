@@ -84,101 +84,113 @@ const enabledExactNumber = (
 };
 
 type Emit = (level: RuleLintLevel, code: string, message: string) => void;
+type FieldLintContext = {
+  field: RuleField;
+  unit: RuleValueUnit;
+  emit: Emit;
+};
+
+const checkSaneRange = (context: FieldLintContext, value: number): void => {
+  const range = SANE_RANGE[context.field.key];
+  if (!range || (value >= range.min && value <= range.max)) return;
+  context.emit(
+    "warn",
+    RULE_LINT_CODES.outOfRange,
+    `「${context.field.label}」的值 ${value} 超出常见范围 ${range.min}~${range.max}，请确认`,
+  );
+};
+
+const checkAlignValue = (context: FieldLintContext, value: unknown): void => {
+  if (context.field.key !== "align" || ALIGN_VALUES.includes(value as string)) return;
+  context.emit(
+    "error",
+    RULE_LINT_CODES.enumInvalid,
+    `「${context.field.label}」的值「${value}」不是合法对齐方式（${ALIGN_VALUES.join(" / ")}）`,
+  );
+};
+
+const lintExactValue = (context: FieldLintContext): void => {
+  const exact = context.field.value.exact;
+  if (exact == null || (typeof exact === "string" && exact.trim() === "")) {
+    context.emit("error", RULE_LINT_CODES.exactMissing, `「${context.field.label}」选择了精确值，但未填写规则值`);
+    return;
+  }
+  if (!matchesUnit(context.unit, exact)) {
+    context.emit("error", RULE_LINT_CODES.typeMismatch, `「${context.field.label}」的规则值类型与字段不匹配`);
+    return;
+  }
+  checkAlignValue(context, exact);
+  if (isNum(exact)) checkSaneRange(context, exact);
+};
+
+const lintOneOfValue = (context: FieldLintContext): void => {
+  const list = context.field.value.oneOf;
+  if (!Array.isArray(list) || list.length === 0) {
+    context.emit("error", RULE_LINT_CODES.oneOfEmpty, `「${context.field.label}」选择了候选值之一，但候选列表为空`);
+    return;
+  }
+  for (const item of list) {
+    if (!matchesUnit(context.unit, item)) {
+      context.emit("error", RULE_LINT_CODES.typeMismatch, `「${context.field.label}」的候选值「${item}」类型与字段不匹配`);
+      continue;
+    }
+    checkAlignValue(context, item);
+    if (isNum(item)) checkSaneRange(context, item);
+  }
+};
+
+const lintRangeValue = (context: FieldLintContext): void => {
+  if (!NUMERIC_UNITS.includes(context.unit)) {
+    context.emit("error", RULE_LINT_CODES.rangeUnit, `「${context.field.label}」是非数值字段，不能使用「范围」方式`);
+    return;
+  }
+
+  const { min, max } = context.field.value;
+  if (min == null && max == null) {
+    context.emit("error", RULE_LINT_CODES.rangeEmpty, `「${context.field.label}」选择了范围，但未填写上下限`);
+    return;
+  }
+  if (min != null && !isNum(min)) {
+    context.emit("error", RULE_LINT_CODES.typeMismatch, `「${context.field.label}」范围下限不是有效数值`);
+  }
+  if (max != null && !isNum(max)) {
+    context.emit("error", RULE_LINT_CODES.typeMismatch, `「${context.field.label}」范围上限不是有效数值`);
+  }
+  if (isNum(min) && isNum(max) && min > max) {
+    context.emit("error", RULE_LINT_CODES.rangeMinMax, `「${context.field.label}」范围下限 ${min} 大于上限 ${max}`);
+  }
+  if (isNum(min)) checkSaneRange(context, min);
+  if (isNum(max)) checkSaneRange(context, max);
+};
 
 /** 校验单个「已启用」字段的规则值（结构 + 一致性 + 合理范围） */
 const lintFieldValue = (field: RuleField, emit: Emit): void => {
-  const unit = RULE_FIELD_UNITS[field.key];
-  const v = field.value;
-  const label = field.label;
+  const context: FieldLintContext = {
+    field,
+    unit: RULE_FIELD_UNITS[field.key],
+    emit,
+  };
+  const { unit } = context;
+  const { value, label } = field;
 
   // 声明单位与字段类型不符（脏数据）
-  if (v.unit != null && v.unit !== unit) {
-    emit("warn", RULE_LINT_CODES.unitMismatch,
-      `「${label}」的单位「${v.unit}」与字段类型不符（应为「${unit}」）`);
+  if (value.unit != null && value.unit !== unit) {
+    emit("warn", RULE_LINT_CODES.unitMismatch, `「${label}」的单位「${value.unit}」与字段类型不符（应为「${unit}」）`);
   }
 
-  const checkSane = (value: number): void => {
-    const range = SANE_RANGE[field.key];
-    if (range && (value < range.min || value > range.max)) {
-      emit("warn", RULE_LINT_CODES.outOfRange,
-        `「${label}」的值 ${value} 超出常见范围 ${range.min}~${range.max}，请确认`);
-    }
-  };
-  const checkAlign = (value: unknown): void => {
-    if (field.key === "align" && !ALIGN_VALUES.includes(value as string)) {
-      emit("error", RULE_LINT_CODES.enumInvalid,
-        `「${label}」的值「${value}」不是合法对齐方式（${ALIGN_VALUES.join(" / ")}）`);
-    }
-  };
-
-  switch (v.mode) {
+  switch (value.mode) {
     case "unset":
-      emit("warn", RULE_LINT_CODES.enabledButUnset,
-        `「${label}」已启用校验，但规则方式为「不校验」，请改用具体规则或停用该字段`);
+      emit("warn", RULE_LINT_CODES.enabledButUnset, `「${label}」已启用校验，但规则方式为「不校验」，请改用具体规则或停用该字段`);
       break;
-
-    case "exact": {
-      const ex = v.exact;
-      if (ex == null || (typeof ex === "string" && ex.trim() === "")) {
-        emit("error", RULE_LINT_CODES.exactMissing,
-          `「${label}」选择了精确值，但未填写规则值`);
-        break;
-      }
-      if (!matchesUnit(unit, ex)) {
-        emit("error", RULE_LINT_CODES.typeMismatch,
-          `「${label}」的规则值类型与字段不匹配`);
-        break;
-      }
-      checkAlign(ex);
-      if (isNum(ex)) checkSane(ex);
+    case "exact":
+      lintExactValue(context);
       break;
-    }
-
-    case "oneOf": {
-      const list = v.oneOf;
-      if (!Array.isArray(list) || list.length === 0) {
-        emit("error", RULE_LINT_CODES.oneOfEmpty,
-          `「${label}」选择了候选值之一，但候选列表为空`);
-        break;
-      }
-      for (const item of list) {
-        if (!matchesUnit(unit, item)) {
-          emit("error", RULE_LINT_CODES.typeMismatch,
-            `「${label}」的候选值「${item}」类型与字段不匹配`);
-          continue;
-        }
-        checkAlign(item);
-        if (isNum(item)) checkSane(item);
-      }
+    case "oneOf":
+      lintOneOfValue(context);
       break;
-    }
-
-    case "range": {
-      if (!NUMERIC_UNITS.includes(unit)) {
-        emit("error", RULE_LINT_CODES.rangeUnit,
-          `「${label}」是非数值字段，不能使用「范围」方式`);
-        break;
-      }
-      const { min, max } = v;
-      if (min == null && max == null) {
-        emit("error", RULE_LINT_CODES.rangeEmpty,
-          `「${label}」选择了范围，但未填写上下限`);
-        break;
-      }
-      if (min != null && !isNum(min)) {
-        emit("error", RULE_LINT_CODES.typeMismatch, `「${label}」范围下限不是有效数值`);
-      }
-      if (max != null && !isNum(max)) {
-        emit("error", RULE_LINT_CODES.typeMismatch, `「${label}」范围上限不是有效数值`);
-      }
-      if (isNum(min) && isNum(max) && min > max) {
-        emit("error", RULE_LINT_CODES.rangeMinMax,
-          `「${label}」范围下限 ${min} 大于上限 ${max}`);
-      }
-      if (isNum(min)) checkSane(min);
-      if (isNum(max)) checkSane(max);
+    case "range":
+      lintRangeValue(context);
       break;
-    }
   }
 };
 

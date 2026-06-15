@@ -146,42 +146,32 @@ const ROLE_ORDER: Record<Role, number> = {
   document: 31,
 };
 
-const roleToSection = (role: Role): SectionKey => {
-  switch (role) {
-    case "abstract_title_cn":
-    case "abstract_body_cn":
-    case "keywords_cn":
-      return "cn_abstract";
-    case "abstract_title_en":
-    case "abstract_body_en":
-    case "keywords_en":
-      return "en_abstract";
-    case "toc_title":
-    case "toc1":
-    case "toc2":
-    case "toc3":
-      return "toc";
-    case "reference_heading":
-    case "reference_body":
-      return "references";
-    case "acknowledgement_heading":
-    case "acknowledgement_body":
-      return "acknowledgement";
-    case "appendix_heading":
-    case "appendix_body":
-      return "appendix";
-    case "achievement_heading":
-    case "achievement_body":
-      return "achievement";
-    case "back_matter_heading":
-    case "back_matter_body":
-      return "back_matter";
-    case "document":
-      return "document";
-    default:
-      return "body";
-  }
+const ROLE_SECTION_MAP: Partial<Record<Role, SectionKey>> = {
+  abstract_title_cn: "cn_abstract",
+  abstract_body_cn: "cn_abstract",
+  keywords_cn: "cn_abstract",
+  abstract_title_en: "en_abstract",
+  abstract_body_en: "en_abstract",
+  keywords_en: "en_abstract",
+  toc_title: "toc",
+  toc1: "toc",
+  toc2: "toc",
+  toc3: "toc",
+  reference_heading: "references",
+  reference_body: "references",
+  acknowledgement_heading: "acknowledgement",
+  acknowledgement_body: "acknowledgement",
+  appendix_heading: "appendix",
+  appendix_body: "appendix",
+  achievement_heading: "achievement",
+  achievement_body: "achievement",
+  back_matter_heading: "back_matter",
+  back_matter_body: "back_matter",
+  document: "document",
 };
+
+const roleToSection = (role: Role): SectionKey =>
+  ROLE_SECTION_MAP[role] ?? "body";
 
 const paraOrder = (issue: Issue): number =>
   issue.paraIndex >= 0 ? issue.paraIndex : Number.MAX_SAFE_INTEGER;

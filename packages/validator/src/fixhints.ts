@@ -32,166 +32,143 @@ const ALIGN_LABELS: Record<string, string> = {
 };
 
 type Scalar = string | number | boolean;
+type FixHintIssue = Pick<Issue, "field" | "expected" | "actual">;
+type FixHintBuilder = (issue: FixHintIssue, target: string) => FixHint;
 
 const isRuleValue = (value: unknown): value is RuleValue =>
   typeof value === "object" && value !== null && "mode" in (value as object);
 
-/** 按字段语义/单位把单个目标值格式化为可读短语 */
-const formatOne = (
-  field: string,
-  value: Scalar,
-  unit?: RuleValue["unit"],
-): string => {
-  if (field === "bold" || unit === "bool") {
-    if (typeof value === "boolean") return value ? "「加粗」" : "「不加粗」";
-    return `「${value}」`;
-  }
-  if (field === "alignment" || unit === "enum") {
-    const key = String(value);
-    return `「${ALIGN_LABELS[key] ?? key}」`;
-  }
-  if (field === "outline_level" || unit === "level") return `${value} 级`;
-  if (unit === "chars" || field.endsWith("_indent_chars")) return `${value} 字符`;
-  if (field.endsWith("_cm")) return `${value}cm`;
-  if (unit === "pt" || field.endsWith("_pt")) return `${value}pt`;
+const formatBoolean = (value: Scalar): string =>
+  typeof value === "boolean" ? (value ? "「加粗」" : "「不加粗」") : `「${value}」`;
+
+const formatAlignment = (value: Scalar): string => {
+  const key = String(value);
+  return `「${ALIGN_LABELS[key] ?? key}」`;
+};
+
+const formatByField = (field: string, value: Scalar): string => {
   if (field === "font_east_asia" || field === "font_latin") return `「${value}」`;
+  if (field === "outline_level") return `${value} 级`;
+  if (field.endsWith("_indent_chars")) return `${value} 字符`;
+  if (field.endsWith("_cm")) return `${value}cm`;
+  if (field.endsWith("_pt")) return `${value}pt`;
   return `${value}`;
+};
+
+const formatByUnit = (value: Scalar, unit?: RuleValue["unit"]): string => {
+  if (unit === "bool") return formatBoolean(value);
+  if (unit === "enum") return formatAlignment(value);
+  if (unit === "level") return `${value} 级`;
+  if (unit === "chars") return `${value} 字符`;
+  if (unit === "pt") return `${value}pt`;
+  return `${value}`;
+};
+
+/** 按字段语义/单位把单个目标值格式化为可读短语 */
+const formatOne = (field: string, value: Scalar, unit?: RuleValue["unit"]): string => {
+  if (field === "bold") return formatBoolean(value);
+  if (field === "alignment") return formatAlignment(value);
+  if (unit) return formatByUnit(value, unit);
+  return formatByField(field, value);
+};
+
+const describeRangeTarget = (
+  field: string,
+  expected: RuleValue,
+): string => {
+  const lo = expected.min != null ? formatOne(field, expected.min, expected.unit) : null;
+  const hi = expected.max != null ? formatOne(field, expected.max, expected.unit) : null;
+  if (lo && hi) return `${lo} ~ ${hi}`;
+  if (lo) return `不小于 ${lo}`;
+  if (hi) return `不大于 ${hi}`;
+  return "规范范围";
+};
+
+const describeRuleValueTarget = (field: string, expected: RuleValue): string => {
+  switch (expected.mode) {
+    case "exact":
+      return expected.exact != null ? formatOne(field, expected.exact, expected.unit) : "规范值";
+    case "oneOf":
+      return (expected.oneOf ?? []).map((value) => formatOne(field, value, expected.unit)).join(" 或 ") || "规范值";
+    case "range":
+      return describeRangeTarget(field, expected);
+    default:
+      return "规范值";
+  }
 };
 
 /** 把规则期望值（RuleValue 或裸标量）描述成目标短语 */
 const describeTarget = (field: string, expected: unknown): string => {
-  if (isRuleValue(expected)) {
-    const { unit } = expected;
-    switch (expected.mode) {
-      case "exact":
-        return expected.exact != null
-          ? formatOne(field, expected.exact, unit)
-          : "规范值";
-      case "oneOf":
-        return (
-          (expected.oneOf ?? [])
-            .map((value) => formatOne(field, value, unit))
-            .join(" 或 ") || "规范值"
-        );
-      case "range": {
-        const lo = expected.min != null ? formatOne(field, expected.min, unit) : null;
-        const hi = expected.max != null ? formatOne(field, expected.max, unit) : null;
-        if (lo && hi) return `${lo} ~ ${hi}`;
-        if (lo) return `不小于 ${lo}`;
-        if (hi) return `不大于 ${hi}`;
-        return "规范范围";
-      }
-      default:
-        return "规范值";
-    }
-  }
+  if (isRuleValue(expected)) return describeRuleValueTarget(field, expected);
   if (expected == null) return "规范值";
   return formatOne(field, expected as Scalar);
 };
 
+const buildAutoFixHint = (suggestion: string): FixHint => ({
+  suggestion,
+  fixability: "auto",
+});
+
+const buildManualFixHint = (suggestion: string): FixHint => ({
+  suggestion,
+  fixability: "manual",
+});
+
+const PARAGRAPH_FIX_HINTS: Record<string, FixHintBuilder> = {
+  font_east_asia: (_issue, target) => buildAutoFixHint(`请将该段落中文字体设为 ${target}`),
+  font_latin: (_issue, target) => buildAutoFixHint(`请将该段落西文字体设为 ${target}`),
+  size_pt: (_issue, target) => buildAutoFixHint(`请将该段落字号调整为 ${target}`),
+  bold: (_issue, target) => buildAutoFixHint(`请将该段落设为 ${target}`),
+  alignment: (_issue, target) => buildAutoFixHint(`请将该段落对齐方式改为 ${target}`),
+  spacing_before_pt: (_issue, target) => buildAutoFixHint(`请将该段落段前间距设为 ${target}`),
+  spacing_after_pt: (_issue, target) => buildAutoFixHint(`请将该段落段后间距设为 ${target}`),
+  first_line_indent_chars: (_issue, target) => buildAutoFixHint(`请将该段落首行缩进设为 ${target}`),
+  hanging_indent_chars: (_issue, target) => buildAutoFixHint(`请将该段落悬挂缩进设为 ${target}`),
+  left_indent_chars: (_issue, target) => buildAutoFixHint(`请将该段落左缩进设为 ${target}`),
+  outline_level: () => buildAutoFixHint("请调整该段落的大纲级别，使其符合规范层级"),
+};
+
+const DOCUMENT_FIX_HINTS: Record<string, FixHintBuilder> = {
+  paper_size: (_issue, target) => buildManualFixHint(`请在页面设置中将纸张大小设为 ${target}`),
+  page_number_front: (_issue, target) => buildManualFixHint(`请将前置部分页码格式设为 ${target}（通常需在分节符处单独设置）`),
+  page_number_body: (_issue, target) => buildManualFixHint(`请将正文页码设为 ${target}，并在正文起始分节处重新编号`),
+  header_text: (issue) => buildManualFixHint(`请在页眉中加入文字「${String(issue.expected ?? "")}」`),
+  caption_reference: (issue) => {
+    const actual = String(issue.actual ?? "");
+    if (actual.includes("不存在")) {
+      return buildManualFixHint("请在 Word 中更新该交叉引用，改为指向现有图/表/公式题注，或补回对应书签后再更新域");
+    }
+    return buildManualFixHint("请核对该交叉引用的目标，确保它指向图/表/公式题注而不是普通书签");
+  },
+  note_reference: () => buildManualFixHint("请在 Word 中检查该脚注/尾注引用，补回对应定义或删除失效引用后再更新注释编号"),
+  note_definition: () => buildManualFixHint("请核对这些脚注/尾注定义是否仍需保留；若正文已无引用，请删除孤立注释或重新插入引用"),
+};
+
+const lineSpacingFixHint = (issue: FixHintIssue, target: string): FixHint => {
+  if (typeof issue.actual === "number") {
+    return buildAutoFixHint(`请将该段落行距改为固定值 ${target}`);
+  }
+  return buildManualFixHint(`当前行距为 ${String(issue.actual)}，请人工核对排版后将其设为固定值 ${target}`);
+};
+
 /** 根据一条 issue 推导修复建议与可修复性 */
 export const computeFixHint = (
-  issue: Pick<Issue, "field" | "expected" | "actual">,
+  issue: FixHintIssue,
 ): FixHint => {
   const { field } = issue;
   const target = describeTarget(field, issue.expected);
 
-  // 行距特例：仅当当前是固定值（数字）时可机械改写；未设置 / 多倍行距改固定
-  // 会影响整体排版观感，需人工核对，标 manual。
-  if (field === "line_spacing_pt") {
-    if (typeof issue.actual === "number") {
-      return {
-        suggestion: `请将该段落行距改为固定值 ${target}`,
-        fixability: "auto",
-      };
-    }
-    return {
-      suggestion: `当前行距为 ${String(issue.actual)}，请人工核对排版后将其设为固定值 ${target}`,
-      fixability: "manual",
-    };
-  }
+  if (field === "line_spacing_pt") return lineSpacingFixHint(issue, target);
 
-  switch (field) {
-    case "font_east_asia":
-      return { suggestion: `请将该段落中文字体设为 ${target}`, fixability: "auto" };
-    case "font_latin":
-      return { suggestion: `请将该段落西文字体设为 ${target}`, fixability: "auto" };
-    case "size_pt":
-      return { suggestion: `请将该段落字号调整为 ${target}`, fixability: "auto" };
-    case "bold":
-      return { suggestion: `请将该段落设为 ${target}`, fixability: "auto" };
-    case "alignment":
-      return { suggestion: `请将该段落对齐方式改为 ${target}`, fixability: "auto" };
-    case "spacing_before_pt":
-      return { suggestion: `请将该段落段前间距设为 ${target}`, fixability: "auto" };
-    case "spacing_after_pt":
-      return { suggestion: `请将该段落段后间距设为 ${target}`, fixability: "auto" };
-    case "first_line_indent_chars":
-      return { suggestion: `请将该段落首行缩进设为 ${target}`, fixability: "auto" };
-    case "hanging_indent_chars":
-      return { suggestion: `请将该段落悬挂缩进设为 ${target}`, fixability: "auto" };
-    case "left_indent_chars":
-      return { suggestion: `请将该段落左缩进设为 ${target}`, fixability: "auto" };
-    case "outline_level":
-      return {
-        suggestion: "请调整该段落的大纲级别，使其符合规范层级",
-        fixability: "auto",
-      };
-    case "paper_size":
-      return {
-        suggestion: `请在页面设置中将纸张大小设为 ${target}`,
-        fixability: "manual",
-      };
-    case "page_number_front":
-      return {
-        suggestion: `请将前置部分页码格式设为 ${target}（通常需在分节符处单独设置）`,
-        fixability: "manual",
-      };
-    case "page_number_body":
-      return {
-        suggestion: `请将正文页码设为 ${target}，并在正文起始分节处重新编号`,
-        fixability: "manual",
-      };
-    case "header_text":
-      return {
-        suggestion: `请在页眉中加入文字「${String(issue.expected ?? "")}」`,
-        fixability: "manual",
-      };
-    case "caption_reference": {
-      const actual = String(issue.actual ?? "");
-      if (actual.includes("不存在")) {
-        return {
-          suggestion: "请在 Word 中更新该交叉引用，改为指向现有图/表/公式题注，或补回对应书签后再更新域",
-          fixability: "manual",
-        };
-      }
-      return {
-        suggestion: "请核对该交叉引用的目标，确保它指向图/表/公式题注而不是普通书签",
-        fixability: "manual",
-      };
-    }
-    case "note_reference":
-      return {
-        suggestion: "请在 Word 中检查该脚注/尾注引用，补回对应定义或删除失效引用后再更新注释编号",
-        fixability: "manual",
-      };
-    case "note_definition":
-      return {
-        suggestion: "请核对这些脚注/尾注定义是否仍需保留；若正文已无引用，请删除孤立注释或重新插入引用",
-        fixability: "manual",
-      };
-  }
+  const paragraphHint = PARAGRAPH_FIX_HINTS[field];
+  if (paragraphHint) return paragraphHint(issue, target);
+
+  const documentHint = DOCUMENT_FIX_HINTS[field];
+  if (documentHint) return documentHint(issue, target);
 
   if (field in DOC_FIELD_LABELS) {
-    return {
-      suggestion: `请在页面设置中将${DOC_FIELD_LABELS[field]}设为 ${target}`,
-      fixability: "manual",
-    };
+    return buildManualFixHint(`请在页面设置中将${DOC_FIELD_LABELS[field]}设为 ${target}`);
   }
 
-  // 兜底：未知字段不臆测可自动修复
-  return {
-    suggestion: `请根据规范要求将该项调整为 ${target}`,
-    fixability: "manual",
-  };
+  return buildManualFixHint(`请根据规范要求将该项调整为 ${target}`);
 };

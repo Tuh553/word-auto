@@ -36,6 +36,165 @@ const SORT_OPTIONS: Array<{ value: ReportSortBy; label: string }> = [
   { value: "severity", label: "严重级优先" },
 ];
 
+function ReportStats({ summary }: { summary: ValidationReport["summary"] }) {
+  return (
+    <div className="stats">
+      {(["error", "warn", "info"] as Severity[]).map((severity) => (
+        <div className={`stat ${severity}`} key={severity}>
+          <div className="n">{summary[severity]}</div>
+          <div className="l">{SEV[severity]}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SeverityChips({
+  active,
+  onToggle,
+}: Pick<Props, "active" | "onToggle">) {
+  return (
+    <div className="filter-chips">
+      {(["error", "warn", "info"] as Severity[]).map((severity) => (
+        <span
+          key={severity}
+          className={`chip ${active.has(severity) ? "on" : ""}`}
+          onClick={() => onToggle(severity)}
+        >
+          {SEV[severity]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ReportToolbar({
+  groupBy,
+  onGroupByChange,
+  onSortByChange,
+  sortBy,
+}: Pick<Props, "groupBy" | "onGroupByChange" | "onSortByChange" | "sortBy">) {
+  return (
+    <div className="report-toolbar">
+      <label className="report-toolbar-row">
+        <span>分组方式</span>
+        <select
+          value={groupBy}
+          onChange={(event) => onGroupByChange(event.target.value as ReportGroupBy)}
+        >
+          {GROUP_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              按{option.label}分组
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="report-toolbar-row">
+        <span>组内排序</span>
+        <select
+          value={sortBy}
+          onChange={(event) => onSortByChange(event.target.value as ReportSortBy)}
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function ReportSummary({
+  classifiedCount,
+  issues,
+  paragraphCount,
+  totalIssues,
+}: {
+  classifiedCount: number;
+  issues: number;
+  paragraphCount: number;
+  totalIssues: number;
+}) {
+  return (
+    <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>
+      共 {paragraphCount} 段，已识别 {classifiedCount} 段，
+      命中 {totalIssues} 个问题（当前显示 {issues} 个）
+    </div>
+  );
+}
+
+function ReportIssueCard({
+  issue,
+  onSelect,
+}: {
+  issue: ValidationReport["issues"][number];
+  onSelect: (paraIndex: number) => void;
+}) {
+  return (
+    <div
+      className={`issue ${issue.severity}`}
+      onClick={() => onSelect(issue.paraIndex)}
+    >
+      <div className="top">
+        <span className={`badge ${issue.severity}`}>{SEV[issue.severity]}</span>
+        <span className="role">
+          {issue.paraIndex < 0 ? "文档级问题" : `第 ${issue.paraIndex + 1} 段`} ·{" "}
+          {formatIssueRole(issue.role)} · {formatIssueField(issue.field)}
+        </span>
+      </div>
+      <div className="msg">{issue.message}</div>
+      <div className="text">「{issue.textPreview}」</div>
+      {issue.suggestion ? (
+        <div className="fix-hint">
+          <span className={`fix-tag ${issue.fixability ?? "manual"}`}>
+            {issue.fixability === "auto" ? "可自动修复" : "需手动处理"}
+          </span>
+          <span className="fix-text">{issue.suggestion}</span>
+        </div>
+      ) : null}
+      {issue.provenance ? (
+        <details
+          className="provenance"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <summary>规范依据</summary>
+          <div>{issue.provenance}</div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function ReportGroups({
+  groups,
+  onSelect,
+}: {
+  groups: ReturnType<typeof buildReportGroups>;
+  onSelect: (paraIndex: number) => void;
+}) {
+  return (
+    <>
+      {groups.map((group) => (
+        <section className="report-group" key={group.key}>
+          <div className="report-group-head">
+            <div className="report-group-title">{group.label}</div>
+            <div className="report-group-meta">共 {group.issues.length} 项</div>
+          </div>
+          {group.issues.map((issue, index) => (
+            <ReportIssueCard
+              key={`${group.key}:${index}:${issue.paraIndex}:${issue.field}`}
+              issue={issue}
+              onSelect={onSelect}
+            />
+          ))}
+        </section>
+      ))}
+    </>
+  );
+}
+
 export function ReportPanel({
   report,
   active,
@@ -52,106 +211,25 @@ export function ReportPanel({
 
   return (
     <div className="report-wrap">
-      <div className="stats">
-        {(["error", "warn", "info"] as Severity[]).map((s) => (
-          <div className={`stat ${s}`} key={s}>
-            <div className="n">{summary[s]}</div>
-            <div className="l">{SEV[s]}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="filter-chips">
-        {(["error", "warn", "info"] as Severity[]).map((s) => (
-          <span
-            key={s}
-            className={`chip ${active.has(s) ? "on" : ""}`}
-            onClick={() => onToggle(s)}
-          >
-            {SEV[s]}
-          </span>
-        ))}
-      </div>
-
-      <div className="report-toolbar">
-        <label className="report-toolbar-row">
-          <span>分组方式</span>
-          <select
-            value={groupBy}
-            onChange={(event) => onGroupByChange(event.target.value as ReportGroupBy)}
-          >
-            {GROUP_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                按{option.label}分组
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="report-toolbar-row">
-          <span>组内排序</span>
-          <select
-            value={sortBy}
-            onChange={(event) => onSortByChange(event.target.value as ReportSortBy)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}>
-        共 {report.paragraphCount} 段，已识别 {report.classifiedCount} 段，
-        命中 {report.issues.length} 个问题（当前显示 {issues.length} 个）
-      </div>
+      <ReportStats summary={summary} />
+      <SeverityChips active={active} onToggle={onToggle} />
+      <ReportToolbar
+        groupBy={groupBy}
+        onGroupByChange={onGroupByChange}
+        onSortByChange={onSortByChange}
+        sortBy={sortBy}
+      />
+      <ReportSummary
+        classifiedCount={report.classifiedCount}
+        issues={issues.length}
+        paragraphCount={report.paragraphCount}
+        totalIssues={report.issues.length}
+      />
 
       {issues.length === 0 ? (
         <div className="empty">没有符合筛选条件的问题 🎉</div>
       ) : (
-        groups.map((group) => (
-          <section className="report-group" key={group.key}>
-            <div className="report-group-head">
-              <div className="report-group-title">{group.label}</div>
-              <div className="report-group-meta">共 {group.issues.length} 项</div>
-            </div>
-            {group.issues.map((it, index) => (
-              <div
-                className={`issue ${it.severity}`}
-                key={`${group.key}:${index}:${it.paraIndex}:${it.field}`}
-                onClick={() => onSelect(it.paraIndex)}
-              >
-                <div className="top">
-                  <span className={`badge ${it.severity}`}>{SEV[it.severity]}</span>
-                  <span className="role">
-                    {it.paraIndex < 0 ? "文档级问题" : `第 ${it.paraIndex + 1} 段`} ·{" "}
-                    {formatIssueRole(it.role)} · {formatIssueField(it.field)}
-                  </span>
-                </div>
-                <div className="msg">{it.message}</div>
-                <div className="text">「{it.textPreview}」</div>
-                {it.suggestion ? (
-                  <div className="fix-hint">
-                    <span className={`fix-tag ${it.fixability ?? "manual"}`}>
-                      {it.fixability === "auto" ? "可自动修复" : "需手动处理"}
-                    </span>
-                    <span className="fix-text">{it.suggestion}</span>
-                  </div>
-                ) : null}
-                {it.provenance ? (
-                  <details
-                    className="provenance"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <summary>规范依据</summary>
-                    <div>{it.provenance}</div>
-                  </details>
-                ) : null}
-              </div>
-            ))}
-          </section>
-        ))
+        <ReportGroups groups={groups} onSelect={onSelect} />
       )}
     </div>
   );

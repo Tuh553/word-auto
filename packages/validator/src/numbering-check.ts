@@ -12,6 +12,32 @@ const RE_SINGLE_LEVEL = /^(\d+)(?:[.、]\s*|\s+(?=\S))/;
 const RE_PAREN = /^\((\d+)\)|^（(\d+)）/;
 const RE_CAPTION = /^[图表]\s*(\d+)(?:[-.](\d+))?/;
 
+type CaptionLabel = "图" | "表";
+type CaptionKind = "figure" | "table";
+type ClassifiedParagraphWithRole = ClassifiedParagraph & {
+  role: NonNullable<ClassifiedParagraph["role"]>;
+};
+type CaptionSequenceState = {
+  currentChapter: number | null;
+  lastMajor: number;
+  lastMinor: number;
+};
+type CaptionIssueInput = {
+  actual: number | string;
+  cp: ClassifiedParagraphWithRole;
+  expected: number | string;
+  fixHint: string;
+  message: string;
+  severity?: ValidationIssue["severity"];
+};
+type MultiLevelCaptionCheckInput = {
+  captionLabel: CaptionLabel;
+  cp: ClassifiedParagraphWithRole;
+  major: number;
+  minor: number;
+  state: CaptionSequenceState;
+};
+
 /** 中文数字转阿拉伯数字 */
 const chineseToNumber = (text: string): number | null => {
   const map: Record<string, number> = {
@@ -73,6 +99,31 @@ const extractCaptionNumber = (text: string): number[] | null => {
   return minor !== undefined ? [major, minor] : [major];
 };
 
+const pushCaptionIssue = (
+  issues: ValidationIssue[],
+  {
+    actual,
+    cp,
+    expected,
+    fixHint,
+    message,
+    severity = "error",
+  }: CaptionIssueInput,
+): void => {
+  issues.push({
+    type: "paragraph",
+    paragraphIndex: cp.para.index,
+    role: cp.role,
+    field: "caption_sequence",
+    severity,
+    message,
+    actual,
+    expected,
+    canAutoFix: false,
+    fixHint,
+  });
+};
+
 /** 检测标题题序连续性（各级标题独立递增，不跳号） */
 export const checkHeadingSequence = (
   classified: ClassifiedParagraph[],
@@ -119,118 +170,144 @@ export const checkHeadingSequence = (
   return issues;
 };
 
-/** 通用题注连号检测（图/表） */
-const checkCaptionSequence = (
+const buildCaptionNumbers = (
   classified: ClassifiedParagraph[],
-  captionRole: "figure_caption" | "table_caption",
-  captionLabel: "图" | "表",
-): ValidationIssue[] => {
-  const issues: ValidationIssue[] = [];
-  const kind = captionRole === "figure_caption" ? "figure" : "table";
+  kind: CaptionKind,
+): Map<number, number[]> => {
   const graph = buildCaptionReferenceGraph(classified);
-  const captionNumbers = new Map(
+  return new Map(
     graph.captions
       .filter((caption) => caption.kind === kind && caption.numberParts.length > 0)
       .map((caption) => [caption.paragraphIndex, caption.numberParts] as const),
   );
-  let lastMajor = 0;
-  let lastMinor = 0;
-  let currentChapter: number | null = null;
+};
+
+const updateCaptionChapterState = (
+  state: CaptionSequenceState,
+  cp: ClassifiedParagraph,
+): CaptionSequenceState => {
+  if (!cp.role?.startsWith("heading") || cp.para.effective.outlineLevel !== 0) {
+    return state;
+  }
+
+  const chapterNum = extractNumber(cp.para.text);
+  if (chapterNum === null) {
+    return state;
+  }
+
+  return {
+    currentChapter: chapterNum,
+    lastMajor: 0,
+    lastMinor: 0,
+  };
+};
+
+const checkSingleLevelCaption = (
+  issues: ValidationIssue[],
+  cp: ClassifiedParagraphWithRole,
+  captionLabel: CaptionLabel,
+  state: CaptionSequenceState,
+  major: number,
+): CaptionSequenceState => {
+  const expected = state.lastMajor + 1;
+  if (major !== expected) {
+    pushCaptionIssue(issues, {
+      cp,
+      message: `${captionLabel}题注编号不连续：期望 ${expected}，实际 ${major}`,
+      actual: major,
+      expected,
+      fixHint: `手动调整为"${captionLabel} ${expected}"，或检查是否遗漏${captionLabel}题注。`,
+    });
+  }
+
+  return { ...state, lastMajor: major };
+};
+
+const checkMultiLevelCaption = (
+  issues: ValidationIssue[],
+  {
+    captionLabel,
+    cp,
+    major,
+    minor,
+    state,
+  }: MultiLevelCaptionCheckInput,
+): CaptionSequenceState => {
+  if (state.currentChapter !== null && major !== state.currentChapter) {
+    pushCaptionIssue(issues, {
+      cp,
+      severity: "warn",
+      message: `${captionLabel}题注章节编号与当前章节不符：期望 ${state.currentChapter}-*，实际 ${major}-${minor}`,
+      actual: `${major}-${minor}`,
+      expected: `${state.currentChapter}-*`,
+      fixHint: `检查${captionLabel}题注是否应为"${captionLabel} ${state.currentChapter}-${minor}"。`,
+    });
+  }
+
+  if (major === state.lastMajor) {
+    const expectedMinor = state.lastMinor + 1;
+    if (minor !== expectedMinor) {
+      pushCaptionIssue(issues, {
+        cp,
+        message: `${captionLabel}题注次编号不连续：期望 ${major}-${expectedMinor}，实际 ${major}-${minor}`,
+        actual: `${major}-${minor}`,
+        expected: `${major}-${expectedMinor}`,
+        fixHint: `手动调整为"${captionLabel} ${major}-${expectedMinor}"。`,
+      });
+    }
+  } else if (minor !== 1) {
+    pushCaptionIssue(issues, {
+      cp,
+      message: `${captionLabel}题注主编号变化后次编号应从 1 开始：实际 ${major}-${minor}`,
+      actual: `${major}-${minor}`,
+      expected: `${major}-1`,
+      fixHint: `手动调整为"${captionLabel} ${major}-1"。`,
+    });
+  }
+
+  return { ...state, lastMajor: major, lastMinor: minor };
+};
+
+/** 通用题注连号检测（图/表） */
+const checkCaptionSequence = (
+  classified: ClassifiedParagraph[],
+  captionRole: "figure_caption" | "table_caption",
+  captionLabel: CaptionLabel,
+): ValidationIssue[] => {
+  const issues: ValidationIssue[] = [];
+  const kind: CaptionKind = captionRole === "figure_caption" ? "figure" : "table";
+  const captionNumbers = buildCaptionNumbers(classified, kind);
+  let state: CaptionSequenceState = {
+    currentChapter: null,
+    lastMajor: 0,
+    lastMinor: 0,
+  };
 
   for (const cp of classified) {
     if (!cp.role) continue; // 跳过未分类段落
-    // 跟踪章节变化（一级标题）
-    if (cp.role.startsWith("heading") && cp.para.effective.outlineLevel === 0) {
-      const chapterNum = extractNumber(cp.para.text);
-      if (chapterNum !== null) {
-        currentChapter = chapterNum;
-        lastMinor = 0; // 新章节，次编号重置
-        lastMajor = 0; // 新章节，主编号也重置
-      }
-    }
+    const withRole = cp as ClassifiedParagraphWithRole;
+    state = updateCaptionChapterState(state, withRole);
 
-    if (cp.role !== captionRole) continue;
+    if (withRole.role !== captionRole) continue;
 
-    const nums = captionNumbers.get(cp.para.index) ?? extractCaptionNumber(cp.para.text);
+    const nums = captionNumbers.get(withRole.para.index)
+      ?? extractCaptionNumber(withRole.para.text);
     if (!nums) continue;
 
     const [major, minor] = nums;
 
-    // 单级编号（图1、图2）
     if (minor === undefined) {
-      const expected = lastMajor + 1;
-      if (major !== expected) {
-        issues.push({
-          type: "paragraph",
-          paragraphIndex: cp.para.index,
-          role: cp.role,
-          field: "caption_sequence",
-          severity: "error",
-          message: `${captionLabel}题注编号不连续：期望 ${expected}，实际 ${major}`,
-          actual: major,
-          expected,
-          canAutoFix: false,
-          fixHint: `手动调整为"${captionLabel} ${expected}"，或检查是否遗漏${captionLabel}题注。`,
-        });
-      }
-      lastMajor = major;
+      state = checkSingleLevelCaption(issues, withRole, captionLabel, state, major);
+      continue;
     }
-    // 两级编号（图1-1、图1-2）
-    else {
-      // 主编号应与当前章节一致（如果有章节跟踪）
-      if (currentChapter !== null && major !== currentChapter) {
-        issues.push({
-          type: "paragraph",
-          paragraphIndex: cp.para.index,
-          role: cp.role,
-          field: "caption_sequence",
-          severity: "warn",
-          message: `${captionLabel}题注章节编号与当前章节不符：期望 ${currentChapter}-*，实际 ${major}-${minor}`,
-          actual: `${major}-${minor}`,
-          expected: `${currentChapter}-*`,
-          canAutoFix: false,
-          fixHint: `检查${captionLabel}题注是否应为"${captionLabel} ${currentChapter}-${minor}"。`,
-        });
-      }
 
-      // 检测次编号连续性
-      if (major === lastMajor) {
-        const expectedMinor = lastMinor + 1;
-        if (minor !== expectedMinor) {
-          issues.push({
-            type: "paragraph",
-            paragraphIndex: cp.para.index,
-            role: cp.role,
-            field: "caption_sequence",
-            severity: "error",
-            message: `${captionLabel}题注次编号不连续：期望 ${major}-${expectedMinor}，实际 ${major}-${minor}`,
-            actual: `${major}-${minor}`,
-            expected: `${major}-${expectedMinor}`,
-            canAutoFix: false,
-            fixHint: `手动调整为"${captionLabel} ${major}-${expectedMinor}"。`,
-          });
-        }
-      } else {
-        // 主编号变化，次编号应从 1 开始
-        if (minor !== 1) {
-          issues.push({
-            type: "paragraph",
-            paragraphIndex: cp.para.index,
-            role: cp.role,
-            field: "caption_sequence",
-            severity: "error",
-            message: `${captionLabel}题注主编号变化后次编号应从 1 开始：实际 ${major}-${minor}`,
-            actual: `${major}-${minor}`,
-            expected: `${major}-1`,
-            canAutoFix: false,
-            fixHint: `手动调整为"${captionLabel} ${major}-1"。`,
-          });
-        }
-      }
-
-      lastMajor = major;
-      lastMinor = minor;
-    }
+    state = checkMultiLevelCaption(issues, {
+      cp: withRole,
+      captionLabel,
+      state,
+      major,
+      minor,
+    });
   }
 
   return issues;
