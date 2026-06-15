@@ -9,6 +9,7 @@ import type {
   RuleValue,
   RuleValueUnit,
 } from "./types.js";
+import { RULE_FIELD_UNITS } from "./rules.js";
 
 /** 规则合法性问题码：前端可据此做字段定位、特定提示或跳转 */
 export const RULE_LINT_CODES = {
@@ -27,22 +28,6 @@ export const RULE_LINT_CODES = {
   hierarchySizeSame: "HIERARCHY_SIZE_SAME",
   fontIncomplete: "FONT_INCOMPLETE",
 } as const;
-
-// 字段 → 权威单位。以 key 推导，不信任 value.unit（脏数据可能绕过类型校验）
-const FIELD_UNIT: Record<RuleFieldKey, RuleValueUnit> = {
-  fontFamilyCn: "enum",
-  fontFamilyLatin: "enum",
-  fontSizePt: "pt",
-  bold: "bool",
-  align: "enum",
-  lineHeightPt: "pt",
-  spaceBeforePt: "pt",
-  spaceAfterPt: "pt",
-  firstLineIndentChars: "chars",
-  hangingIndentChars: "chars",
-  leftIndentChars: "chars",
-  outlineLevel: "level",
-};
 
 // align 为受限枚举（对应 validate.ts 归一词汇）；字体虽也是 enum 但属自由文本，不校验集合
 const ALIGN_VALUES = ["left", "center", "right", "justify"];
@@ -102,7 +87,7 @@ type Emit = (level: RuleLintLevel, code: string, message: string) => void;
 
 /** 校验单个「已启用」字段的规则值（结构 + 一致性 + 合理范围） */
 const lintFieldValue = (field: RuleField, emit: Emit): void => {
-  const unit = FIELD_UNIT[field.key];
+  const unit = RULE_FIELD_UNITS[field.key];
   const v = field.value;
   const label = field.label;
 

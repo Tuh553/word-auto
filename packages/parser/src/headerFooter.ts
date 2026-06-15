@@ -1,4 +1,4 @@
-import { attr, parseXml } from "./ooxml.js";
+import { attr, collectNodeText, collectParagraphNodes, parseXml, readTextNode, toArray } from "./ooxml.js";
 import type {
   HeaderFooterAlignment,
   HeaderFooterParagraph,
@@ -29,22 +29,6 @@ type ActiveField = {
 const PAGE_FIELD_PATTERN = /\bPAGE\b/i;
 const LONG_SPACE_PATTERN = /(\s{4,})/;
 
-const toArray = <T>(value: T | T[] | undefined): T[] => {
-  if (value == null) return [];
-  return Array.isArray(value) ? value : [value];
-};
-
-const readTextNode = (node: unknown): string => {
-  if (node == null) return "";
-  if (Array.isArray(node)) return node.map(readTextNode).join("");
-  if (typeof node === "string") return node;
-  if (typeof node === "object") {
-    const text = (node as Record<string, unknown>)["#text"];
-    return typeof text === "string" ? text : "";
-  }
-  return "";
-};
-
 const normalizeAlignment = (value: string | undefined): HeaderFooterAlignment => {
   switch (value) {
     case "center":
@@ -59,42 +43,6 @@ const normalizeAlignment = (value: string | undefined): HeaderFooterAlignment =>
 
 const cleanZoneText = (text: string): string =>
   text.replace(/\s+/g, " ").trim();
-
-const collectParagraphNodes = (node: unknown, out: any[] = []): any[] => {
-  if (node == null || typeof node !== "object") return out;
-  if (Array.isArray(node)) {
-    for (const item of node) collectParagraphNodes(item, out);
-    return out;
-  }
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "w:p") {
-      for (const paragraph of toArray(value as any)) {
-        out.push(paragraph);
-        collectParagraphNodes(paragraph, out);
-      }
-      continue;
-    }
-    collectParagraphNodes(value, out);
-  }
-  return out;
-};
-
-const collectDisplayText = (node: unknown): string => {
-  if (node == null || typeof node !== "object") return "";
-  if (Array.isArray(node)) return node.map(collectDisplayText).join("");
-
-  let text = "";
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "w:t") {
-      text += readTextNode(value);
-      continue;
-    }
-    if (key === "w:instrText") continue;
-    text += collectDisplayText(value);
-  }
-  return text;
-};
 
 const fieldKind = (instruction: string): HeaderFooterSegment["kind"] | undefined =>
   PAGE_FIELD_PATTERN.test(instruction) ? "pageNumber" : undefined;
@@ -127,7 +75,7 @@ const tokenizeRuns = (runs: any[]): Token[] => {
     for (const fldSimple of toArray(run["w:fldSimple"])) {
       const instruction = attr(fldSimple, "w:instr") ?? "";
       const kind = fieldKind(instruction) ?? "text";
-      const text = collectDisplayText(fldSimple);
+      const text = collectNodeText(fldSimple, { skipInstrText: true });
       tokens.push({ type: "text", text, kind, instruction: instruction.trim() || undefined });
     }
 

@@ -78,18 +78,21 @@ export default function App() {
     setBuffer(await f.arrayBuffer());
   };
 
+  // 取首个可跳转问题的原文（供预览定位）；run 与发布回灌共用
+  const firstNavigableText = (r: AnalyzeResult): string | null => {
+    const firstIssue = findFirstNavigableIssue(
+      r.report.issues.filter((issue) => active.has(issue.severity)),
+    );
+    return firstIssue ? r.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null;
+  };
+
   const run = () => {
     if (!buffer || !currentLibrary) return;
     try {
       const nextResult = analyze(buffer, currentLibrary.published);
       setResult(nextResult);
       setError(null);
-      const firstIssue = findFirstNavigableIssue(
-        nextResult.report.issues.filter((issue) => active.has(issue.severity)),
-      );
-      setSelectedText(
-        firstIssue ? nextResult.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null,
-      );
+      setSelectedText(firstNavigableText(nextResult));
       setStep(3);
     } catch (e) {
       setError(getFriendlyAnalyzeErrorMessage(e));
@@ -107,7 +110,8 @@ export default function App() {
 
   const toggle = (s: Severity) => {
     const next = new Set(active);
-    next.has(s) ? next.delete(s) : next.add(s);
+    if (next.has(s)) next.delete(s);
+    else next.add(s);
     setActive(next);
   };
 
@@ -176,12 +180,7 @@ export default function App() {
       if (publishedCurrent && buffer && result) {
         const nextResult = analyze(buffer, publishedCurrent.published);
         setResult(nextResult);
-        const firstIssue = findFirstNavigableIssue(
-          nextResult.report.issues.filter((issue) => active.has(issue.severity)),
-        );
-        setSelectedText(
-          firstIssue ? nextResult.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null,
-        );
+        setSelectedText(firstNavigableText(nextResult));
         setRuleMessage(`已发布 ${publishedCurrent.published.version}，并回灌到当前检测结果`);
       } else if (publishedCurrent) {
         setRuleMessage(`已发布 ${publishedCurrent.published.version}`);

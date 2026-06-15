@@ -63,7 +63,6 @@ test("checkNoteConsistency：定位缺失定义的脚注引用与未引用定义
         id: "2",
         type: "footnote",
         runIndex: 1,
-        content: "已存在脚注",
         hasDefinition: true,
       }],
     }),

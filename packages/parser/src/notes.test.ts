@@ -77,7 +77,7 @@ test("parseNoteDefinitions：解析脚注/尾注正文并忽略分隔符注释",
   }]);
 });
 
-test("parseDocx：回填段落脚注/尾注引用位置与正文", () => {
+test("parseDocx：回填段落脚注/尾注引用位置并关联定义存在性", () => {
   const model = parseDocx(makeDocx(`
     <w:p>
       <w:r><w:t>正文甲</w:t></w:r>
@@ -107,14 +107,12 @@ test("parseDocx：回填段落脚注/尾注引用位置与正文", () => {
       id: "2",
       type: "footnote",
       runIndex: 1,
-      content: "脚注正文",
       hasDefinition: true,
     },
     {
       id: "7",
       type: "endnote",
       runIndex: 3,
-      content: "尾注正文",
       hasDefinition: true,
     },
   ]);

@@ -89,8 +89,6 @@ export interface NoteReference {
   type: NoteType;
   /** 引用标记所在 run 索引 */
   runIndex: number;
-  /** 若能在定义部件中找到对应注释，则回填正文 */
-  content?: string;
   hasDefinition: boolean;
 }
 

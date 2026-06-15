@@ -6,8 +6,6 @@ import type {
   ValidationReport,
 } from "@word-auto/validator";
 
-export type { ValidationReport };
-
 export interface AnalyzeResult {
   model: DocModel;
   report: ValidationReport;

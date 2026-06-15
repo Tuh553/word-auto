@@ -1,37 +1,5 @@
-import { attr } from "./ooxml.js";
+import { attr, collectNodeText, readTextNode, toArray } from "./ooxml.js";
 import type { Bookmark, Field } from "./types.js";
-
-const toArray = <T>(value: T | T[] | undefined): T[] => {
-  if (value == null) return [];
-  return Array.isArray(value) ? value : [value];
-};
-
-const readTextNode = (node: unknown): string => {
-  if (node == null) return "";
-  if (Array.isArray(node)) return node.map(readTextNode).join("");
-  if (typeof node === "string") return node;
-  if (typeof node === "object") {
-    const text = (node as Record<string, unknown>)["#text"];
-    return typeof text === "string" ? text : "";
-  }
-  return "";
-};
-
-const collectDisplayText = (node: unknown): string => {
-  if (node == null || typeof node !== "object") return "";
-  if (Array.isArray(node)) return node.map(collectDisplayText).join("");
-
-  let text = "";
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "w:t") {
-      text += readTextNode(value);
-      continue;
-    }
-    if (key === "w:instrText") continue;
-    text += collectDisplayText(value);
-  }
-  return text;
-};
 
 const collectRuns = (node: unknown, out: any[] = []): any[] => {
   if (node == null || typeof node !== "object") return out;
@@ -179,7 +147,7 @@ const parseSimpleFields = (groups: SimpleFieldRunGroup[]): Field[] =>
     return {
       ...parseFieldDescriptor(instruction),
       instruction,
-      displayText: collectDisplayText(node),
+      displayText: collectNodeText(node, { skipInstrText: true }),
       startRunIndex,
       endRunIndex,
     };

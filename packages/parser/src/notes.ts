@@ -1,53 +1,5 @@
-import { attr, parseXml } from "./ooxml.js";
+import { attr, collectNodeText, collectParagraphNodes, parseXml, toArray } from "./ooxml.js";
 import type { NoteDefinition, NoteReference, NoteType } from "./types.js";
-
-const toArray = <T>(value: T | T[] | undefined): T[] => {
-  if (value == null) return [];
-  return Array.isArray(value) ? value : [value];
-};
-
-const readTextNode = (node: unknown): string => {
-  if (node == null) return "";
-  if (Array.isArray(node)) return node.map(readTextNode).join("");
-  if (typeof node === "string") return node;
-  if (typeof node === "object") {
-    const text = (node as Record<string, unknown>)["#text"];
-    return typeof text === "string" ? text : "";
-  }
-  return "";
-};
-
-const collectParagraphNodes = (node: unknown, out: any[] = []): any[] => {
-  if (node == null || typeof node !== "object") return out;
-  if (Array.isArray(node)) {
-    for (const item of node) collectParagraphNodes(item, out);
-    return out;
-  }
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "w:p") {
-      out.push(...toArray(value as any));
-      continue;
-    }
-    collectParagraphNodes(value, out);
-  }
-  return out;
-};
-
-const collectParagraphText = (node: unknown): string => {
-  if (node == null || typeof node !== "object") return "";
-  if (Array.isArray(node)) return node.map(collectParagraphText).join("");
-
-  let text = "";
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "w:t") {
-      text += readTextNode(value);
-      continue;
-    }
-    text += collectParagraphText(value);
-  }
-  return text;
-};
 
 const isRegularNote = (node: any): boolean => {
   const type = attr(node, "w:type");
@@ -74,7 +26,7 @@ export const parseNoteDefinitions = (
     if (!id || !isRegularNote(item)) continue;
 
     const paragraphs = collectParagraphNodes(item)
-      .map((paragraph) => collectParagraphText(paragraph).trim())
+      .map((paragraph) => collectNodeText(paragraph).trim())
       .filter(Boolean);
 
     definitions.push({
@@ -106,7 +58,6 @@ export const parseParagraphNotes = (
         id,
         type: "footnote",
         runIndex,
-        ...(definition ? { content: definition.content } : {}),
         hasDefinition: definition != null,
       });
     }
@@ -119,7 +70,6 @@ export const parseParagraphNotes = (
         id,
         type: "endnote",
         runIndex,
-        ...(definition ? { content: definition.content } : {}),
         hasDefinition: definition != null,
       });
     }

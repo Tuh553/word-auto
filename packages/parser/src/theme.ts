@@ -1,7 +1,7 @@
 import { attr, parseXml } from "./ooxml.js";
 
 /** 一个字体组（major/minor）解析出的关键字体 */
-export interface FontGroup {
+interface FontGroup {
   /** 拉丁字体（对应 ascii/hAnsi/bidi theme） */
   latin?: string;
   /** 东亚字体（a:ea 为空时回退到 script="Hans" 的简体中文字体） */
