@@ -52,63 +52,104 @@ const pushFieldlessText = (tokens: Token[], text: string): void => {
   tokens.push({ type: "text", text, kind: "text" });
 };
 
+const startField = (
+  activeField: ActiveField | undefined,
+  fldCharType: string | undefined,
+): ActiveField | undefined =>
+  fldCharType === "begin"
+    ? { instruction: "", inResult: false, sawResult: false }
+    : activeField;
+
+const appendInstructionText = (
+  activeField: ActiveField | undefined,
+  run: any,
+): void => {
+  const instrText = readTextNode(run["w:instrText"]);
+  if (instrText && activeField) {
+    activeField.instruction += instrText;
+  }
+};
+
+const markFieldResult = (
+  activeField: ActiveField | undefined,
+  fldCharType: string | undefined,
+): void => {
+  if (fldCharType !== "separate" || !activeField) return;
+  activeField.inResult = true;
+  activeField.resultKind = fieldKind(activeField.instruction);
+};
+
+const appendSimpleFieldTokens = (tokens: Token[], run: any): void => {
+  for (const fldSimple of toArray(run["w:fldSimple"])) {
+    const instruction = attr(fldSimple, "w:instr") ?? "";
+    const kind = fieldKind(instruction) ?? "text";
+    const text = collectNodeText(fldSimple, { skipInstrText: true });
+    tokens.push({ type: "text", text, kind, instruction: instruction.trim() || undefined });
+  }
+};
+
+const appendFieldResultToken = (
+  tokens: Token[],
+  activeField: ActiveField,
+  text: string,
+): void => {
+  tokens.push({
+    type: "text",
+    text,
+    kind: activeField.resultKind!,
+    instruction: activeField.instruction.trim() || undefined,
+  });
+  activeField.sawResult = true;
+};
+
+const appendRunTextToken = (
+  tokens: Token[],
+  activeField: ActiveField | undefined,
+  run: any,
+): void => {
+  const text = readTextNode(run["w:t"]);
+  if (!text) return;
+  if (activeField?.inResult && activeField.resultKind) {
+    appendFieldResultToken(tokens, activeField, text);
+    return;
+  }
+  pushFieldlessText(tokens, text);
+};
+
+const endField = (
+  tokens: Token[],
+  activeField: ActiveField | undefined,
+  fldCharType: string | undefined,
+): ActiveField | undefined => {
+  if (fldCharType !== "end") return activeField;
+  if (activeField?.resultKind && !activeField.sawResult) {
+    tokens.push({
+      type: "text",
+      text: "",
+      kind: activeField.resultKind,
+      instruction: activeField.instruction.trim() || undefined,
+    });
+  }
+  return undefined;
+};
+
 const tokenizeRuns = (runs: any[]): Token[] => {
   const tokens: Token[] = [];
   let activeField: ActiveField | undefined;
 
   for (const run of runs) {
     const fldCharType = attr(run["w:fldChar"], "w:fldCharType");
-    if (fldCharType === "begin") {
-      activeField = { instruction: "", inResult: false, sawResult: false };
-    }
-
-    const instrText = readTextNode(run["w:instrText"]);
-    if (instrText && activeField) {
-      activeField.instruction += instrText;
-    }
-
-    if (fldCharType === "separate" && activeField) {
-      activeField.inResult = true;
-      activeField.resultKind = fieldKind(activeField.instruction);
-    }
-
-    for (const fldSimple of toArray(run["w:fldSimple"])) {
-      const instruction = attr(fldSimple, "w:instr") ?? "";
-      const kind = fieldKind(instruction) ?? "text";
-      const text = collectNodeText(fldSimple, { skipInstrText: true });
-      tokens.push({ type: "text", text, kind, instruction: instruction.trim() || undefined });
-    }
-
-    const text = readTextNode(run["w:t"]);
-    if (text) {
-      if (activeField?.inResult && activeField.resultKind) {
-        tokens.push({
-          type: "text",
-          text,
-          kind: activeField.resultKind,
-          instruction: activeField.instruction.trim() || undefined,
-        });
-        activeField.sawResult = true;
-      } else {
-        pushFieldlessText(tokens, text);
-      }
-    }
+    activeField = startField(activeField, fldCharType);
+    appendInstructionText(activeField, run);
+    markFieldResult(activeField, fldCharType);
+    appendSimpleFieldTokens(tokens, run);
+    appendRunTextToken(tokens, activeField, run);
 
     if (run["w:tab"] !== undefined) {
       tokens.push({ type: "tab" });
     }
 
-    if (fldCharType === "end") {
-      if (activeField?.resultKind && !activeField.sawResult) {
-        tokens.push({
-          type: "text",
-          text: "",
-          kind: activeField.resultKind,
-          instruction: activeField.instruction.trim() || undefined,
-        });
-      }
-      activeField = undefined;
-    }
+    activeField = endField(tokens, activeField, fldCharType);
   }
 
   return tokens;

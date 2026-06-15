@@ -55,12 +55,17 @@ const collectBookmarks = (classified: ClassifiedParagraph[]): Set<string> => {
   return out;
 };
 
-export const buildCaptionReferenceGraph = (
+const collectBookmarkNames = (para: ClassifiedParagraph["para"]): string[] =>
+  [...new Set((para.bookmarks ?? []).map((bookmark) => bookmark.name))];
+
+const collectCaptions = (
   classified: ClassifiedParagraph[],
-): CaptionReferenceGraph => {
+): {
+  captions: CaptionTarget[];
+  captionsByBookmark: Map<string, CaptionTarget>;
+} => {
   const captions: CaptionTarget[] = [];
   const captionsByBookmark = new Map<string, CaptionTarget>();
-  const bookmarks = collectBookmarks(classified);
 
   for (const { para, role } of classified) {
     for (const kind of ["figure", "table", "equation"] as const) {
@@ -68,7 +73,7 @@ export const buildCaptionReferenceGraph = (
       const match = findCaptionField(para.fields, kind);
       if (!match) continue;
 
-      const bookmarkNames = [...new Set((para.bookmarks ?? []).map((bookmark) => bookmark.name))];
+      const bookmarkNames = collectBookmarkNames(para);
       const caption: CaptionTarget = {
         kind,
         role,
@@ -89,6 +94,14 @@ export const buildCaptionReferenceGraph = (
     }
   }
 
+  return { captions, captionsByBookmark };
+};
+
+const collectReferences = (
+  classified: ClassifiedParagraph[],
+  bookmarks: Set<string>,
+  captionsByBookmark: Map<string, CaptionTarget>,
+): CaptionReference[] => {
   const references: CaptionReference[] = [];
   for (const { para, role } of classified) {
     for (let fieldIndex = 0; fieldIndex < (para.fields?.length ?? 0); fieldIndex += 1) {
@@ -109,6 +122,20 @@ export const buildCaptionReferenceGraph = (
       });
     }
   }
+
+  return references;
+};
+
+export const buildCaptionReferenceGraph = (
+  classified: ClassifiedParagraph[],
+): CaptionReferenceGraph => {
+  const bookmarks = collectBookmarks(classified);
+  const { captions, captionsByBookmark } = collectCaptions(classified);
+  const references = collectReferences(
+    classified,
+    bookmarks,
+    captionsByBookmark,
+  );
 
   return {
     captions,

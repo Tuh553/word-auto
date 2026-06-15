@@ -171,6 +171,47 @@ const measureToTwips = (v: string | undefined): number | undefined => {
   }
 };
 
+const applyIndentProps = (props: ParaProps, ind: any): void => {
+  const fl = measureToTwips(attr(ind, "w:firstLine"));
+  const flc = num(attr(ind, "w:firstLineChars"));
+  const hg = measureToTwips(attr(ind, "w:hanging"));
+  const hgc = num(attr(ind, "w:hangingChars"));
+  const lf = measureToTwips(attr(ind, "w:left") ?? attr(ind, "w:start"));
+  const lfc = num(attr(ind, "w:leftChars") ?? attr(ind, "w:startChars"));
+
+  if (fl !== undefined) props.firstLineIndentTwips = fl;
+  if (flc !== undefined) props.firstLineIndentChars = flc / 100;
+  if (hg !== undefined) props.hangingIndentTwips = hg;
+  if (hgc !== undefined) props.hangingIndentChars = hgc / 100;
+  if (lf !== undefined) props.leftIndentTwips = lf;
+  if (lfc !== undefined) props.leftIndentChars = lfc / 100;
+};
+
+const parseLineSpacingValue = (
+  spacing: any,
+  rule: string,
+): number | undefined =>
+  rule === "auto"
+    ? num(attr(spacing, "w:line"))
+    : measureToTwips(attr(spacing, "w:line"));
+
+const applySpacingProps = (props: ParaProps, spacing: any): void => {
+  const rule = attr(spacing, "w:lineRule") ?? "auto";
+  // auto 时 line 是 1/240 行（整数）；exact/atLeast 时是测量值（可带单位）
+  const line = parseLineSpacingValue(spacing, rule);
+  if (line !== undefined) props.lineSpacing = makeLineSpacing(line, rule);
+
+  const before = measureToTwips(attr(spacing, "w:before"));
+  const after = measureToTwips(attr(spacing, "w:after"));
+  if (before !== undefined) props.spacingBeforePt = before / 20;
+  if (after !== undefined) props.spacingAfterPt = after / 20;
+};
+
+const applyOutlineLevel = (props: ParaProps, outline: any): void => {
+  const level = num(attr(outline, "w:val"));
+  if (level !== undefined) props.outlineLevel = level;
+};
+
 /** 从 rPr 节点提取 run 级格式（theme 用于解析主题字体引用） */
 export const parseRunProps = (rPr: any, theme?: ThemeFonts): RunProps => {
   const p: RunProps = {};
@@ -210,41 +251,13 @@ export const parseParaProps = (pPr: any): ParaProps => {
   if (jc) p.alignment = jc;
 
   const ind = pPr["w:ind"];
-  if (ind) {
-    const fl = measureToTwips(attr(ind, "w:firstLine"));
-    const flc = num(attr(ind, "w:firstLineChars"));
-    const hg = measureToTwips(attr(ind, "w:hanging"));
-    const hgc = num(attr(ind, "w:hangingChars"));
-    const lf = measureToTwips(attr(ind, "w:left") ?? attr(ind, "w:start"));
-    const lfc = num(attr(ind, "w:leftChars") ?? attr(ind, "w:startChars"));
-    if (fl !== undefined) p.firstLineIndentTwips = fl;
-    if (flc !== undefined) p.firstLineIndentChars = flc / 100;
-    if (hg !== undefined) p.hangingIndentTwips = hg;
-    if (hgc !== undefined) p.hangingIndentChars = hgc / 100;
-    if (lf !== undefined) p.leftIndentTwips = lf;
-    if (lfc !== undefined) p.leftIndentChars = lfc / 100;
-  }
+  if (ind) applyIndentProps(p, ind);
 
   const sp = pPr["w:spacing"];
-  if (sp) {
-    const rule = attr(sp, "w:lineRule") ?? "auto";
-    // auto 时 line 是 1/240 行（整数）；exact/atLeast 时是测量值（可带单位）
-    const line =
-      rule === "auto"
-        ? num(attr(sp, "w:line"))
-        : measureToTwips(attr(sp, "w:line"));
-    if (line !== undefined) p.lineSpacing = makeLineSpacing(line, rule);
-    const before = measureToTwips(attr(sp, "w:before"));
-    const after = measureToTwips(attr(sp, "w:after"));
-    if (before !== undefined) p.spacingBeforePt = before / 20;
-    if (after !== undefined) p.spacingAfterPt = after / 20;
-  }
+  if (sp) applySpacingProps(p, sp);
 
   const ol = pPr["w:outlineLvl"];
-  if (ol) {
-    const lvl = num(attr(ol, "w:val"));
-    if (lvl !== undefined) p.outlineLevel = lvl;
-  }
+  if (ol) applyOutlineLevel(p, ol);
   return p;
 };
 

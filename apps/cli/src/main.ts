@@ -71,6 +71,15 @@ type CliOptions = {
   outPath?: string;
 };
 
+type ReportTextInput = {
+  docxPath: string;
+  rulesPath: string;
+  rulesName: string;
+  model: ReturnType<typeof parseDocx>;
+  roles: ReturnType<typeof classifyParagraphs>;
+  report: ReturnType<typeof validateDoc>;
+};
+
 const parseRawArgs = () => {
   try {
     return parseArgs({
@@ -128,14 +137,14 @@ const loadDocModel = (docxPath: string): ReturnType<typeof parseDocx> => {
   throw new Error("unreachable");
 };
 
-const buildReportText = (
-  docxPath: string,
-  rulesPath: string,
-  rulesName: string,
-  model: ReturnType<typeof parseDocx>,
-  roles: ReturnType<typeof classifyParagraphs>,
-  report: ReturnType<typeof validateDoc>,
-): string => {
+const buildReportText = ({
+  docxPath,
+  rulesPath,
+  rulesName,
+  model,
+  roles,
+  report,
+}: ReportTextInput): string => {
   const lines: string[] = [];
 
   lines.push(`输入文档: ${docxPath}`);
@@ -223,14 +232,14 @@ const main = (): void => {
 
   const roles = classifyParagraphs(model.paragraphs);
   const report = validateDoc(model, normalizedRules);
-  const text = buildReportText(
+  const text = buildReportText({
     docxPath,
     rulesPath,
-    normalizedRules.name,
+    rulesName: normalizedRules.name,
     model,
     roles,
     report,
-  );
+  });
 
   try {
     writeOutput(text, outPath);

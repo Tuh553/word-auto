@@ -9,7 +9,7 @@
     "build": "pnpm -r --if-present --filter @word-auto/parser --filter @word-auto/validator --filter @word-auto/cli --filter @word-auto/web run build",
     "check": "pnpm -r --filter ./apps/cli run check",
     "ci": "pnpm typecheck && pnpm lint && pnpm knip && pnpm jscpd && pnpm test && pnpm build",
-    "lint": "eslint . --max-warnings 28",
+    "lint": "eslint . --max-warnings 0",
     "knip": "knip",
     "jscpd": "jscpd packages apps",
     "test": "pnpm -r --if-present --filter @word-auto/parser --filter @word-auto/validator --filter @word-auto/web run test",

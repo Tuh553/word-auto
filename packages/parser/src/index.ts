@@ -124,45 +124,33 @@ const extractText = (r: any): string => {
   return Array.isArray(t) ? t.map(one).join("") : one(t);
 };
 
-/** 解析 .docx 二进制为文档模型 */
-export const parseDocx = (buf: Uint8Array): DocModel => {
-  if (hasPrefix(buf, CFBF_MAGIC)) {
-    failParse("LEGACY_DOC", "检测到旧版 .doc 二进制文档（OLE 复合文档），当前仅支持 .docx");
-  }
+const buildNoteLookups = (
+  noteDefinitions: ReturnType<typeof parseNoteDefinitions>,
+) => ({
+  footnote: buildNoteDefinitionLookup(
+    noteDefinitions.filter((item) => item.type === "footnote"),
+  ),
+  endnote: buildNoteDefinitionLookup(
+    noteDefinitions.filter((item) => item.type === "endnote"),
+  ),
+});
 
-  const files = unzipDocx(buf);
+type ParagraphBuildContext = {
+  theme: ThemeFonts;
+  styles: Map<string, StyleDef>;
+  docDefaults: DocDefaults;
+  noteLookups: ReturnType<typeof buildNoteLookups>;
+};
 
-  if (files.EncryptedPackage || files.EncryptionInfo) {
-    failParse("ENCRYPTED", "检测到受密码保护的 Office 加密包，当前不支持解析");
-  }
-
-  const read = (p: string): string | undefined =>
-    files[p] ? strFromU8(files[p]) : undefined;
-
-  const docXml = read("word/document.xml");
-  if (!docXml) {
-    failParse("NOT_DOCX", "压缩包中缺少 word/document.xml，不是有效的 .docx");
-  }
-  const docXmlText = docXml!;
-
-  const { theme, styles, docDefaults, noteDefinitions, numbering, root } = parseDocumentParts(
-    read,
-    docXmlText,
-  );
-  const noteLookups = {
-    footnote: buildNoteDefinitionLookup(noteDefinitions.filter((item) => item.type === "footnote")),
-    endnote: buildNoteDefinitionLookup(noteDefinitions.filter((item) => item.type === "endnote")),
-  };
-
-  if (!root["w:document"]?.["w:body"]) {
-    failParse("NOT_DOCX", "word/document.xml 不是有效的 Word OOXML 文档结构");
-  }
-
-  const body = root["w:document"]?.["w:body"] ?? {};
-  const wps: any[] = body["w:p"] ?? [];
-
+const createParagraphBuilder = ({
+  theme,
+  styles,
+  docDefaults,
+  noteLookups,
+}: ParagraphBuildContext): ((wp: any, inTable: boolean) => Paragraph) => {
   let nextIndex = 0;
-  const buildParagraph = (wp: any, inTable: boolean): Paragraph => {
+
+  return (wp: any, inTable: boolean): Paragraph => {
     const pPr = wp["w:pPr"];
     const directPara = parseParaProps(pPr);
     const markRun = parseRunProps(pPr?.["w:rPr"], theme);
@@ -199,63 +187,113 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     para.effective = computeEffective(para, styles, docDefaults);
     return para;
   };
+};
+
+const appendTableParagraphs = (
+  container: any,
+  paragraphs: Paragraph[],
+  buildParagraph: (wp: any, inTable: boolean) => Paragraph,
+): void => {
+  for (const tbl of (container["w:tbl"] ?? []) as any[]) {
+    for (const tr of (tbl["w:tr"] ?? []) as any[]) {
+      for (const tc of (tr["w:tc"] ?? []) as any[]) {
+        for (const paragraph of (tc["w:p"] ?? []) as any[]) {
+          paragraphs.push(buildParagraph(paragraph, true));
+        }
+        appendTableParagraphs(tc, paragraphs, buildParagraph);
+      }
+    }
+  }
+};
+
+const collectSections = (body: any, wps: any[]): SectionProps[] => {
+  const sectPrs: any[] = [];
+  for (const wp of wps) {
+    const sectPr = wp["w:pPr"]?.["w:sectPr"];
+    if (sectPr) sectPrs.push(sectPr);
+  }
+  if (body["w:sectPr"]) sectPrs.push(body["w:sectPr"]);
+  return sectPrs.map(parseSectPr);
+};
+
+const readHeaderFooterParts = (
+  files: Record<string, Uint8Array>,
+  kind: HeaderFooterPart["kind"],
+): HeaderFooterPart[] => {
+  const pattern = kind === "header"
+    ? /^word\/header\d+\.xml$/
+    : /^word\/footer\d+\.xml$/;
+  const parts: HeaderFooterPart[] = [];
+  for (const name of Object.keys(files)) {
+    if (!pattern.test(name)) continue;
+    try {
+      parts.push(parseHeaderFooterPart(strFromU8(files[name]), name, kind));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      failParse("CORRUPT", `${name} XML 解析失败，文件可能已损坏：${detail}`);
+    }
+  }
+  return parts;
+};
+
+const projectHeaderFooterText = (parts: HeaderFooterPart[]): string[] =>
+  parts
+    .map((part) => part.text)
+    .filter((text) => text.trim());
+
+/** 解析 .docx 二进制为文档模型 */
+export const parseDocx = (buf: Uint8Array): DocModel => {
+  if (hasPrefix(buf, CFBF_MAGIC)) {
+    failParse("LEGACY_DOC", "检测到旧版 .doc 二进制文档（OLE 复合文档），当前仅支持 .docx");
+  }
+
+  const files = unzipDocx(buf);
+
+  if (files.EncryptedPackage || files.EncryptionInfo) {
+    failParse("ENCRYPTED", "检测到受密码保护的 Office 加密包，当前不支持解析");
+  }
+
+  const read = (p: string): string | undefined =>
+    files[p] ? strFromU8(files[p]) : undefined;
+
+  const docXml = read("word/document.xml");
+  if (!docXml) {
+    failParse("NOT_DOCX", "压缩包中缺少 word/document.xml，不是有效的 .docx");
+  }
+  const docXmlText = docXml!;
+
+  const { theme, styles, docDefaults, noteDefinitions, numbering, root } = parseDocumentParts(
+    read,
+    docXmlText,
+  );
+  const noteLookups = buildNoteLookups(noteDefinitions);
+
+  if (!root["w:document"]?.["w:body"]) {
+    failParse("NOT_DOCX", "word/document.xml 不是有效的 Word OOXML 文档结构");
+  }
+
+  const body = root["w:document"]?.["w:body"] ?? {};
+  const wps: any[] = body["w:p"] ?? [];
+  const buildParagraph = createParagraphBuilder({
+    theme,
+    styles,
+    docDefaults,
+    noteLookups,
+  });
 
   // body 直接段落（保持原顺序与索引 0..N-1）
   const paragraphs: Paragraph[] = wps.map((wp) => buildParagraph(wp, false));
 
   // 表格内段落：递归 w:tbl > w:tr > w:tc > w:p，追加到末尾并标记 inTable。
   // 复用同一套构造逻辑，单元格段落同样解析样式继承/字体/有效格式。
-  const collectTableParagraphs = (container: any): void => {
-    for (const tbl of (container["w:tbl"] ?? []) as any[]) {
-      for (const tr of (tbl["w:tr"] ?? []) as any[]) {
-        for (const tc of (tr["w:tc"] ?? []) as any[]) {
-          for (const cp of (tc["w:p"] ?? []) as any[]) {
-            paragraphs.push(buildParagraph(cp, true));
-          }
-          collectTableParagraphs(tc); // 嵌套表格
-        }
-      }
-    }
-  };
-  collectTableParagraphs(body);
+  appendTableParagraphs(body, paragraphs, buildParagraph);
 
-  // 收集分节页面设置：各分节点在段落 pPr/sectPr，最后一节在 body 末尾 sectPr
-  const sectPrs: any[] = [];
-  for (const wp of wps) {
-    const sp = wp["w:pPr"]?.["w:sectPr"];
-    if (sp) sectPrs.push(sp);
-  }
-  if (body["w:sectPr"]) sectPrs.push(body["w:sectPr"]);
-  const sections: SectionProps[] = sectPrs.map(parseSectPr);
-
-  const readHeaderFooterParts = (
-    kind: HeaderFooterPart["kind"],
-  ): HeaderFooterPart[] => {
-    const pattern = kind === "header"
-      ? /^word\/header\d+\.xml$/
-      : /^word\/footer\d+\.xml$/;
-    const parts: HeaderFooterPart[] = [];
-    for (const name of Object.keys(files)) {
-      if (!pattern.test(name)) continue;
-      try {
-        parts.push(parseHeaderFooterPart(strFromU8(files[name]), name, kind));
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        failParse("CORRUPT", `${name} XML 解析失败，文件可能已损坏：${detail}`);
-      }
-    }
-    return parts;
-  };
-
-  const headerParts = readHeaderFooterParts("header");
-  const footerParts = readHeaderFooterParts("footer");
+  const sections = collectSections(body, wps);
+  const headerParts = readHeaderFooterParts(files, "header");
+  const footerParts = readHeaderFooterParts(files, "footer");
   // 兼容旧调用：保留 header*.xml / footer*.xml 的纯文本投影。
-  const headers = headerParts
-    .map((part) => part.text)
-    .filter((text) => text.trim());
-  const footers = footerParts
-    .map((part) => part.text)
-    .filter((text) => text.trim());
+  const headers = projectHeaderFooterText(headerParts);
+  const footers = projectHeaderFooterText(footerParts);
 
   return {
     paragraphs,
