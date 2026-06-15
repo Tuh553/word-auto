@@ -57,8 +57,12 @@ export const computeEffective = (
   para: Paragraph,
   styles: Map<string, StyleDef>,
   docDefaults: DocDefaults,
+  defaultParagraphStyleId?: string,
 ): EffectiveProps => {
-  const chain = resolveStyleChain(para.styleId, styles);
+  const chain = resolveStyleChain(
+    para.styleId ?? defaultParagraphStyleId,
+    styles,
+  );
 
   const ep = merge(merge(docDefaults.para ?? {}, chain.para), para.directPara);
   const er = merge(

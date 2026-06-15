@@ -14,25 +14,17 @@ const docxPath = resolve(
 const rulesPath = resolve(here, "../../../apps/web/src/templates/chongqing-thesis-phase1.json");
 
 const ISSUE_DIST_BASELINE: Record<string, number> = {
-  "abstract_body_cn:alignment": 2,
   "keywords_cn:bold": 1,
-  "keywords_cn:alignment": 1,
-  "abstract_body_en:alignment": 2,
   "keywords_en:bold": 1,
-  "keywords_en:alignment": 1,
-  "body_text:alignment": 41,
-  "heading2:alignment": 6,
-  "body_text:size_pt": 2,
-  "heading3:alignment": 6,
+  "body_text:size_pt": 4,
   "formula_line:alignment": 1,
   "formula_line:size_pt": 1,
   "formula_line:line_spacing_pt": 1,
+  "body_text:alignment": 2,
   "reference_body:size_pt": 1,
-  "reference_body:alignment": 1,
   "reference_body:line_spacing_pt": 1,
   "appendix_body:font_east_asia": 4,
   "appendix_body:line_spacing_pt": 5,
-  "acknowledgement_body:alignment": 4,
   "acknowledgement_body:font_east_asia": 1,
   "acknowledgement_body:size_pt": 1,
   "acknowledgement_body:first_line_indent_chars": 2,
@@ -51,24 +43,20 @@ test("标准模板校验基线：发布规则消费结果保持一致", () => {
     dist[key] = (dist[key] ?? 0) + 1;
   }
 
-  assert.equal(report.issues.length, 87);
+  assert.equal(report.issues.length, 27);
   assert.deepEqual(report.summary, {
-    error: 11,
-    warn: 70,
+    error: 13,
+    warn: 8,
     info: 6,
     byRole: {
       table_caption: 1,
-      abstract_body_cn: 2,
-      keywords_cn: 2,
-      abstract_body_en: 2,
-      keywords_en: 2,
-      body_text: 43,
-      heading2: 6,
-      heading3: 6,
+      keywords_cn: 1,
+      keywords_en: 1,
+      body_text: 6,
       formula_line: 3,
-      reference_body: 3,
+      reference_body: 2,
       appendix_body: 9,
-      acknowledgement_body: 8,
+      acknowledgement_body: 4,
     },
   });
   assert.deepEqual(dist, ISSUE_DIST_BASELINE);

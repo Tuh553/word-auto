@@ -6,15 +6,27 @@ import type { DocDefaults, StyleDef } from "./types.js";
 export const parseStyles = (
   stylesXml: string,
   theme?: ThemeFonts,
-): { styles: Map<string, StyleDef>; docDefaults: DocDefaults } => {
+): {
+  styles: Map<string, StyleDef>;
+  docDefaults: DocDefaults;
+  defaultParagraphStyleId?: string;
+} => {
   const root = parseXml(stylesXml);
   const wStyles = root["w:styles"] ?? {};
   const styles = new Map<string, StyleDef>();
+  let defaultParagraphStyleId: string | undefined;
 
   const list: any[] = wStyles["w:style"] ?? [];
   for (const s of list) {
     const styleId = attr(s, "w:styleId");
     if (!styleId) continue;
+    if (
+      defaultParagraphStyleId == null &&
+      attr(s, "w:type") === "paragraph" &&
+      attr(s, "w:default") === "1"
+    ) {
+      defaultParagraphStyleId = styleId;
+    }
     styles.set(styleId, {
       styleId,
       type: attr(s, "w:type"),
@@ -30,5 +42,5 @@ export const parseStyles = (
     run: parseRunProps(dd["w:rPrDefault"]?.["w:rPr"], theme),
     para: parseParaProps(dd["w:pPrDefault"]?.["w:pPr"]),
   };
-  return { styles, docDefaults };
+  return { styles, docDefaults, defaultParagraphStyleId };
 };

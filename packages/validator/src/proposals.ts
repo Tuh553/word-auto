@@ -81,7 +81,7 @@ const FIELD_SPECS: FieldSpec[] = [
   {
     key: "align",
     unit: RULE_FIELD_UNITS.align,
-    read: (para) => normalizeAlign(para.effective.alignment) ?? "left",
+    read: (para) => normalizeAlign(para.effective.alignment),
   },
   {
     key: "lineHeightPt",

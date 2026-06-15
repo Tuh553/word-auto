@@ -93,6 +93,32 @@ test("extractRuleProposal：聚合候选值、覆盖率、冲突与可信提示"
   assert.deepEqual(align?.proposedValue, { mode: "exact", exact: "justify", unit: "enum" });
 });
 
+test("extractRuleProposal：对齐缺失时不再默认提取为 left", () => {
+  const model = {
+    paragraphs: [
+      mkPara("摘要"),
+      mkPara("这是摘要正文", { alignment: "both", sizePt: 12 }),
+      mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
+      mkPara("正文一", { sizePt: 12 }),
+      mkPara("正文二", { alignment: "both", sizePt: 12 }),
+      mkPara("正文三", { sizePt: 12 }),
+    ],
+    styles: new Map(),
+    docDefaults: {},
+    sections: [],
+    headers: [],
+    numbering: { abstractNums: new Map(), nums: new Map() },
+  };
+
+  const proposal = extractRuleProposal(model, { sourceName: "sample.docx" });
+  const body = proposal.roles.find((item) => item.role === "body_text");
+  const align = body?.fields.find((item) => item.key === "align");
+
+  assert.deepEqual(align?.proposedValue, { mode: "exact", exact: "justify", unit: "enum" });
+  assert.equal(align?.observedCount, 1);
+  assert.equal(align?.totalCount, 3);
+});
+
 test("applyProposalFieldToDraft / applyProposalRoleToDraft：候选进入草稿并补齐缺失字段", () => {
   const proposal: RoleRuleProposal = {
     role: "body_text",

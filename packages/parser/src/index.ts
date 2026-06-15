@@ -82,13 +82,14 @@ const parseDocumentParts = (
   theme: ThemeFonts;
   styles: Map<string, StyleDef>;
   docDefaults: DocDefaults;
+  defaultParagraphStyleId?: string;
   noteDefinitions: ReturnType<typeof parseNoteDefinitions>;
   numbering: NumberingDefinitions;
   root: any;
 } => {
   try {
     const theme = parseTheme(read("word/theme/theme1.xml") ?? "<a:theme/>");
-    const { styles, docDefaults } = parseStyles(
+    const { styles, docDefaults, defaultParagraphStyleId } = parseStyles(
       read("word/styles.xml") ?? "<w:styles/>",
       theme,
     );
@@ -106,7 +107,15 @@ const parseDocumentParts = (
       ),
     ];
     const root = parseXml(docXml);
-    return { theme, styles, docDefaults, noteDefinitions, numbering, root };
+    return {
+      theme,
+      styles,
+      docDefaults,
+      defaultParagraphStyleId,
+      noteDefinitions,
+      numbering,
+      root,
+    };
   } catch (error) {
     if (isParseError(error)) throw error;
     const detail = error instanceof Error ? error.message : String(error);
@@ -139,6 +148,7 @@ type ParagraphBuildContext = {
   theme: ThemeFonts;
   styles: Map<string, StyleDef>;
   docDefaults: DocDefaults;
+  defaultParagraphStyleId?: string;
   noteLookups: ReturnType<typeof buildNoteLookups>;
 };
 
@@ -146,6 +156,7 @@ const createParagraphBuilder = ({
   theme,
   styles,
   docDefaults,
+  defaultParagraphStyleId,
   noteLookups,
 }: ParagraphBuildContext): ((wp: any, inTable: boolean) => Paragraph) => {
   let nextIndex = 0;
@@ -184,7 +195,12 @@ const createParagraphBuilder = ({
       numbering: numRef,
     };
     if (inTable) para.inTable = true;
-    para.effective = computeEffective(para, styles, docDefaults);
+    para.effective = computeEffective(
+      para,
+      styles,
+      docDefaults,
+      defaultParagraphStyleId,
+    );
     return para;
   };
 };
@@ -262,7 +278,15 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   }
   const docXmlText = docXml!;
 
-  const { theme, styles, docDefaults, noteDefinitions, numbering, root } = parseDocumentParts(
+  const {
+    theme,
+    styles,
+    docDefaults,
+    defaultParagraphStyleId,
+    noteDefinitions,
+    numbering,
+    root,
+  } = parseDocumentParts(
     read,
     docXmlText,
   );
@@ -278,6 +302,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     theme,
     styles,
     docDefaults,
+    defaultParagraphStyleId,
     noteLookups,
   });
 
