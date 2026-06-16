@@ -102,11 +102,10 @@ CI（`.github/workflows/quality.yml`）与 `pnpm run ci` 在 `typecheck`/`test`/
 
 ### 棘轮维护（结构债务只减不增）
 
-现存复杂度/体量超标是历史存量，设为 **warn** 并由 `package.json` 的
-`"lint": "eslint . --max-warnings <N>"` 锁定上限（当前 `N=28`）：
+复杂度/体量存量已收紧到当前无 warning。`package.json` 的
+`"lint": "eslint . --max-warnings 0"` 要保持为硬门禁：
 
-- 新增任何结构 warning → 总数 > N → CI 红，逼停劣化。
-- 每清理一批存量，**同步下调 N**（只减不增），让上限贴着现实收紧。
+- 新增任何结构 warning → CI 红，逼停劣化。
 - 某规则的存量清零后，把它从 `warn` 升 `error`。
 - 远期可开 type-checked 规则（typescript-eslint `projectService`）治理 `any`。
 
@@ -118,9 +117,11 @@ CI（`.github/workflows/quality.yml`）与 `pnpm run ci` 在 `typecheck`/`test`/
    `inTable` / 角色 `table_cell`；**未走全局 `preserveOrder`**（风险低一个量级）。代价：表格与
    正文的全局交错顺序暂未保留（对格式检测无影响）。待办：表格专属规则/降噪。
 4. ✅ 后置部分正式章节：致谢/附录/成果已升级为独立 heading/body 角色并纳入校验；后续可继续细分附录内部异构内容。
-5. 规则配置页：字段值编辑控件、`mode` 切换、草稿/发布态，以及发布后回灌检测。
+5. 多模板管理补齐：新建、复制、重命名、删除模板。
+6. 模板候选增强：候选 diff、证据下钻、多样本聚合与评分校准。
 6. （远期、高风险）自动套版改写——务必无损保留分节/域/题注/交叉引用。
 
 > 已完成：主题字体、按脚本降噪、页面设置检测、行距缺失提示、分节页码、TOC 条目、
 > 页眉内容、带单位测量值、封面区跳过、标准模板接入对账、web 预览高亮定位、
-> 后置部分正式章节、特殊正文元素正式角色。
+> 后置部分正式章节、特殊正文元素正式角色、规则配置闭环、模板候选提取、报告分组、
+> 规范依据展示与修复建议。

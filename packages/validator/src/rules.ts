@@ -196,10 +196,19 @@ const normalizePageNumbers = (pn: LegacyRuleLibrary["page_numbers"]): PageNumber
     front_matter_format: pn.front_matter_format,
     body_format: pn.body_format,
     body_restart_at: pn.body_restart_at,
+    alignment: pn.alignment,
+    font_latin: pn.font_latin,
+    size_pt: pn.size_pt,
   } : undefined;
 
 const normalizeHeaders = (headers: LegacyRuleLibrary["headers"]): HeaderRuleSet | undefined =>
-  headers ? { left_text: headers.left_text } : undefined;
+  headers ? {
+    left_text: headers.left_text,
+    font_east_asia: headers.font_east_asia,
+    font_latin: headers.font_latin,
+    size_pt: headers.size_pt,
+    bottom_border: headers.bottom_border,
+  } : undefined;
 
 const normalizeSource = (
   source: LegacyRuleLibrary["source"] | EditableRuleLibrary["source"],

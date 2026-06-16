@@ -74,6 +74,18 @@ test("RuleValue 期望：oneOf / range 描述目标短语", () => {
   );
 });
 
+test("run 级样式字段：建议指向文本片段", () => {
+  assert.deepEqual(
+    computeFixHint({
+      field: "font_latin",
+      expected: "Times New Roman",
+      actual: "Arial",
+      startRunIndex: 2,
+    }),
+    { suggestion: "请将该文本片段西文字体设为 「Times New Roman」", fixability: "auto" },
+  );
+});
+
 test("未知字段兜底为 manual，不臆测自动修复", () => {
   const hint = computeFixHint({ field: "some_unknown_field", expected: 1, actual: 2 });
   assert.equal(hint.fixability, "manual");

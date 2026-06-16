@@ -5,15 +5,24 @@ import type {
   Role,
   RuleField,
   RuleFieldKey,
-  RuleValue,
   Severity,
   StyleRule,
 } from "./types.js";
+import { checkEditableRunField, checkLegacyRunField } from "./validate-runs.js";
 import { findEditableRoleRule, getRoleProvenance } from "./validate-rules.js";
+import {
+  EDITABLE_FIELD_TOLERANCE,
+  approx,
+  describeRuleValue,
+  matchesRuleValue,
+  preview,
+  textHasCJK,
+  textHasLatin,
+  type Scalar,
+  type ValueFormatter,
+} from "./validate-style-utils.js";
 
-type Scalar = string | number | boolean;
 type EffectiveProps = Paragraph["effective"];
-type ValueFormatter = (value: Scalar) => string;
 
 interface ParagraphIssueContext {
   para: Paragraph;
@@ -25,10 +34,12 @@ interface ParagraphIssueContext {
 }
 
 interface EditableParagraphContext extends ParagraphIssueContext {
+  out: Issue[];
   pushFieldIssue: (field: RuleField, actualValue: Scalar | undefined, actualText: string, formatter: ValueFormatter, tolerance?: number) => void;
 }
 
 interface LegacyParagraphContext extends ParagraphIssueContext {
+  out: Issue[];
   rule: StyleRule;
   push: (field: string, expected: unknown, actual: unknown, severity: Severity, message: string) => void;
 }
@@ -57,7 +68,6 @@ const FIELD_NAMES: Record<RuleFieldKey, string> = {
   outlineLevel: "outline_level",
 };
 
-const EDITABLE_FIELD_TOLERANCE = 0.01;
 const LINE_HEIGHT_TOLERANCE = 0.5;
 const INDENT_TOLERANCE = 0.1;
 
@@ -67,59 +77,8 @@ const normAlign = (value?: string): string | undefined => {
   return map[value] ?? value;
 };
 
-const approx = (a: number, b: number, tolerance: number): boolean => Math.abs(a - b) <= tolerance;
-const preview = (text: string): string => text.replace(/\s+/g, " ").trim().slice(0, 24);
-const textHasCJK = (text: string): boolean => /[一-鿿]/.test(text);
-const textHasLatin = (text: string): boolean => /[A-Za-z]/.test(text);
 const formatScalar = (value: Scalar): string => typeof value === "boolean" ? (value ? "是" : "否") : String(value);
 const outlineComparable = (value: number | undefined): number => value == null ? 10 : value + 1;
-
-const compareScalar = (
-  actual: Scalar,
-  expected: Scalar,
-  tolerance = EDITABLE_FIELD_TOLERANCE,
-): boolean => {
-  if (typeof actual === "number" && typeof expected === "number") {
-    return approx(actual, expected, tolerance);
-  }
-  return actual === expected;
-};
-
-const matchesRuleValue = (
-  ruleValue: RuleValue,
-  actual: Scalar | undefined,
-  tolerance = EDITABLE_FIELD_TOLERANCE,
-): boolean => {
-  if (ruleValue.mode === "unset") return true;
-  if (actual == null) return false;
-  switch (ruleValue.mode) {
-    case "exact":
-      return ruleValue.exact != null && compareScalar(actual, ruleValue.exact, tolerance);
-    case "oneOf":
-      return (ruleValue.oneOf ?? []).some((item) => compareScalar(actual, item, tolerance));
-    case "range":
-      if (typeof actual !== "number") return false;
-      if (ruleValue.min != null && actual < ruleValue.min) return false;
-      return ruleValue.max == null || actual <= ruleValue.max;
-  }
-};
-
-const describeRuleValue = (ruleValue: RuleValue, formatter: ValueFormatter): string => {
-  switch (ruleValue.mode) {
-    case "exact":
-      return `应为 ${formatter(ruleValue.exact as Scalar)}`;
-    case "oneOf":
-      return `应为以下之一：${(ruleValue.oneOf ?? []).map(formatter).join(" / ")}`;
-    case "range":
-      if (ruleValue.min != null && ruleValue.max != null) {
-        return `应在 ${formatter(ruleValue.min)} ~ ${formatter(ruleValue.max)} 范围内`;
-      }
-      if (ruleValue.min != null) return `应不小于 ${formatter(ruleValue.min)}`;
-      return `应不大于 ${formatter(ruleValue.max as number)}`;
-    case "unset":
-      return "不校验";
-  }
-};
 
 const createParagraphIssue = ({
   context,
@@ -186,6 +145,7 @@ const createEditableContext = (
   const context = createParagraphContext(para, role, provenance);
   return {
     ...context,
+    out,
     pushFieldIssue: (field, actualValue, actualText, formatter, tolerance = EDITABLE_FIELD_TOLERANCE) => {
       if (!field.enabled || field.value.mode === "unset") return;
       if (matchesRuleValue(field.value, actualValue, tolerance)) return;
@@ -218,15 +178,51 @@ const pushNumericField = (
 
 const checkEditableCnFont = (context: EditableParagraphContext, field: RuleField): void => {
   if (!context.hasCJK) return;
+  const issues = checkEditableRunField({
+    context,
+    field,
+    fieldName: FIELD_NAMES[field.key],
+    acceptsText: textHasCJK,
+    selectValue: (run) => run.effective?.fontEastAsia,
+    formatter: (value) => `「${value}」`,
+  });
+  if (issues) {
+    context.out.push(...issues);
+    return;
+  }
   pushStringField(context, field, context.effective.fontEastAsia);
 };
 
 const checkEditableLatinFont = (context: EditableParagraphContext, field: RuleField): void => {
   if (!context.hasLatin) return;
+  const issues = checkEditableRunField({
+    context,
+    field,
+    fieldName: FIELD_NAMES[field.key],
+    acceptsText: textHasLatin,
+    selectValue: (run) => run.effective?.fontAscii,
+    formatter: (value) => `「${value}」`,
+  });
+  if (issues) {
+    context.out.push(...issues);
+    return;
+  }
   pushStringField(context, field, context.effective.fontAscii);
 };
 
 const checkEditableFontSize = (context: EditableParagraphContext, field: RuleField): void => {
+  const issues = checkEditableRunField({
+    context,
+    field,
+    fieldName: FIELD_NAMES[field.key],
+    acceptsText: () => true,
+    selectValue: (run) => run.effective?.sizePt,
+    formatter: (value) => `${value}pt`,
+  });
+  if (issues) {
+    context.out.push(...issues);
+    return;
+  }
   pushNumericField(context, field, context.effective.sizePt, "pt");
 };
 
@@ -291,6 +287,20 @@ const EDITABLE_FIELD_CHECKERS: Record<RuleFieldKey, (context: EditableParagraphC
 const checkLegacyCnFont = (context: LegacyParagraphContext): void => {
   const expected = context.rule.font_east_asia;
   const actual = context.effective.fontEastAsia;
+  if (!expected || !context.hasCJK) return;
+  const issues = checkLegacyRunField({
+    context,
+    fieldName: "font_east_asia",
+    expected,
+    acceptsText: textHasCJK,
+    selectValue: (run) => run.effective?.fontEastAsia,
+    message: ({ expected: target, actual: value, range, text }) =>
+      `${range}「${text}」中文字体应为「${target}」，实际「${value}」`,
+  });
+  if (issues) {
+    context.out.push(...issues);
+    return;
+  }
   if (!expected || !context.hasCJK || !actual || actual === expected) return;
   context.push("font_east_asia", expected, actual, "error", `中文字体应为「${expected}」，实际「${actual}」`);
 };
@@ -298,6 +308,20 @@ const checkLegacyCnFont = (context: LegacyParagraphContext): void => {
 const checkLegacyLatinFont = (context: LegacyParagraphContext): void => {
   const expected = context.rule.font_latin;
   const actual = context.effective.fontAscii;
+  if (!expected || !context.hasLatin) return;
+  const issues = checkLegacyRunField({
+    context,
+    fieldName: "font_latin",
+    expected,
+    acceptsText: textHasLatin,
+    selectValue: (run) => run.effective?.fontAscii,
+    message: ({ expected: target, actual: value, range, text }) =>
+      `${range}「${text}」西文字体应为「${target}」，实际「${value}」`,
+  });
+  if (issues) {
+    context.out.push(...issues);
+    return;
+  }
   if (!expected || !context.hasLatin || !actual || actual === expected) return;
   context.push("font_latin", expected, actual, "error", `西文字体应为「${expected}」，实际「${actual}」`);
 };
@@ -305,6 +329,19 @@ const checkLegacyLatinFont = (context: LegacyParagraphContext): void => {
 const checkLegacyFontSize = (context: LegacyParagraphContext): void => {
   const expected = context.rule.size_pt;
   const actual = context.effective.sizePt;
+  const issues = checkLegacyRunField({
+    context,
+    fieldName: "size_pt",
+    expected,
+    acceptsText: () => true,
+    selectValue: (run) => run.effective?.sizePt,
+    message: ({ expected: target, actual: value, range, text }) =>
+      `${range}「${text}」字号应为 ${target}pt，实际 ${value}pt`,
+  });
+  if (issues) {
+    context.out.push(...issues);
+    return;
+  }
   if (expected == null || actual == null || approx(actual, expected, EDITABLE_FIELD_TOLERANCE)) return;
   context.push("size_pt", expected, actual, "error", `字号应为 ${expected}pt，实际 ${actual}pt`);
 };
@@ -388,6 +425,7 @@ export const checkPara = (
   const contextBase = createParagraphContext(para, role, provenance);
   const context: LegacyParagraphContext = {
     ...contextBase,
+    out,
     rule,
     push: createParagraphIssuePush(contextBase, out),
   };

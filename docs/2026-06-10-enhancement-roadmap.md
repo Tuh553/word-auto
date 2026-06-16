@@ -3,7 +3,8 @@
 > 日期：2026-06-10　范围：基于当时代码库现状的全面盘点
 > 与 [`plans/2026-06-09-rule-library-and-template-prd.md`](./plans/2026-06-09-rule-library-and-template-prd.md)
 > 互补：PRD 聚焦「规则库可视化」单条主线，本文覆盖**解析引擎 / 校验能力 / 工程质量 / 产品形态**全栈，
-> 用「价值 × 成本 × 风险」给出取舍与推荐路线。2026-06-11 已完成工程安全网、规则配置闭环和模板候选 MVP；
+> 用「价值 × 成本 × 风险」给出取舍与推荐路线。2026-06-15 已完成工程安全网、规则配置闭环、模板候选 MVP、
+> 报告依据/修复建议展示，以及 Web 工作台/validator 热路径结构拆分；
 > 当前待办以 [`TODO.md`](./TODO.md) 为准。
 
 ---
@@ -17,7 +18,7 @@
 | parser | docx→文档模型；样式继承（直接→样式→`basedOn`链→`docDefaults`）；主题字体回填；`sectPr` 页面设置；分节页码；页眉文本；表格内段落提取 |
 | validator | 角色识别状态机（`classify.ts`）；逐段比对（`validate.ts`）；文档级检测；`RuleValue` 模式比对；规则合法性校验 `lintRuleLibrary`；规则模型 + 兼容层；模板候选提取 |
 | web | 四步检测流程 + `docx-preview` 预览高亮；规则配置；草稿/发布；多模板；规则库导入/导出；模板候选面板 |
-| 测试/CI | parser 4 例、validator 32 例、web 3 例；`quality.yml` 覆盖 type-check、test、build |
+| 测试/CI | parser 22 例、validator 73 例、web 13 例；`quality.yml` 覆盖 typecheck、lint、knip、jscpd、test、build |
 
 整体判断：**解析与检测的核心链路已跑通且对账过标准模板**，价值已验证。2026-06-11 已补上
 金标准回归、CI 门禁、规则配置闭环、模板候选提取 MVP。当前主要短板转为：
@@ -45,7 +46,7 @@
 
 ### 1.2 CI 质量门禁 —— 已落地
 
-- **现状**：`.github/workflows/quality.yml` 已在 PR / push 触发 `pnpm typecheck`、`pnpm test`、`pnpm build`。
+- **现状**：`.github/workflows/quality.yml` 已在 PR / push 触发 `pnpm typecheck`、`pnpm lint`、`pnpm knip`、`pnpm jscpd`、`pnpm test`、`pnpm build`。
 - **本地命令**：使用 `pnpm run ci`；不要用 `pnpm ci`。
 
 ### 1.3 parser 类型不安全（`any` 泛滥）
@@ -172,12 +173,12 @@
 
 | 子项 | 阶段 | 说明 | 价值/成本 |
 | --- | --- | --- | --- |
-| 字段值编辑控件 | PRD 阶段4 | 精确值数值输入、字体下拉、对齐枚举、范围输入，替换当前只读展示（配合 §3.3） | 高 / 中 |
-| 规则方式 `mode` 切换 | 阶段4 | exact/oneOf/range/unset 切换 UI | 中 / 中 |
-| 草稿/发布态 | 阶段2 | `localStorage` 草稿 + 发布动作；**发布后回灌检测链路**（当前配置不影响检测） | 高 / 中 |
-| 多规则库管理 | 阶段5 | 列表/切换/新建/复制；BOM 兼容已就绪 | 中 / 中 |
-| 规则库导入/导出 | 新增 | 上传自定义 JSON（去 BOM + `lint` 校验 styles）、导出当前库 | 高 / 低 |
-| 模板候选提取 | 阶段6-7 | 上传 .docx → parser+classify 聚合 → 候选值/覆盖率/冲突/置信度 → 接受到草稿 | 高 / 高 |
+| 字段值编辑控件 | 已完成 MVP | 精确值数值输入、字体下拉、对齐枚举、范围输入，配合 §3.3 生效 | 高 / 中 |
+| 规则方式 `mode` 切换 | 已完成 MVP | exact/oneOf/range/unset 切换 UI | 中 / 中 |
+| 草稿/发布态 | 已完成 MVP | `localStorage` 草稿 + 发布动作；发布后回灌检测链路 | 高 / 中 |
+| 多规则库管理 | 部分完成 | 已支持导入/导出/切换；新建/复制/重命名/删除待补 | 中 / 中 |
+| 规则库导入/导出 | 已完成 MVP | 上传自定义 JSON（去 BOM + `lint` 校验）、导出当前库 | 高 / 低 |
+| 模板候选提取 | 已完成 MVP | 上传 .docx → parser+classify 聚合 → 候选值/覆盖率/冲突/置信度 → 接受到草稿 | 高 / 高 |
 
 - **要点**：①§3.3 的引擎对齐应先于「可编辑值」，否则配了不生效；
   ②「导入自定义规则库 + `lint` 校验」性价比极高，是多模板生态的最小可用起点；

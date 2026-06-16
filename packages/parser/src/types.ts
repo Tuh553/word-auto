@@ -71,6 +71,8 @@ export interface EffectiveProps {
 export interface Run {
   text: string;
   props: RunProps;
+  /** 继承解析后的 run 级有效格式 */
+  effective?: RunProps;
 }
 
 export type NoteType = "footnote" | "endnote";
@@ -232,6 +234,16 @@ export interface HeaderFooterSegment {
   alignment: HeaderFooterAlignment;
   /** 域代码，如 PAGE */
   instruction?: string;
+  /** 继承解析后的片段 run 级有效格式 */
+  effective?: RunProps;
+}
+
+/** 页眉/页脚段落边框。 */
+export interface HeaderFooterBorder {
+  style?: string;
+  size?: number;
+  color?: string;
+  space?: number;
 }
 
 export interface HeaderFooterParagraph {
@@ -241,6 +253,10 @@ export interface HeaderFooterParagraph {
   rightText: string;
   alignment: HeaderFooterAlignment;
   hasPageNumber: boolean;
+  /** 继承解析后的段落级有效格式 */
+  effective: EffectiveProps;
+  /** 直接解析自 w:pBdr/w:bottom 的下边框 */
+  bottomBorder?: HeaderFooterBorder;
   segments: HeaderFooterSegment[];
 }
 

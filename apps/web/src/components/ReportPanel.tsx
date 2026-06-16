@@ -145,7 +145,14 @@ function ReportIssueCard({
         </span>
       </div>
       <div className="msg">{issue.message}</div>
-      <div className="text">「{issue.textPreview}」</div>
+      {issue.affectedText ? (
+        <div className="text">
+          片段 {issue.startRunIndex == null ? "" : `#${issue.startRunIndex + 1}`}：
+          「{issue.affectedText}」
+        </div>
+      ) : (
+        <div className="text">「{issue.textPreview}」</div>
+      )}
       {issue.suggestion ? (
         <div className="fix-hint">
           <span className={`fix-tag ${issue.fixability ?? "manual"}`}>

@@ -14,11 +14,12 @@ const docxPath = resolve(
 const rulesPath = resolve(here, "../../../apps/web/src/templates/chongqing-thesis-phase1.json");
 
 const ISSUE_DIST_BASELINE: Record<string, number> = {
+  "document:page_number_alignment": 1,
   "keywords_cn:bold": 1,
   "keywords_en:bold": 1,
   "body_text:size_pt": 4,
   "formula_line:alignment": 1,
-  "formula_line:size_pt": 1,
+  "formula_line:size_pt": 2,
   "formula_line:line_spacing_pt": 1,
   "body_text:alignment": 2,
   "reference_body:size_pt": 1,
@@ -43,17 +44,18 @@ test("标准模板校验基线：发布规则消费结果保持一致", () => {
     dist[key] = (dist[key] ?? 0) + 1;
   }
 
-  assert.equal(report.issues.length, 27);
+  assert.equal(report.issues.length, 29);
   assert.deepEqual(report.summary, {
-    error: 13,
-    warn: 8,
+    error: 14,
+    warn: 9,
     info: 6,
     byRole: {
+      document: 1,
       table_caption: 1,
       keywords_cn: 1,
       keywords_en: 1,
       body_text: 6,
-      formula_line: 3,
+      formula_line: 4,
       reference_body: 2,
       appendix_body: 9,
       acknowledgement_body: 4,

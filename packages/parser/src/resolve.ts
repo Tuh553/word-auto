@@ -49,6 +49,29 @@ const dominantRun = (para: Paragraph): RunProps => {
   return r?.props ?? para.markRun ?? {};
 };
 
+const baseRunProps = (
+  para: Paragraph,
+  chain: { run: RunProps },
+  docDefaults: DocDefaults,
+): RunProps => merge(
+  merge(docDefaults.run ?? {}, chain.run),
+  para.markRun,
+);
+
+export const computeRunEffective = (
+  para: Paragraph,
+  styles: Map<string, StyleDef>,
+  docDefaults: DocDefaults,
+  defaultParagraphStyleId?: string,
+): RunProps[] => {
+  const chain = resolveStyleChain(
+    para.styleId ?? defaultParagraphStyleId,
+    styles,
+  );
+  const base = baseRunProps(para, chain, docDefaults);
+  return para.runs.map((run) => merge(base, run.props));
+};
+
 /**
  * 计算继承后的有效格式。
  * 优先级（低→高）：docDefaults → basedOn 样式链 → 段落/run 直接格式。
@@ -66,7 +89,7 @@ export const computeEffective = (
 
   const ep = merge(merge(docDefaults.para ?? {}, chain.para), para.directPara);
   const er = merge(
-    merge(docDefaults.run ?? {}, chain.run),
+    baseRunProps(para, chain, docDefaults),
     dominantRun(para),
   );
 

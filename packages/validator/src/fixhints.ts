@@ -32,7 +32,7 @@ const ALIGN_LABELS: Record<string, string> = {
 };
 
 type Scalar = string | number | boolean;
-type FixHintIssue = Pick<Issue, "field" | "expected" | "actual">;
+type FixHintIssue = Pick<Issue, "field" | "expected" | "actual" | "startRunIndex">;
 type FixHintBuilder = (issue: FixHintIssue, target: string) => FixHint;
 
 const isRuleValue = (value: unknown): value is RuleValue =>
@@ -114,10 +114,13 @@ const buildManualFixHint = (suggestion: string): FixHint => ({
   fixability: "manual",
 });
 
+const paragraphOrRun = (issue: FixHintIssue): string =>
+  issue.startRunIndex == null ? "该段落" : "该文本片段";
+
 const PARAGRAPH_FIX_HINTS: Record<string, FixHintBuilder> = {
-  font_east_asia: (_issue, target) => buildAutoFixHint(`请将该段落中文字体设为 ${target}`),
-  font_latin: (_issue, target) => buildAutoFixHint(`请将该段落西文字体设为 ${target}`),
-  size_pt: (_issue, target) => buildAutoFixHint(`请将该段落字号调整为 ${target}`),
+  font_east_asia: (issue, target) => buildAutoFixHint(`请将${paragraphOrRun(issue)}中文字体设为 ${target}`),
+  font_latin: (issue, target) => buildAutoFixHint(`请将${paragraphOrRun(issue)}西文字体设为 ${target}`),
+  size_pt: (issue, target) => buildAutoFixHint(`请将${paragraphOrRun(issue)}字号调整为 ${target}`),
   bold: (_issue, target) => buildAutoFixHint(`请将该段落设为 ${target}`),
   alignment: (_issue, target) => buildAutoFixHint(`请将该段落对齐方式改为 ${target}`),
   spacing_before_pt: (_issue, target) => buildAutoFixHint(`请将该段落段前间距设为 ${target}`),
@@ -132,7 +135,14 @@ const DOCUMENT_FIX_HINTS: Record<string, FixHintBuilder> = {
   paper_size: (_issue, target) => buildManualFixHint(`请在页面设置中将纸张大小设为 ${target}`),
   page_number_front: (_issue, target) => buildManualFixHint(`请将前置部分页码格式设为 ${target}（通常需在分节符处单独设置）`),
   page_number_body: (_issue, target) => buildManualFixHint(`请将正文页码设为 ${target}，并在正文起始分节处重新编号`),
+  page_number_alignment: (_issue, target) => buildManualFixHint(`请将页码位置设为 ${target}`),
+  page_number_font_latin: (_issue, target) => buildManualFixHint(`请将页码西文字体设为 ${target}`),
+  page_number_size_pt: (_issue, target) => buildManualFixHint(`请将页码字号设为 ${target}`),
   header_text: (issue) => buildManualFixHint(`请在页眉中加入文字「${String(issue.expected ?? "")}」`),
+  header_font_east_asia: (_issue, target) => buildManualFixHint(`请将页眉中文字体设为 ${target}`),
+  header_font_latin: (_issue, target) => buildManualFixHint(`请将页眉西文字体设为 ${target}`),
+  header_size_pt: (_issue, target) => buildManualFixHint(`请将页眉字号设为 ${target}`),
+  header_bottom_border: () => buildManualFixHint("请在页眉段落下方设置符合规范的下边框线"),
   caption_reference: (issue) => {
     const actual = String(issue.actual ?? "");
     if (actual.includes("不存在")) {

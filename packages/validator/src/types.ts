@@ -49,9 +49,16 @@ export interface RuleLibrary {
     front_matter_format?: string;
     body_format?: string;
     body_restart_at?: number;
+    alignment?: string;
+    font_latin?: string;
+    size_pt?: number;
   };
   headers?: {
     left_text?: string;
+    font_east_asia?: string;
+    font_latin?: string;
+    size_pt?: number;
+    bottom_border?: boolean;
     [k: string]: unknown;
   };
   styles: Record<string, StyleRule>;
@@ -118,10 +125,17 @@ export interface PageNumberRuleSet {
   front_matter_format?: string;
   body_format?: string;
   body_restart_at?: number;
+  alignment?: string;
+  font_latin?: string;
+  size_pt?: number;
 }
 
 export interface HeaderRuleSet {
   left_text?: string;
+  font_east_asia?: string;
+  font_latin?: string;
+  size_pt?: number;
+  bottom_border?: boolean;
 }
 
 export interface EditableRuleLibrary {
@@ -294,6 +308,9 @@ export interface ValidationIssue {
   severity: Severity;
   message: string;
   textPreview?: string;
+  startRunIndex?: number;
+  endRunIndex?: number;
+  affectedText?: string;
   provenance?: string;
   /** 可操作的人话修复指引 */
   suggestion?: string;
@@ -312,6 +329,9 @@ export interface Issue {
   severity: Severity;
   message: string;
   textPreview: string;
+  startRunIndex?: number;
+  endRunIndex?: number;
+  affectedText?: string;
   provenance?: string;
   /** 可操作的人话修复指引（如「请将该段落字号调整为 12pt」） */
   suggestion?: string;

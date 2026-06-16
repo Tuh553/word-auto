@@ -1,6 +1,7 @@
 # 实施计划：多模板规则库可视化配置与模板候选提取
 
 > 状态更新（2026-06-11）：阶段 1-7 的 MVP 已落地并通过 `pnpm run ci`。
+> 2026-06-15：Web 工作台已完成结构拆分，`App` 只做导航和编排，检测、规则库、候选提取状态分别进入 hooks。
 > 当前 TODO 集中维护在 [`../TODO.md`](../TODO.md)；本文保留实施过程与历史决策。
 
 ## 1. 目标
@@ -437,6 +438,14 @@
 4. 多模板支持已具备导入 JSON、导出草稿/生效版本、模板切换。
 5. 模板候选提取支持上传 `.docx`、聚合候选、逐项/整角色接受到草稿。
 6. 金标准回归和 CI 质量门禁已落地。
+
+截至 `2026-06-15`，结构收尾已完成：
+
+1. `App.tsx` 从大组件拆为导航编排层。
+2. 检测 UI 进入 `DetectWorkspace`，检测状态进入 `useDetectionFlow`。
+3. 规则配置和候选面板进入 `RulesWorkspace`，规则库状态进入 `useRuleLibraries`，候选动作进入 `useRuleProposals`。
+4. `RuleConfigPanel` 拆为 toolbar / summary / field pane / field card，并复用 `ruleConfigShared`。
+5. `pnpm run ci` 已覆盖 `typecheck`、`lint`、`knip`、`jscpd`、`test`、`build`。
 
 说明：
 

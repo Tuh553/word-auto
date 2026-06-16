@@ -46,10 +46,20 @@ const BASELINE = {
     "摘要",
     "Abstract",
   ],
+  headerParagraphCount: 10,
+  headerFontEastAsia: ["宋体"],
+  headerFontAscii: ["Times New Roman"],
+  headerSizePt: [10.5],
+  headerBottomBorderStyle: ["single"],
+  footerPageNumberFontAscii: ["Times New Roman"],
+  footerPageNumberSizePt: [9],
 };
 
 const compactHeader = (text: string): string =>
   text.replace(/\s+/g, " ").trim().replace(/^重庆大学硕士学位论文\s+/, "");
+
+const uniqueDefined = <T>(values: Array<T | undefined>): T[] =>
+  Array.from(new Set(values.filter((value): value is T => value !== undefined)));
 
 test("parseDocx：标准模板解析基线保持稳定", () => {
   const model = parseDocx(new Uint8Array(readFileSync(docxPath)));
@@ -92,5 +102,35 @@ test("parseDocx：标准模板解析基线保持稳定", () => {
     model.headerParts?.map((part) => part.rightText).filter(Boolean),
     BASELINE.headerTitles,
   );
+  const headerParagraphs = model.headerParts?.flatMap((part) => part.paragraphs) ?? [];
+  assert.equal(headerParagraphs.length, BASELINE.headerParagraphCount);
+  assert.deepEqual(
+    uniqueDefined(headerParagraphs.map((paragraph) => paragraph.effective.fontEastAsia)),
+    BASELINE.headerFontEastAsia,
+  );
+  assert.deepEqual(
+    uniqueDefined(headerParagraphs.map((paragraph) => paragraph.effective.fontAscii)),
+    BASELINE.headerFontAscii,
+  );
+  assert.deepEqual(
+    uniqueDefined(headerParagraphs.map((paragraph) => paragraph.effective.sizePt)),
+    BASELINE.headerSizePt,
+  );
+  assert.deepEqual(
+    uniqueDefined(headerParagraphs.map((paragraph) => paragraph.bottomBorder?.style)),
+    BASELINE.headerBottomBorderStyle,
+  );
   assert.ok(model.footerParts?.some((part) => part.hasPageNumber));
+  const pageNumberSegments = model.footerParts
+    ?.flatMap((part) => part.paragraphs)
+    .flatMap((paragraph) => paragraph.segments)
+    .filter((segment) => segment.kind === "pageNumber") ?? [];
+  assert.deepEqual(
+    uniqueDefined(pageNumberSegments.map((segment) => segment.effective?.fontAscii)),
+    BASELINE.footerPageNumberFontAscii,
+  );
+  assert.deepEqual(
+    uniqueDefined(pageNumberSegments.map((segment) => segment.effective?.sizePt)),
+    BASELINE.footerPageNumberSizePt,
+  );
 });

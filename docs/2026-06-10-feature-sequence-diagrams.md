@@ -2,14 +2,15 @@
 
 > 日期：2026-06-10　配套：[`2026-06-10-enhancement-roadmap.md`](./2026-06-10-enhancement-roadmap.md)
 > 覆盖**现有已实现功能**与**规划新功能**两大部分，用 Mermaid 时序图描述运行时交互。
-> 2026-06-11 更新：图 6-8 的导入/草稿发布/模板候选 MVP 已落地；图 9-11 仍是规划。
+> 2026-06-15 更新：图 6-8 的导入/草稿发布/模板候选 MVP 已落地；图 11 的依据与修复建议已落地；图 9-10 仍是规划。
 > 不支持 Mermaid 渲染时，可读每图下方「说明」。
 
 ## 参与者图例
 
 | 参与者 | 对应模块 | 状态 |
 | --- | --- | --- |
-| `App` / `RuleConfigPanel` / `ReportPanel` / `PreviewPanel` | `apps/web` 组件 | 现有 |
+| `App` / `DetectWorkspace` / `RulesWorkspace` / `RuleConfigPanel` / `ReportPanel` / `PreviewPanel` | `apps/web` 组件 | 现有 |
+| `useDetectionFlow` / `useRuleLibraries` / `useRuleProposals` | `apps/web` 状态 hooks | 现有 |
 | `parseDocx` | `@word-auto/parser` 解析入口 | 现有 |
 | `computeEffective` | `parser/resolve.ts` 样式继承 | 现有 |
 | `classifyParagraphs` / `validateDoc` | `@word-auto/validator` | 现有 |
@@ -43,7 +44,7 @@ sequenceDiagram
         W->>V: 角色识别 + 文档/逐段校验
         V-->>W: 分级报告
         W-->>U: 预览高亮 + 报告 + 问题下钻
-    else B 规则配置线（现有骨架→新增 · 图 5-7）
+    else B 规则配置线（现有 MVP · 图 5-7）
         U->>W: 导入 / 编辑规则
         W->>V: lintRuleLibrary 实时校验
         V-->>W: errors / warnings / infos
@@ -192,15 +193,15 @@ sequenceDiagram
 
 ---
 
-## 图 5　规则配置页实时校验（已实现骨架）
+## 图 5　规则配置页实时校验（已实现 MVP）
 
 载入模板可编辑副本 → 浏览/切换启用/改严重级别 → 实时跑 `lintRuleLibrary` 反馈。
 
 ```mermaid
 sequenceDiagram
     actor U as 用户
-    participant A as App
-    participant P as RuleConfigPanel
+    participant A as App / useRuleLibraries
+    participant P as RulesWorkspace / RuleConfigPanel
     participant L as lintRuleLibrary
 
     U->>A: 切到「规则配置」
@@ -217,7 +218,7 @@ sequenceDiagram
     P-->>U: 实时反馈 + 角色错误标记
 ```
 
-**说明**：当前值为只读展示；编辑只支持启用开关与严重级别。值编辑控件、草稿/发布见第二部分图 7。
+**说明**：字段值编辑、`mode` 切换、启用状态、严重级别、草稿保存和发布已落地；图 7 描述草稿与生效规则的状态流。
 
 ---
 
@@ -378,7 +379,7 @@ sequenceDiagram
 
 ---
 
-## 图 11　问题下钻：规则依据 + 修复建议（roadmap §3.5）
+## 图 11　问题下钻：规则依据 + 修复建议（已实现）
 
 点击问题展示其原始模板批注依据（`provenance`）与人话修复指引。
 
@@ -386,25 +387,22 @@ sequenceDiagram
 sequenceDiagram
     actor U as 用户
     participant RP as ReportPanel
-    participant RL as 生效规则库
     participant PV as PreviewPanel
 
     U->>RP: 点击某条问题
-    RP->>RL: 取该规则依据原文（provenance）
-    RL-->>RP: 原始模板批注文本
-    RP->>RP: 生成修复建议（期望值 → 怎么改）
+    RP->>RP: 读取 issue.provenance 与 suggestion / fixability
     RP-->>U: 展示 期望/实际 + 规则依据 + 修复指引
     RP->>PV: 传该段原文
     PV-->>U: 滚动并高亮对应段落
 ```
 
-**说明**：规则库 JSON 的 `source.provenance` 已存每条规则的批注原文，目前未利用——展示它几乎零成本即可提升信任度。
+**说明**：validator 在 issue 中透传 `source.provenance`，并补齐修复建议与可修复性；Web 报告项已展示这些信息。
 
 ---
 
 ## 标记约定
 
 - **现有功能（图 1-8）**：已在代码库实现并经测试/对账验证（含表格段落提取、草稿/发布、规则库导入、候选提取 MVP）。
-- **规划功能（图 9-11）**：Web Worker、批注导出器、问题下钻增强仍未实现。
-- **已完成改造点**：图 7 的 `validateDoc` 已支持直接消费 `RuleValue`。
+- **规划功能（图 9-10）**：Web Worker、批注导出器仍未实现。
+- **已完成改造点**：图 7 的 `validateDoc` 已支持直接消费 `RuleValue`；图 11 的依据展示与修复建议已接入报告。
 - 所有流程严守：纯 OOXML（无 Word COM）、检测与改写分离、规则可回溯依据、文件不离开浏览器。

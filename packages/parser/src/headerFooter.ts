@@ -1,9 +1,17 @@
-import { attr, collectNodeText, collectParagraphNodes, parseXml, readTextNode, toArray } from "./ooxml.js";
+import { computeEffective, computeRunEffective } from "./resolve.js";
+import { attr, collectNodeText, collectParagraphNodes, parseParaProps, parseRunProps, parseXml, readTextNode, toArray } from "./ooxml.js";
+import type { ThemeFonts } from "./theme.js";
 import type {
+  DocDefaults,
+  HeaderFooterBorder,
   HeaderFooterAlignment,
   HeaderFooterParagraph,
   HeaderFooterPart,
   HeaderFooterSegment,
+  Paragraph,
+  Run,
+  RunProps,
+  StyleDef,
 } from "./types.js";
 
 type TextToken = {
@@ -11,6 +19,7 @@ type TextToken = {
   text: string;
   kind: HeaderFooterSegment["kind"];
   instruction?: string;
+  effective?: RunProps;
 };
 
 type TabToken = {
@@ -24,7 +33,20 @@ type ActiveField = {
   resultKind?: HeaderFooterSegment["kind"];
   inResult: boolean;
   sawResult: boolean;
+  effective?: RunProps;
 };
+
+interface HeaderFooterParseContext {
+  theme?: ThemeFonts;
+  styles?: Map<string, StyleDef>;
+  docDefaults?: DocDefaults;
+  defaultParagraphStyleId?: string;
+}
+
+interface ParagraphFormatInfo {
+  effective: Paragraph["effective"];
+  runEffective: RunProps[];
+}
 
 const PAGE_FIELD_PATTERN = /\bPAGE\b/i;
 const LONG_SPACE_PATTERN = /(\s{4,})/;
@@ -47,9 +69,13 @@ const cleanZoneText = (text: string): string =>
 const fieldKind = (instruction: string): HeaderFooterSegment["kind"] | undefined =>
   PAGE_FIELD_PATTERN.test(instruction) ? "pageNumber" : undefined;
 
-const pushFieldlessText = (tokens: Token[], text: string): void => {
+const pushFieldlessText = (
+  tokens: Token[],
+  text: string,
+  effective?: RunProps,
+): void => {
   if (!text) return;
-  tokens.push({ type: "text", text, kind: "text" });
+  tokens.push({ type: "text", text, kind: "text", effective });
 };
 
 const startField = (
@@ -73,18 +99,30 @@ const appendInstructionText = (
 const markFieldResult = (
   activeField: ActiveField | undefined,
   fldCharType: string | undefined,
+  effective?: RunProps,
 ): void => {
   if (fldCharType !== "separate" || !activeField) return;
   activeField.inResult = true;
   activeField.resultKind = fieldKind(activeField.instruction);
+  activeField.effective = effective;
 };
 
-const appendSimpleFieldTokens = (tokens: Token[], run: any): void => {
+const appendSimpleFieldTokens = (
+  tokens: Token[],
+  run: any,
+  effective?: RunProps,
+): void => {
   for (const fldSimple of toArray(run["w:fldSimple"])) {
     const instruction = attr(fldSimple, "w:instr") ?? "";
     const kind = fieldKind(instruction) ?? "text";
     const text = collectNodeText(fldSimple, { skipInstrText: true });
-    tokens.push({ type: "text", text, kind, instruction: instruction.trim() || undefined });
+    tokens.push({
+      type: "text",
+      text,
+      kind,
+      instruction: instruction.trim() || undefined,
+      effective,
+    });
   }
 };
 
@@ -92,12 +130,14 @@ const appendFieldResultToken = (
   tokens: Token[],
   activeField: ActiveField,
   text: string,
+  effective?: RunProps,
 ): void => {
   tokens.push({
     type: "text",
     text,
     kind: activeField.resultKind!,
     instruction: activeField.instruction.trim() || undefined,
+    effective,
   });
   activeField.sawResult = true;
 };
@@ -106,14 +146,15 @@ const appendRunTextToken = (
   tokens: Token[],
   activeField: ActiveField | undefined,
   run: any,
+  effective?: RunProps,
 ): void => {
   const text = readTextNode(run["w:t"]);
   if (!text) return;
   if (activeField?.inResult && activeField.resultKind) {
-    appendFieldResultToken(tokens, activeField, text);
+    appendFieldResultToken(tokens, activeField, text, effective);
     return;
   }
-  pushFieldlessText(tokens, text);
+  pushFieldlessText(tokens, text, effective);
 };
 
 const endField = (
@@ -128,22 +169,24 @@ const endField = (
       text: "",
       kind: activeField.resultKind,
       instruction: activeField.instruction.trim() || undefined,
+      effective: activeField.effective,
     });
   }
   return undefined;
 };
 
-const tokenizeRuns = (runs: any[]): Token[] => {
+const tokenizeRuns = (runs: any[], runEffective: RunProps[]): Token[] => {
   const tokens: Token[] = [];
   let activeField: ActiveField | undefined;
 
-  for (const run of runs) {
+  for (const [index, run] of runs.entries()) {
+    const effective = runEffective[index];
     const fldCharType = attr(run["w:fldChar"], "w:fldCharType");
     activeField = startField(activeField, fldCharType);
     appendInstructionText(activeField, run);
-    markFieldResult(activeField, fldCharType);
-    appendSimpleFieldTokens(tokens, run);
-    appendRunTextToken(tokens, activeField, run);
+    markFieldResult(activeField, fldCharType, effective);
+    appendSimpleFieldTokens(tokens, run, effective);
+    appendRunTextToken(tokens, activeField, run, effective);
 
     if (run["w:tab"] !== undefined) {
       tokens.push({ type: "tab" });
@@ -175,6 +218,7 @@ const splitByTabs = (
       text: token.text,
       alignment,
       instruction: token.instruction,
+      effective: token.effective,
     });
   }
 
@@ -194,6 +238,7 @@ const splitByLongSpaces = (tokens: TextToken[]): HeaderFooterSegment[] => {
         text: part,
         alignment,
         instruction: token.instruction,
+        effective: token.effective,
       });
       if (LONG_SPACE_PATTERN.test(part)) {
         alignment = "right";
@@ -224,6 +269,7 @@ const alignTokens = (
     text: token.text,
     alignment: paragraphAlignment,
     instruction: token.instruction,
+    effective: token.effective,
   }));
 };
 
@@ -238,9 +284,84 @@ const joinAlignedText = (
       .join(""),
   );
 
-const parseHeaderFooterParagraph = (wp: any): HeaderFooterParagraph | undefined => {
+const numAttr = (node: any, name: string): number | undefined => {
+  const raw = attr(node, name);
+  if (raw == null) return undefined;
+  const value = Number(raw);
+  return Number.isNaN(value) ? undefined : value;
+};
+
+const parseBottomBorder = (pPr: any): HeaderFooterBorder | undefined => {
+  const bottom = pPr?.["w:pBdr"]?.["w:bottom"];
+  if (!bottom) return undefined;
+  return {
+    style: attr(bottom, "w:val"),
+    size: numAttr(bottom, "w:sz"),
+    color: attr(bottom, "w:color"),
+    space: numAttr(bottom, "w:space"),
+  };
+};
+
+const extractRunText = (run: any): string =>
+  readTextNode(run["w:t"]);
+
+const emptyFormatInfo = (): ParagraphFormatInfo => ({
+  effective: {},
+  runEffective: [],
+});
+
+const resolveParagraphFormat = (
+  wp: any,
+  runsRaw: any[],
+  context: HeaderFooterParseContext,
+): ParagraphFormatInfo => {
+  const styles = context.styles ?? new Map<string, StyleDef>();
+  const docDefaults = context.docDefaults ?? {};
+  const directPara = parseParaProps(wp["w:pPr"]);
+  const markRun = parseRunProps(wp["w:pPr"]?.["w:rPr"], context.theme);
+  const runs: Run[] = runsRaw.map((run) => ({
+    text: extractRunText(run),
+    props: parseRunProps(run["w:rPr"], context.theme),
+  }));
+  const paragraph: Paragraph = {
+    index: -1,
+    styleId: directPara.styleId,
+    styleName: directPara.styleId
+      ? styles.get(directPara.styleId)?.name
+      : undefined,
+    directPara,
+    markRun,
+    runs,
+    text: runs.map((run) => run.text).join(""),
+    structure: { drawingCount: 0, mathCount: 0, embeddedObjectCount: 0 },
+    effective: {},
+  };
+  return {
+    effective: computeEffective(
+      paragraph,
+      styles,
+      docDefaults,
+      context.defaultParagraphStyleId,
+    ),
+    runEffective: computeRunEffective(
+      paragraph,
+      styles,
+      docDefaults,
+      context.defaultParagraphStyleId,
+    ),
+  };
+};
+
+const parseHeaderFooterParagraph = (
+  wp: any,
+  context: HeaderFooterParseContext,
+): HeaderFooterParagraph | undefined => {
   const alignment = normalizeAlignment(attr(wp["w:pPr"]?.["w:jc"], "w:val"));
-  const tokens = tokenizeRuns(toArray(wp["w:r"]));
+  const runs = toArray(wp["w:r"]);
+  const format = runs.length > 0
+    ? resolveParagraphFormat(wp, runs, context)
+    : emptyFormatInfo();
+  const tokens = tokenizeRuns(runs, format.runEffective);
   const segments = alignTokens(tokens, alignment);
   const text = segments.map((segment) => segment.text).join("");
   const hasPageNumber = segments.some((segment) => segment.kind === "pageNumber");
@@ -254,6 +375,8 @@ const parseHeaderFooterParagraph = (wp: any): HeaderFooterParagraph | undefined 
     rightText: joinAlignedText(segments, "right"),
     alignment,
     hasPageNumber,
+    effective: format.effective,
+    bottomBorder: parseBottomBorder(wp["w:pPr"]),
     segments,
   };
 };
@@ -282,12 +405,13 @@ export const parseHeaderFooterPart = (
   xml: string,
   path: string,
   kind: HeaderFooterPart["kind"],
+  context: HeaderFooterParseContext = {},
 ): HeaderFooterPart => {
   const root = parseXml(xml);
   const body = root["w:hdr"] ?? root["w:ftr"] ?? root;
   const paragraphs = uniqueParagraphs(
     collectParagraphNodes(body)
-      .map(parseHeaderFooterParagraph)
+      .map((paragraph) => parseHeaderFooterParagraph(paragraph, context))
       .filter((paragraph): paragraph is HeaderFooterParagraph => paragraph !== undefined),
   );
 

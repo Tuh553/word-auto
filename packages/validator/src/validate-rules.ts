@@ -47,7 +47,14 @@ const FIELD_PROVENANCE_KEYS: Record<string, string[]> = {
   gutter_cm: ["page_setup_comment"],
   page_number_front: ["page_setup_comment"],
   page_number_body: ["page_setup_comment"],
+  page_number_alignment: ["page_setup_comment"],
+  page_number_font_latin: ["page_setup_comment"],
+  page_number_size_pt: ["page_setup_comment"],
   header_text: ["page_setup_comment"],
+  header_font_east_asia: ["page_setup_comment"],
+  header_font_latin: ["page_setup_comment"],
+  header_size_pt: ["page_setup_comment"],
+  header_bottom_border: ["page_setup_comment"],
 };
 
 const readProvenanceText = (

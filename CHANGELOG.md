@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 - **脚注 / 尾注解析与基础校验**：解析 `footnotes.xml` / `endnotes.xml` 注释定义，回填段落引用位置与正文，并检测失效引用 / 孤立定义
 - **列表识别**：基于 numFmt 判断有序/无序列表（bullet→无序，decimal/roman→有序），支持多级嵌套和列表项分组
 - **页眉/页脚结构化解析**：解析 `header*.xml` / `footer*.xml`，输出左/中/右基础位置、页脚纯文本与 `PAGE` 页码域识别，保留旧 `headers` 纯文本兼容字段
+- **页眉/页脚样式校验**：校验页眉中文/西文字体、字号、页眉下边框，以及页码位置、页码西文字体和字号
+- **run 级混排检测**：段落内局部 run 字体/字号不合规时输出片段定位，报告展示受影响文本范围
 - **代码审查报告**：通过 Claude Code 内置代码审查（extra-high effort，9个角度），发现并修复 7 个关键问题（详见 `code-review-findings.json`）
 
 ### Changed
@@ -24,7 +26,9 @@ All notable changes to this project will be documented in this file.
   - `Role` 类型新增 `"heading"` 和 `"unknown"` 枚举值
   - `ClassifiedParagraph` 的 `role` 字段改为可空类型（`Role | null`）
   - `ValidationIssue` 的 `role` 字段收窄为严格 `Role` 类型
+- **run 有效格式解析**：`Paragraph.runs` 增加继承后的 `effective`，供正文混排检测和页眉/页脚片段样式检测复用
 - **页眉内容检测迁移**：`headers.left_text` 优先匹配结构化左侧页眉，仅在旧模型没有结构化页眉时回退纯文本
+- **页眉/页脚解析增强**：`headerParts` / `footerParts` 的段落和片段现在携带有效字体、字号，并解析 `w:pBdr/w:bottom` 页眉线
 - **校验流程集成**：`validateDoc` 自动调用编号连续性检测，编号问题统一输出到 `ValidationReport`
 - **题注连号策略明确**：图 / 表题注优先消费 `SEQ` 域编号，段落正则仅作为无域样本兜底
 - **测试基线更新**：新增 parser `PAGEREF` synthetic 用例与 validator 引用有效性用例，标准模板当前仍保留 1 个表题注连号问题
@@ -46,6 +50,11 @@ All notable changes to this project will be documented in this file.
 ### Refactored
 
 - **消除代码重复**：提取 `checkCaptionSequence` 通用函数，消除 `checkFigureCaptionSequence` 和 `checkTableCaptionSequence` 之间 97% 的重复代码（净减少 96 行）
+- **Web 工作台拆分**：将 `App.tsx` 中的检测流程、规则库状态、模板候选提取拆入
+  `useDetectionFlow` / `useRuleLibraries` / `useRuleProposals`，页面拆为 `DetectWorkspace`
+  与 `RulesWorkspace`
+- **规则配置组件拆分**：将 `RuleConfigPanel` 拆为 toolbar、summary、字段面板、字段卡片与共享格式化 helper
+- **validator 结构整理**：拆分 `classify`、`fixhints`、`lint`、`numbering-check` 中的热路径辅助函数，降低单函数复杂度并保持既有行为
 
 ### Technical Details
 
@@ -58,22 +67,35 @@ All notable changes to this project will be documented in this file.
 - `packages/validator/src/list-recognition.test.ts` - 列表识别测试（6个用例）
 - `packages/parser/src/headerFooter.test.ts` - 页眉/页脚结构化解析测试（2个用例）
 - `code-review-findings.json` - 代码审查发现的 15 个问题详细报告
+- `apps/web/src/components/DetectWorkspace.tsx` - 检测四步流程 UI
+- `apps/web/src/components/RulesWorkspace.tsx` - 规则配置与候选提取工作区
+- `apps/web/src/components/RuleConfigFieldCard.tsx` - 单字段规则编辑卡片
+- `apps/web/src/components/RuleConfigPanelSections.tsx` - 规则配置 toolbar / summary / role-field pane
+- `apps/web/src/components/ruleConfigShared.ts` - 规则值格式化、模式切换、输入解析 helper
+- `apps/web/src/hooks/useDetectionFlow.ts` - 检测流程状态与动作
+- `apps/web/src/hooks/useRuleLibraries.ts` - 规则库草稿、发布、导入导出状态与动作
+- `apps/web/src/hooks/useRuleProposals.ts` - 模板候选提取与接受动作
 
 **修改文件**：
 - `packages/parser/src/index.ts`, `types.ts`, `ooxml.ts` - 集成编号解析与结构化页眉页脚输出
 - `packages/validator/src/index.ts`, `types.ts`, `validate.ts`, `rules.ts`, `numbering-check.ts` - 集成编号检测与结构化页眉检测
 - `packages/validator/src/*.test.ts` - 更新测试基线
 - `apps/web/src/lib/reportGroups.ts` - 支持编号字段分组并修复排序冲突
+- `apps/web/src/App.tsx`, `ReportPanel.tsx`, `RuleConfigPanel.tsx`, `TemplateProposalPanel.tsx` - 组件瘦身与复用 shared helper
+- `packages/validator/src/classify.ts`, `fixhints.ts`, `lint.ts`, `numbering-check.ts` - 保持行为不变的结构拆分
 
 **测试覆盖**：
-- parser: 13 个测试 ✅
-- validator: 62 个测试 ✅（新增 21 个）
+- parser: 25 个测试 ✅
+- validator: 78 个测试 ✅
 - web: 13 个测试 ✅
-- **总计 88 个测试全部通过**
+- **总计 116 个测试全部通过**
 
 **质量保证**：
 - 类型检查：`pnpm typecheck` ✅
-- 单元测试：`pnpm test` ✅（88/88）
+- ESLint：`pnpm lint` ✅（`--max-warnings 0`）
+- 未用代码检查：`pnpm knip` ✅
+- 复制粘贴检查：`pnpm jscpd` ✅（0 clones）
+- 单元测试：`pnpm test` ✅（108/108）
 - 构建验证：`pnpm build` ✅
 - CI 门禁：`pnpm run ci` ✅
 - 代码审查：Claude Code extra-high effort（9个角度 × 72候选）✅

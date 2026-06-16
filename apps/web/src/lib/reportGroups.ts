@@ -79,7 +79,14 @@ const FIELD_LABELS: Record<string, string> = {
   gutter_cm: "装订线",
   page_number_front: "前置部分页码",
   page_number_body: "正文页码",
+  page_number_alignment: "页码位置",
+  page_number_font_latin: "页码西文字体",
+  page_number_size_pt: "页码字号",
   header_text: "页眉内容",
+  header_font_east_asia: "页眉中文字体",
+  header_font_latin: "页眉西文字体",
+  header_size_pt: "页眉字号",
+  header_bottom_border: "页眉线",
   caption_reference: "交叉引用",
 };
 

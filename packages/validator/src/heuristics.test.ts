@@ -426,3 +426,191 @@ test("页眉内容检测：目标文字只在右侧时不算左侧页眉合格",
   assert.equal(report.issues.length, 1);
   assert.equal(report.issues[0]?.field, "header_text");
 });
+
+test("页眉页脚样式检测：合规字体、字号、页眉线与页码位置不报错", () => {
+  const model: DocModel = {
+    ...mkModel([]),
+    headerParts: [
+      {
+        kind: "header",
+        path: "word/header1.xml",
+        text: "重庆大学硕士学位论文 第一章 绪论",
+        leftText: "重庆大学硕士学位论文",
+        centerText: "",
+        rightText: "第一章 绪论",
+        hasPageNumber: false,
+        paragraphs: [{
+          text: "重庆大学硕士学位论文",
+          leftText: "重庆大学硕士学位论文",
+          centerText: "",
+          rightText: "",
+          alignment: "left",
+          hasPageNumber: false,
+          effective: {
+            fontEastAsia: "宋体",
+            fontAscii: "Times New Roman",
+            sizePt: 10.5,
+          },
+          bottomBorder: { style: "single" },
+          segments: [{
+            kind: "text",
+            text: "重庆大学硕士学位论文",
+            alignment: "left",
+            effective: {
+              fontEastAsia: "宋体",
+              fontAscii: "Times New Roman",
+              sizePt: 10.5,
+            },
+          }],
+        }],
+      },
+    ],
+    footerParts: [
+      {
+        kind: "footer",
+        path: "word/footer1.xml",
+        text: "3",
+        leftText: "",
+        centerText: "3",
+        rightText: "",
+        hasPageNumber: true,
+        paragraphs: [{
+          text: "3",
+          leftText: "",
+          centerText: "3",
+          rightText: "",
+          alignment: "center",
+          hasPageNumber: true,
+          effective: {},
+          segments: [{
+            kind: "pageNumber",
+            text: "3",
+            alignment: "center",
+            effective: {
+              fontAscii: "Times New Roman",
+              sizePt: 9,
+            },
+          }],
+        }],
+      },
+    ],
+  };
+  const rules: RuleLibrary = {
+    headers: {
+      left_text: "重庆大学硕士学位论文",
+      font_east_asia: "宋体",
+      font_latin: "Times New Roman",
+      size_pt: 10.5,
+      bottom_border: true,
+    },
+    page_numbers: {
+      alignment: "center",
+      font_latin: "Times New Roman",
+      size_pt: 9,
+    },
+    styles: {},
+  };
+
+  const report = validateDoc(model, rules);
+
+  assert.equal(report.issues.length, 0);
+});
+
+test("页眉页脚样式检测：报告字体、字号、页眉线与页码位置问题", () => {
+  const model: DocModel = {
+    ...mkModel([]),
+    headerParts: [
+      {
+        kind: "header",
+        path: "word/header1.xml",
+        text: "重庆大学硕士学位论文",
+        leftText: "重庆大学硕士学位论文",
+        centerText: "",
+        rightText: "",
+        hasPageNumber: false,
+        paragraphs: [{
+          text: "重庆大学硕士学位论文",
+          leftText: "重庆大学硕士学位论文",
+          centerText: "",
+          rightText: "",
+          alignment: "left",
+          hasPageNumber: false,
+          effective: {
+            fontEastAsia: "黑体",
+            fontAscii: "Arial",
+            sizePt: 12,
+          },
+          segments: [{
+            kind: "text",
+            text: "重庆大学硕士学位论文",
+            alignment: "left",
+            effective: {
+              fontEastAsia: "黑体",
+              fontAscii: "Arial",
+              sizePt: 12,
+            },
+          }],
+        }],
+      },
+    ],
+    footerParts: [
+      {
+        kind: "footer",
+        path: "word/footer1.xml",
+        text: "3",
+        leftText: "3",
+        centerText: "",
+        rightText: "",
+        hasPageNumber: true,
+        paragraphs: [{
+          text: "3",
+          leftText: "3",
+          centerText: "",
+          rightText: "",
+          alignment: "left",
+          hasPageNumber: true,
+          effective: {},
+          segments: [{
+            kind: "pageNumber",
+            text: "3",
+            alignment: "left",
+            effective: {
+              fontAscii: "Arial",
+              sizePt: 12,
+            },
+          }],
+        }],
+      },
+    ],
+  };
+  const rules: RuleLibrary = {
+    headers: {
+      left_text: "重庆大学硕士学位论文",
+      font_east_asia: "宋体",
+      font_latin: "Times New Roman",
+      size_pt: 10.5,
+      bottom_border: true,
+    },
+    page_numbers: {
+      alignment: "center",
+      font_latin: "Times New Roman",
+      size_pt: 9,
+    },
+    styles: {},
+  };
+
+  const report = validateDoc(model, rules);
+
+  assert.deepEqual(
+    report.issues.map((issue) => issue.field),
+    [
+      "header_font_east_asia",
+      "header_font_latin",
+      "header_size_pt",
+      "header_bottom_border",
+      "page_number_alignment",
+      "page_number_font_latin",
+      "page_number_size_pt",
+    ],
+  );
+});

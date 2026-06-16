@@ -18,7 +18,7 @@ import {
   parseSectPr,
   parseXml,
 } from "./ooxml.js";
-import { computeEffective } from "./resolve.js";
+import { computeEffective, computeRunEffective } from "./resolve.js";
 import { parseStyles } from "./styles.js";
 import { parseTheme, type ThemeFonts } from "./theme.js";
 import type {
@@ -201,6 +201,16 @@ const createParagraphBuilder = ({
       docDefaults,
       defaultParagraphStyleId,
     );
+    const runEffective = computeRunEffective(
+      para,
+      styles,
+      docDefaults,
+      defaultParagraphStyleId,
+    );
+    para.runs = para.runs.map((run, index) => ({
+      ...run,
+      effective: runEffective[index],
+    }));
     return para;
   };
 };
@@ -235,6 +245,7 @@ const collectSections = (body: any, wps: any[]): SectionProps[] => {
 const readHeaderFooterParts = (
   files: Record<string, Uint8Array>,
   kind: HeaderFooterPart["kind"],
+  context: Parameters<typeof parseHeaderFooterPart>[3],
 ): HeaderFooterPart[] => {
   const pattern = kind === "header"
     ? /^word\/header\d+\.xml$/
@@ -243,7 +254,7 @@ const readHeaderFooterParts = (
   for (const name of Object.keys(files)) {
     if (!pattern.test(name)) continue;
     try {
-      parts.push(parseHeaderFooterPart(strFromU8(files[name]), name, kind));
+      parts.push(parseHeaderFooterPart(strFromU8(files[name]), name, kind, context));
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       failParse("CORRUPT", `${name} XML 解析失败，文件可能已损坏：${detail}`);
@@ -314,8 +325,14 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
   appendTableParagraphs(body, paragraphs, buildParagraph);
 
   const sections = collectSections(body, wps);
-  const headerParts = readHeaderFooterParts(files, "header");
-  const footerParts = readHeaderFooterParts(files, "footer");
+  const headerFooterContext = {
+    theme,
+    styles,
+    docDefaults,
+    defaultParagraphStyleId,
+  };
+  const headerParts = readHeaderFooterParts(files, "header", headerFooterContext);
+  const footerParts = readHeaderFooterParts(files, "footer", headerFooterContext);
   // 兼容旧调用：保留 header*.xml / footer*.xml 的纯文本投影。
   const headers = projectHeaderFooterText(headerParts);
   const footers = projectHeaderFooterText(footerParts);

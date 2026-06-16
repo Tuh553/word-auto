@@ -1,6 +1,7 @@
 import { units, type DocModel } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
 import { computeFixHint } from "./fixhints.js";
+import { checkHeaderFooter } from "./header-footer-check.js";
 import { checkNoteConsistency } from "./notes-check.js";
 import { checkNumberingSequence } from "./numbering-check.js";
 import { checkCaptionReferenceValidity } from "./reference-check.js";
@@ -204,37 +205,6 @@ const checkPageNumbers = (
   return out;
 };
 
-const checkHeaders = (
-  model: DocModel,
-  rules: ValidationRules,
-): Issue[] => {
-  const leftText = rules.headers?.left_text;
-  if (!leftText) return [];
-
-  const target = leftText.replace(/\s+/g, "");
-  const structuredHeaders = model.headerParts ?? [];
-  const candidateTexts = structuredHeaders.length > 0
-    ? structuredHeaders.map((part) => part.leftText)
-    : model.headers;
-  const found = candidateTexts.some((text) => text.replace(/\s+/g, "").includes(target));
-  if (found) return [];
-
-  const actual = structuredHeaders.length > 0
-    ? structuredHeaders.map((part) => part.leftText || "(左侧无文字)").join(" / ")
-    : model.headers.join(" / ");
-  return [{
-    paraIndex: -1,
-    role: "document",
-    field: "header_text",
-    expected: leftText,
-    actual: actual || "(无页眉文字)",
-    severity: "warn",
-    message: `页眉应包含「${leftText}」`,
-    textPreview: "页眉",
-    provenance: getFieldProvenance(rules, "header_text"),
-  }];
-};
-
 const collectStructuredIssues = (
   model: DocModel,
   classified: Array<{ para: DocModel["paragraphs"][number]; role: ReturnType<typeof classifyParagraphs>[number] | null }>,
@@ -332,7 +302,7 @@ export const validateDoc = (
   const issues: Issue[] = [
     ...checkDocument(model, rules),
     ...checkPageNumbers(model, rules),
-    ...checkHeaders(model, rules),
+    ...checkHeaderFooter(model, rules),
     ...collectStructuredIssues(model, classified),
   ];
   const paragraphResult = collectParagraphIssues(model, classified, rules);
