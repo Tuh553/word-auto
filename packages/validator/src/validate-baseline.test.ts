@@ -15,13 +15,15 @@ const rulesPath = resolve(here, "../../../apps/web/src/templates/chongqing-thesi
 
 const ISSUE_DIST_BASELINE: Record<string, number> = {
   "document:page_number_alignment": 1,
+  // 编号连续性检测（新增）
+  "table_caption:caption_sequence": 1,
   "keywords_cn:bold": 1,
   "keywords_en:bold": 1,
-  "body_text:size_pt": 4,
+  "body_text:size_pt": 7,
+  "body_text:alignment": 5,
   "formula_line:alignment": 1,
   "formula_line:size_pt": 2,
   "formula_line:line_spacing_pt": 1,
-  "body_text:alignment": 2,
   "reference_body:size_pt": 1,
   "reference_body:line_spacing_pt": 1,
   "appendix_body:font_east_asia": 4,
@@ -29,8 +31,6 @@ const ISSUE_DIST_BASELINE: Record<string, number> = {
   "acknowledgement_body:font_east_asia": 1,
   "acknowledgement_body:size_pt": 1,
   "acknowledgement_body:first_line_indent_chars": 2,
-  // 编号连续性检测（新增）
-  "table_caption:caption_sequence": 1,
 };
 
 test("标准模板校验基线：发布规则消费结果保持一致", () => {
@@ -44,17 +44,17 @@ test("标准模板校验基线：发布规则消费结果保持一致", () => {
     dist[key] = (dist[key] ?? 0) + 1;
   }
 
-  assert.equal(report.issues.length, 29);
+  assert.equal(report.issues.length, 35);
   assert.deepEqual(report.summary, {
-    error: 14,
-    warn: 9,
+    error: 17,
+    warn: 12,
     info: 6,
     byRole: {
       document: 1,
       table_caption: 1,
       keywords_cn: 1,
       keywords_en: 1,
-      body_text: 6,
+      body_text: 12,
       formula_line: 4,
       reference_body: 2,
       appendix_body: 9,

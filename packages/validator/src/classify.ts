@@ -3,6 +3,7 @@ import type { Role } from "./types.js";
 
 /** 去除所有空白，便于标题文本精确匹配 */
 const compact = (s: string): string => s.replace(/\s+/g, "");
+const normalizeInline = (s: string): string => s.replace(/\s+/g, " ").trim();
 
 /**
  * 封面/扉页特征字段。出现这些（且为短段落）大概率是封面页信息，
@@ -18,10 +19,10 @@ const APPENDIX_HEADING =
 const ACHIEVEMENT_HEADING =
   /^(攻读.*学位期间.*成果|攻读学位期间发表的学术成果|在学期间取得的研究成果)$/;
 const FIGURE_CAPTION =
-  /^(图|figure)\d+(?:[-－—.．]\d+)*[A-Za-z]*[:：]?/i;
+  /^(图|figure)\d+(?:[-－—.．]\d+)*[A-Za-z]*(?=\s|[:：]|$|[（(])/i;
 const FIGURE_CAPTION_RELAXED = /^(续?图|figure)/i;
 const TABLE_CAPTION =
-  /^(表|table)\d+(?:[-－—.．]\d+)*[A-Za-z]*[:：]?/i;
+  /^(表|table)\d+(?:[-－—.．]\d+)*[A-Za-z]*(?=\s|[:：]|$|[（(])/i;
 const SOURCE_NOTE =
   /^(资料来源|数据来源|图源|表源|source[:：]|注[:：](资料|数据|图表?)来源)/i;
 const EQUATION_NUMBER =
@@ -188,13 +189,14 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       roles.push("table_cell");
       continue;
     }
-    const t = compact(p.text);
-    if (!t) {
+    const compactText = compact(p.text);
+    if (!compactText) {
       roles.push(null);
       continue;
     }
+    const inlineText = normalizeInline(p.text);
 
-    const sectionHeading = sectionHeadingRole(t);
+    const sectionHeading = sectionHeadingRole(compactText);
     if (sectionHeading) {
       section = sectionHeading.section;
       roles.push(sectionHeading.role);
@@ -212,7 +214,7 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
       continue;
     }
 
-    const keyword = keywordRole(t);
+    const keyword = keywordRole(compactText);
     if (keyword) {
       roles.push(keyword);
       continue;
@@ -226,14 +228,14 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
     }
 
     if (section === "body") {
-      const special = specialBodyRole(paras, i, p, t);
+      const special = specialBodyRole(paras, i, p, inlineText);
       if (special) {
         roles.push(special);
         continue;
       }
     }
 
-    roles.push(bodyRoleForSection(section, t));
+    roles.push(bodyRoleForSection(section, compactText));
   }
 
   return roles;

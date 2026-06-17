@@ -94,6 +94,8 @@ test("特殊正文元素：图注/表注/资料来源/公式编号从 body_text 
     mkPara("第一章 绪论", { outlineLevel: 0 }),
     mkPara("图1-1 系统架构图"),
     mkPara("表2-3 实验结果"),
+    mkPara("图1.1给出了系统整体架构。"),
+    mkPara("表2.3给出了实验结果。"),
     mkPara("资料来源：教育部统计年鉴"),
     mkPara("F=ma（3-2）", { alignment: "center" }),
   ];
@@ -104,6 +106,8 @@ test("特殊正文元素：图注/表注/资料来源/公式编号从 body_text 
     "heading1",
     "figure_caption",
     "table_caption",
+    "body_text",
+    "body_text",
     "source_note",
     "formula_line",
   ]);

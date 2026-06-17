@@ -7,7 +7,7 @@ import type { ClassifiedParagraph, ValidationIssue } from "./types.js";
 // 预编译正则表达式（模块级常量，避免重复创建）
 const RE_CHINESE_CHAPTER = /^第?([一二三四五六七八九十]+)[章节条款]/;
 const RE_ARABIC_CHAPTER = /^第?\s*(\d+)\s*[章节条款]/;
-const RE_MULTI_LEVEL = /^(\d+(?:\.\d+)+)[.、\s]/;
+const RE_MULTI_LEVEL = /^(\d+(?:\.\d+)+)(?:[.、\s]|(?=\D))/;
 const RE_SINGLE_LEVEL = /^(\d+)(?:[.、]\s*|\s+(?=\S))/;
 const RE_PAREN = /^\((\d+)\)|^（(\d+)）/;
 const RE_CAPTION = /^[图表]\s*(\d+)(?:[-.](\d+))?/;
@@ -124,6 +124,15 @@ const pushCaptionIssue = (
   });
 };
 
+const resetDeeperHeadingLevels = (
+  lastNumber: Map<number, number>,
+  level: number,
+): void => {
+  for (let nextLevel = level + 1; nextLevel <= 8; nextLevel += 1) {
+    lastNumber.delete(nextLevel);
+  }
+};
+
 /** 检测标题题序连续性（各级标题独立递增，不跳号） */
 export const checkHeadingSequence = (
   classified: ClassifiedParagraph[],
@@ -139,6 +148,10 @@ export const checkHeadingSequence = (
     if (!cp.role) continue; // 跳过未分类段落
     // 支持通用 "heading" 或具体 "heading1/2/3" 角色
     if (!cp.role.startsWith("heading")) continue;
+
+    // 只要出现更高层标题，就应重置所有下级计数；
+    // 否则无编号章标题（如“绪论”）会把上一章的 2 级计数串到下一章。
+    resetDeeperHeadingLevels(lastNumber, level);
 
     const num = extractNumber(cp.para.text);
     if (num === null) continue; // 无法提取编号，跳过
@@ -160,11 +173,6 @@ export const checkHeadingSequence = (
     }
 
     lastNumber.set(level, num);
-
-    // 下级标题重置：如果当前是 N 级标题，清空所有 > N 级的计数器
-    for (let l = level + 1; l <= 8; l++) {
-      lastNumber.delete(l);
-    }
   }
 
   return issues;
@@ -191,9 +199,6 @@ const updateCaptionChapterState = (
   }
 
   const chapterNum = extractNumber(cp.para.text);
-  if (chapterNum === null) {
-    return state;
-  }
 
   return {
     currentChapter: chapterNum,
