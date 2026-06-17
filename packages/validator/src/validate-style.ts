@@ -70,6 +70,9 @@ const FIELD_NAMES: Record<RuleFieldKey, string> = {
 
 const LINE_HEIGHT_TOLERANCE = 0.5;
 const INDENT_TOLERANCE = 0.1;
+// Twip -> pt conversion commonly lands on 12.45 / 12.5-style boundaries.
+// Keep the intended 0.05pt tolerance while absorbing floating-point jitter.
+const SPACING_TOLERANCE = 0.05 + 1e-6;
 
 const normAlign = (value?: string): string | undefined => {
   if (!value) return value;
@@ -99,41 +102,17 @@ const createParagraphIssue = ({
   provenance: context.provenance,
 });
 
-const createParagraphIssuePush = (
-  context: ParagraphIssueContext,
-  out: Issue[],
-): LegacyParagraphContext["push"] => (field, expected, actual, severity, message) => {
-  out.push(createParagraphIssue({ context, field, expected, actual, severity, message }));
+const createParagraphIssuePush = (context: ParagraphIssueContext, out: Issue[]): LegacyParagraphContext["push"] =>
+  (field, expected, actual, severity, message) => {
+    out.push(createParagraphIssue({ context, field, expected, actual, severity, message }));
+  };
+
+const pushEditableFieldIssue = (context: ParagraphIssueContext, out: Issue[], field: RuleField, actual: unknown, message: string): void => {
+  out.push(createParagraphIssue({ context, field: FIELD_NAMES[field.key], expected: field.value, actual, severity: field.severity, message }));
 };
 
-const pushEditableFieldIssue = (
-  context: ParagraphIssueContext,
-  out: Issue[],
-  field: RuleField,
-  actual: unknown,
-  message: string,
-): void => {
-  out.push(createParagraphIssue({
-    context,
-    field: FIELD_NAMES[field.key],
-    expected: field.value,
-    actual,
-    severity: field.severity,
-    message,
-  }));
-};
-
-const createParagraphContext = (
-  para: Paragraph,
-  role: Role,
-  provenance?: string,
-): ParagraphIssueContext => ({
-  para,
-  role,
-  effective: para.effective,
-  hasCJK: textHasCJK(para.text),
-  hasLatin: textHasLatin(para.text),
-  provenance,
+const createParagraphContext = (para: Paragraph, role: Role, provenance?: string): ParagraphIssueContext => ({
+  para, role, effective: para.effective, hasCJK: textHasCJK(para.text), hasLatin: textHasLatin(para.text), provenance,
 });
 
 const createEditableContext = (
@@ -165,13 +144,7 @@ const pushStringField = (context: EditableParagraphContext, field: RuleField, ac
   context.pushFieldIssue(field, actualValue, `「${actualValue}」`, (value) => `「${value}」`);
 };
 
-const pushNumericField = (
-  context: EditableParagraphContext,
-  field: RuleField,
-  actualValue: number | undefined,
-  suffix: string,
-  tolerance = EDITABLE_FIELD_TOLERANCE,
-): void => {
+const pushNumericField = (context: EditableParagraphContext, field: RuleField, actualValue: number | undefined, suffix: string, tolerance = EDITABLE_FIELD_TOLERANCE): void => {
   if (actualValue == null) return;
   context.pushFieldIssue(field, actualValue, `${actualValue}${suffix}`, (value) => `${value}${suffix}`, tolerance);
 };
@@ -244,25 +217,20 @@ const checkEditableLineHeight = (context: EditableParagraphContext, field: RuleF
   context.pushFieldIssue(field, actualValue, actualText, (value) => `${value}pt`, LINE_HEIGHT_TOLERANCE);
 };
 
-const checkEditableSpaceBefore = (context: EditableParagraphContext, field: RuleField): void => {
-  pushNumericField(context, field, context.effective.spacingBeforePt, "pt");
-};
+const checkEditableSpaceBefore = (context: EditableParagraphContext, field: RuleField): void =>
+  pushNumericField(context, field, context.effective.spacingBeforePt, "pt", SPACING_TOLERANCE);
 
-const checkEditableSpaceAfter = (context: EditableParagraphContext, field: RuleField): void => {
-  pushNumericField(context, field, context.effective.spacingAfterPt, "pt");
-};
+const checkEditableSpaceAfter = (context: EditableParagraphContext, field: RuleField): void =>
+  pushNumericField(context, field, context.effective.spacingAfterPt, "pt", SPACING_TOLERANCE);
 
-const checkEditableFirstLineIndent = (context: EditableParagraphContext, field: RuleField): void => {
+const checkEditableFirstLineIndent = (context: EditableParagraphContext, field: RuleField): void =>
   pushNumericField(context, field, context.effective.firstLineIndentChars, " 字符", INDENT_TOLERANCE);
-};
 
-const checkEditableHangingIndent = (context: EditableParagraphContext, field: RuleField): void => {
+const checkEditableHangingIndent = (context: EditableParagraphContext, field: RuleField): void =>
   pushNumericField(context, field, context.effective.hangingIndentChars, " 字符", INDENT_TOLERANCE);
-};
 
-const checkEditableLeftIndent = (context: EditableParagraphContext, field: RuleField): void => {
+const checkEditableLeftIndent = (context: EditableParagraphContext, field: RuleField): void =>
   pushNumericField(context, field, context.effective.leftIndentChars, " 字符", INDENT_TOLERANCE);
-};
 
 const checkEditableOutlineLevel = (context: EditableParagraphContext, field: RuleField): void => {
   const actual = outlineComparable(context.effective.outlineLevel);
@@ -390,15 +358,7 @@ const checkLegacyFirstLineIndent = (context: LegacyParagraphContext): void => {
   context.push("first_line_indent_chars", expected, actual, "warn", `首行缩进应为 ${expected} 字符，实际 ${actual} 字符`);
 };
 
-const LEGACY_CHECKERS = [
-  checkLegacyCnFont,
-  checkLegacyLatinFont,
-  checkLegacyFontSize,
-  checkLegacyBold,
-  checkLegacyAlignment,
-  checkLegacyLineSpacing,
-  checkLegacyFirstLineIndent,
-] as const;
+const LEGACY_CHECKERS = [checkLegacyCnFont, checkLegacyLatinFont, checkLegacyFontSize, checkLegacyBold, checkLegacyAlignment, checkLegacyLineSpacing, checkLegacyFirstLineIndent] as const;
 
 export const checkEditablePara = (
   para: Paragraph,

@@ -4,7 +4,10 @@ import type { Paragraph } from "@word-auto/parser";
 import { checkEditablePara, checkPara } from "./validate-style.js";
 import type { EditableRuleLibrary, StyleRule } from "./types.js";
 
-const mkPara = (alignment?: string): Paragraph => ({
+const mkPara = (
+  alignment?: string,
+  effective: Partial<Paragraph["effective"]> = {},
+): Paragraph => ({
   index: 3,
   styleId: undefined,
   styleName: undefined,
@@ -15,6 +18,7 @@ const mkPara = (alignment?: string): Paragraph => ({
   structure: { drawingCount: 0, mathCount: 0, embeddedObjectCount: 0 },
   effective: {
     alignment,
+    ...effective,
   },
 });
 
@@ -137,4 +141,35 @@ test("checkEditablePara：run 级字号问题保留规则值与片段定位", ()
   assert.equal(issues[0]?.endRunIndex, 1);
   assert.equal(issues[0]?.affectedText, "bad");
   assert.deepEqual(issues[0]?.expected, { mode: "exact", exact: 12, unit: "pt" });
+});
+
+test("checkEditablePara：段前 12.45pt 对 12.5pt 使用容差不过报", () => {
+  const rules: EditableRuleLibrary = {
+    id: "demo",
+    name: "Demo",
+    version: "1.0.0",
+    roles: [
+      {
+        role: "toc_title",
+        label: "目录标题",
+        fields: [
+          {
+            key: "spaceBeforePt",
+            label: "段前",
+            enabled: true,
+            severity: "warn",
+            value: { mode: "exact", exact: 12.5, unit: "pt" },
+          },
+        ],
+      },
+    ],
+  };
+
+  const issues = checkEditablePara(
+    mkPara("center", { spacingBeforePt: 12.45 }),
+    "toc_title",
+    rules,
+  );
+
+  assert.equal(issues.length, 0);
 });
