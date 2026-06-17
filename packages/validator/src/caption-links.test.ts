@@ -161,3 +161,50 @@ test("buildCaptionReferenceGraph：区分缺失书签与非题注书签", () => 
   assert.equal(graph.references[1]?.bookmarkExists, true);
   assert.equal(graph.references[1]?.targetCaption, undefined);
 });
+
+test("buildCaptionReferenceGraph：忽略参考文献编号 REF 域", () => {
+  const classified = [
+    mkPara("文献引用[1]", {
+      index: 0,
+      role: "body_text",
+      fields: [{
+        type: "REF",
+        instruction: "REF _Ref229234233 \\r \\h \\* MERGEFORMAT",
+        displayText: "[1]",
+        bookmark: "_Ref229234233",
+        startRunIndex: 0,
+        endRunIndex: 8,
+      }],
+    }),
+    mkPara("图 1-1 研究框架", {
+      index: 1,
+      role: "figure_caption",
+      bookmarks: [{ name: "_RefFigure1", id: "1" }],
+      fields: [{
+        type: "SEQ",
+        instruction: "SEQ Figure \\* ARABIC",
+        displayText: "1-1",
+        sequence: "Figure",
+        startRunIndex: 1,
+        endRunIndex: 5,
+      }],
+    }),
+    mkPara("见图 1-1", {
+      index: 2,
+      role: "body_text",
+      fields: [{
+        type: "REF",
+        instruction: "REF _RefFigure1 \\h",
+        displayText: "1-1",
+        bookmark: "_RefFigure1",
+        startRunIndex: 0,
+        endRunIndex: 4,
+      }],
+    }),
+  ];
+
+  const graph = buildCaptionReferenceGraph(classified);
+
+  assert.equal(graph.references.length, 1);
+  assert.equal(graph.references[0]?.bookmark, "_RefFigure1");
+});

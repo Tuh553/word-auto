@@ -58,6 +58,30 @@ const collectBookmarks = (classified: ClassifiedParagraph[]): Set<string> => {
 const collectBookmarkNames = (para: ClassifiedParagraph["para"]): string[] =>
   [...new Set((para.bookmarks ?? []).map((bookmark) => bookmark.name))];
 
+const hasRelativeNumberSwitch = (instruction: string): boolean =>
+  /\\r(?:\s|$)/i.test(instruction);
+
+const isBracketedReferenceNumber = (displayText: string): boolean =>
+  /^\[\s*\d+(?:\s*[-,，]\s*\d+)*\s*\]$/.test(displayText.trim());
+
+const isCaptionReferenceCandidate = (
+  field: Field,
+): field is Field & { type: "REF" | "PAGEREF"; bookmark: string } => {
+  if (field.type !== "REF" && field.type !== "PAGEREF") return false;
+  if (!field.bookmark) return false;
+
+  // `REF ... \r` with `[1]`-style display text is Word's numbered citation pattern,
+  // not a figure/table/equation caption cross-reference.
+  if (
+    hasRelativeNumberSwitch(field.instruction) &&
+    isBracketedReferenceNumber(field.displayText)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
 const collectCaptions = (
   classified: ClassifiedParagraph[],
 ): {
@@ -107,7 +131,7 @@ const collectReferences = (
     for (let fieldIndex = 0; fieldIndex < (para.fields?.length ?? 0); fieldIndex += 1) {
       const field = para.fields?.[fieldIndex];
       if (!field) continue;
-      if ((field.type !== "REF" && field.type !== "PAGEREF") || !field.bookmark) continue;
+      if (!isCaptionReferenceCandidate(field)) continue;
 
       references.push({
         type: field.type,
