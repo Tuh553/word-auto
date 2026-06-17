@@ -1,21 +1,34 @@
 import { RuleConfigPanel } from "./RuleConfigPanel.js";
 import { TemplateProposalPanel } from "./TemplateProposalPanel.js";
-import type { RuleProposal } from "@word-auto/validator";
+import type {
+  DocumentRuleProposal,
+  DocumentRuleProposalField,
+  RuleProposal,
+} from "@word-auto/validator";
 import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 
 type ProposalRole = RuleProposal["roles"][number];
 type ProposalField = ProposalRole["fields"][number];
+type ProposalFeedback = {
+  kind: "success" | "error" | "info";
+  title: string;
+  details: string[];
+};
 
 type RulesWorkspaceProps = {
   currentLibrary: RuleLibraryRecord | undefined;
   currentProposal: RuleProposal | null;
   draftDirty: boolean;
   libraries: RuleLibraryRecord[];
+  proposalFeedback: ProposalFeedback | null;
   ruleMessage: string | null;
   unpublishedChanges: boolean;
+  onAcceptDocument: (proposal: DocumentRuleProposal) => void;
+  onAcceptDocumentField: (proposal: DocumentRuleProposal, field: DocumentRuleProposalField) => void;
   onAcceptField: (role: ProposalRole, field: ProposalField) => void;
   onAcceptRole: (role: ProposalRole) => void;
   onChangeDraft: (draft: RuleLibraryRecord["draft"]) => void;
+  onClearProposalFeedback: () => void;
   onExportDraft: () => void;
   onExportPublished: () => void;
   onExtract: () => void;
@@ -30,11 +43,15 @@ export function RulesWorkspace({
   currentProposal,
   draftDirty,
   libraries,
+  proposalFeedback,
   ruleMessage,
   unpublishedChanges,
+  onAcceptDocument,
+  onAcceptDocumentField,
   onAcceptField,
   onAcceptRole,
   onChangeDraft,
+  onClearProposalFeedback,
   onExportDraft,
   onExportPublished,
   onExtract,
@@ -70,9 +87,13 @@ export function RulesWorkspace({
       <TemplateProposalPanel
         draft={currentLibrary.draft}
         proposal={currentProposal}
+        proposalFeedback={proposalFeedback}
+        onAcceptDocument={onAcceptDocument}
+        onAcceptDocumentField={onAcceptDocumentField}
         onExtract={onExtract}
         onAcceptField={onAcceptField}
         onAcceptRole={onAcceptRole}
+        onClearFeedback={onClearProposalFeedback}
       />
     </>
   );

@@ -10,10 +10,16 @@ import type {
 import {
   RuleConfigFieldPane,
   RuleConfigGlobalIssues,
+  RuleConfigSectionTabs,
   RuleConfigSummary,
   RuleConfigToolbar,
+  type RuleConfigSection,
   type LibraryOption,
 } from "./RuleConfigPanelSections.js";
+import {
+  RuleConfigPlainSectionPane,
+  RuleConfigRoleSnapshot,
+} from "./RuleConfigStaticSections.js";
 
 
 interface Props {
@@ -33,6 +39,75 @@ interface Props {
   onExportPublished: () => void;
 }
 
+type EditorProps = {
+  activeSection: RuleConfigSection;
+  draft: RuleDraft;
+  fieldItems: (roleKey: string, fieldKey: string) => RuleLintItem[];
+  onPatchField: (fieldIdx: number, patch: Partial<RuleField>) => void;
+  onPatchFieldValue: (fieldIdx: number, patch: Partial<RuleValue>) => void;
+  onSectionChange: (section: RuleConfigSection) => void;
+  published: EditableRuleLibrary;
+  role: RuleDraft["roles"][number] | undefined;
+  roleErrors: (roleKey: string) => number;
+  safeRoleIdx: number;
+  setRoleIdx: (index: number) => void;
+};
+
+function RuleConfigEditor({
+  activeSection,
+  draft,
+  fieldItems,
+  onPatchField,
+  onPatchFieldValue,
+  onSectionChange,
+  published,
+  role,
+  roleErrors,
+  safeRoleIdx,
+  setRoleIdx,
+}: EditorProps) {
+  return (
+    <>
+      <RuleConfigSectionTabs
+        activeSection={activeSection}
+        draft={draft}
+        onChange={onSectionChange}
+      />
+      {activeSection === "roles" ? (
+        <>
+          <RuleConfigRoleSnapshot role={role} />
+          <RuleConfigFieldPane
+            draft={draft}
+            fieldItems={fieldItems}
+            onPatchField={onPatchField}
+            onPatchFieldValue={onPatchFieldValue}
+            role={role}
+            roleErrors={roleErrors}
+            safeRoleIdx={safeRoleIdx}
+            setRoleIdx={setRoleIdx}
+          />
+        </>
+      ) : (
+        <RuleConfigPlainSectionPane
+          draft={draft}
+          published={published}
+          section={activeSection}
+        />
+      )}
+    </>
+  );
+}
+
+const patchDraftClone = (
+  draft: RuleDraft,
+  onChange: (draft: RuleDraft) => void,
+  updater: (next: RuleDraft) => void,
+): void => {
+  const next = structuredClone(draft);
+  updater(next);
+  onChange(next);
+};
+
 export function RuleConfigPanel({
   draft,
   published,
@@ -50,6 +125,7 @@ export function RuleConfigPanel({
   onExportPublished,
 }: Props) {
   const [roleIdx, setRoleIdx] = useState(0);
+  const [activeSection, setActiveSection] = useState<RuleConfigSection>("roles");
   const lint = useMemo(() => lintRuleLibrary(draft), [draft]);
   const safeRoleIdx = Math.min(roleIdx, Math.max(draft.roles.length - 1, 0));
   const role = draft.roles[safeRoleIdx];
@@ -63,20 +139,14 @@ export function RuleConfigPanel({
   const roleLabel = (roleKey: string): string =>
     draft.roles.find((item) => item.role === roleKey)?.label ?? roleKey;
 
-  const patchDraft = (updater: (next: RuleDraft) => void): void => {
-    const next = structuredClone(draft);
-    updater(next);
-    onChange(next);
-  };
-
   const patchField = (fieldIdx: number, patch: Partial<RuleField>): void => {
-    patchDraft((next) => {
+    patchDraftClone(draft, onChange, (next) => {
       Object.assign(next.roles[safeRoleIdx].fields[fieldIdx], patch);
     });
   };
 
   const patchFieldValue = (fieldIdx: number, patch: Partial<RuleValue>): void => {
-    patchDraft((next) => {
+    patchDraftClone(draft, onChange, (next) => {
       Object.assign(next.roles[safeRoleIdx].fields[fieldIdx].value, patch);
     });
   };
@@ -104,11 +174,14 @@ export function RuleConfigPanel({
         publishedVersion={published.version}
       />
       <RuleConfigGlobalIssues items={globalItems} roleLabel={roleLabel} />
-      <RuleConfigFieldPane
+      <RuleConfigEditor
+        activeSection={activeSection}
         draft={draft}
         fieldItems={fieldItems}
         onPatchField={patchField}
         onPatchFieldValue={patchFieldValue}
+        onSectionChange={setActiveSection}
+        published={published}
         role={role}
         roleErrors={roleErrors}
         safeRoleIdx={safeRoleIdx}

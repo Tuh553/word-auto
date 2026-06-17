@@ -1,7 +1,10 @@
 import type {
+  DocumentRuleKey,
   EditableRuleLibrary,
+  HeaderRuleKey,
   HeaderRuleSet,
   LegacyRuleLibrary,
+  PageNumberRuleKey,
   PageNumberRuleSet,
   Role,
   RoleRuleSet,
@@ -64,6 +67,62 @@ export const FIELD_LABELS: Record<RuleFieldKey, string> = {
   outlineLevel: "大纲级别",
 };
 
+export const DOCUMENT_FIELD_LABELS: Record<DocumentRuleKey, string> = {
+  paper_size: "纸张",
+  margin_top_cm: "上边距",
+  margin_bottom_cm: "下边距",
+  margin_left_cm: "左边距",
+  margin_right_cm: "右边距",
+  header_distance_cm: "页眉距",
+  footer_distance_cm: "页脚距",
+  gutter_cm: "装订线",
+};
+
+export const DOCUMENT_FIELD_ORDER: DocumentRuleKey[] = [
+  "paper_size",
+  "margin_top_cm",
+  "margin_bottom_cm",
+  "margin_left_cm",
+  "margin_right_cm",
+  "header_distance_cm",
+  "footer_distance_cm",
+  "gutter_cm",
+];
+
+export const PAGE_NUMBER_FIELD_LABELS: Record<PageNumberRuleKey, string> = {
+  front_matter_format: "前置部分格式",
+  body_format: "正文格式",
+  body_restart_at: "正文起始页码",
+  alignment: "页码对齐",
+  font_latin: "页码字体",
+  size_pt: "页码字号",
+};
+
+export const PAGE_NUMBER_FIELD_ORDER: PageNumberRuleKey[] = [
+  "front_matter_format",
+  "body_format",
+  "body_restart_at",
+  "alignment",
+  "font_latin",
+  "size_pt",
+];
+
+export const HEADER_FIELD_LABELS: Record<HeaderRuleKey, string> = {
+  left_text: "左侧页眉文本",
+  font_east_asia: "中文字体",
+  font_latin: "西文字体",
+  size_pt: "字号",
+  bottom_border: "下边框",
+};
+
+export const HEADER_FIELD_ORDER: HeaderRuleKey[] = [
+  "left_text",
+  "font_east_asia",
+  "font_latin",
+  "size_pt",
+  "bottom_border",
+];
+
 export const RULE_FIELD_UNITS: Record<RuleFieldKey, "pt" | "chars" | "enum" | "bool" | "level"> = {
   fontFamilyCn: "enum",
   fontFamilyLatin: "enum",
@@ -95,6 +154,9 @@ export const RULE_FIELD_ORDER: RuleFieldKey[] = [
 ];
 
 export const getFieldLabel = (key: RuleFieldKey): string => FIELD_LABELS[key];
+export const getDocumentFieldLabel = (key: DocumentRuleKey): string => DOCUMENT_FIELD_LABELS[key];
+export const getPageNumberFieldLabel = (key: PageNumberRuleKey): string => PAGE_NUMBER_FIELD_LABELS[key];
+export const getHeaderFieldLabel = (key: HeaderRuleKey): string => HEADER_FIELD_LABELS[key];
 
 export const defaultSeverityForField = (key: RuleFieldKey): RuleField["severity"] =>
   key === "fontFamilyCn" || key === "fontFamilyLatin" || key === "fontSizePt"

@@ -138,6 +138,10 @@ export interface HeaderRuleSet {
   bottom_border?: boolean;
 }
 
+export type DocumentRuleKey = keyof DocumentRuleSet;
+export type PageNumberRuleKey = keyof PageNumberRuleSet;
+export type HeaderRuleKey = keyof HeaderRuleSet;
+
 export interface EditableRuleLibrary {
   id: string;
   name: string;
@@ -173,6 +177,33 @@ export interface RuleProposalField {
   }>;
 }
 
+export interface DocumentRuleProposalField {
+  key: DocumentRuleKey;
+  label: string;
+  unit: "cm" | "enum";
+  proposedValue: string | number;
+  confidence: number;
+  confidenceLevel: "high" | "medium" | "low";
+  confidenceHint: string;
+  sampleCount: number;
+  coverage: number;
+  observedCount: number;
+  totalCount: number;
+  evidence: string[];
+  conflicts?: Array<{
+    value: string | number;
+    sampleCount: number;
+    evidence: string[];
+  }>;
+}
+
+export interface DocumentRuleProposal {
+  key: "document";
+  label: string;
+  totalCount: number;
+  fields: DocumentRuleProposalField[];
+}
+
 export interface RoleRuleProposal {
   role: Role;
   label: string;
@@ -187,7 +218,26 @@ export interface RuleProposal {
   classifiedCount: number;
   unclassifiedCount: number;
   notices: string[];
+  document?: DocumentRuleProposal;
   roles: RoleRuleProposal[];
+}
+
+export type ProposalApplyStatus = "added" | "updated" | "enabled" | "unchanged";
+
+export interface ProposalApplyChange {
+  scope: "document" | "role";
+  targetKey: string;
+  targetLabel: string;
+  fieldKey: string;
+  fieldLabel: string;
+  previousValue: unknown;
+  nextValue: unknown;
+  status: ProposalApplyStatus;
+}
+
+export interface ProposalApplyResult {
+  draft: RuleDraft;
+  changes: ProposalApplyChange[];
 }
 
 // ── 规则合法性校验（lint）：对规则库「配置本身」做静态检查，不依赖真实 .docx ──

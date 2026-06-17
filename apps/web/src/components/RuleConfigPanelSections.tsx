@@ -50,6 +50,15 @@ type FieldPaneProps = {
   setRoleIdx: (index: number) => void;
 };
 
+export type RuleConfigSection = "document" | "pageNumbers" | "headers" | "roles";
+
+type SectionTabsProps = {
+  activeSection: RuleConfigSection;
+  draft: RuleDraft;
+  onChange: (section: RuleConfigSection) => void;
+};
+
+
 export function RuleConfigToolbar({
   draft,
   draftDirty,
@@ -134,6 +143,50 @@ export function RuleConfigSummary({
           : "✗ 存在阻断性错误，需先修正后才能发布"}
       </div>
     </>
+  );
+}
+
+export function RuleConfigSectionTabs({
+  activeSection,
+  draft,
+  onChange,
+}: SectionTabsProps) {
+  const items: Array<{ key: RuleConfigSection; label: string; meta: string }> = [
+    {
+      key: "document",
+      label: "document",
+      meta: `${Object.keys(draft.document ?? {}).length} 项`,
+    },
+    {
+      key: "pageNumbers",
+      label: "pageNumbers",
+      meta: `${Object.keys(draft.pageNumbers ?? {}).length} 项`,
+    },
+    {
+      key: "headers",
+      label: "headers",
+      meta: `${Object.keys(draft.headers ?? {}).length} 项`,
+    },
+    {
+      key: "roles",
+      label: "roles",
+      meta: `${draft.roles.length} 个角色`,
+    },
+  ];
+
+  return (
+    <div className="rc-section-tabs">
+      {items.map((item) => (
+        <button
+          key={item.key}
+          className={item.key === activeSection ? "active" : ""}
+          onClick={() => onChange(item.key)}
+        >
+          <span>{item.label}</span>
+          <small>{item.meta}</small>
+        </button>
+      ))}
+    </div>
   );
 }
 

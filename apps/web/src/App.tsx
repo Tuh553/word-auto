@@ -85,11 +85,15 @@ function RulesScreen({
         currentProposal={proposals.currentProposal}
         draftDirty={rules.draftDirty}
         libraries={rules.libraries}
+        proposalFeedback={proposals.proposalFeedback}
         ruleMessage={rules.ruleMessage}
         unpublishedChanges={rules.unpublishedChanges}
+        onAcceptDocument={proposals.acceptDocumentProposal}
+        onAcceptDocumentField={proposals.acceptDocumentProposalField}
         onAcceptField={proposals.acceptProposalField}
         onAcceptRole={proposals.acceptProposalRole}
         onChangeDraft={rules.updateDraft}
+        onClearProposalFeedback={proposals.clearProposalFeedback}
         onExportDraft={rules.exportDraft}
         onExportPublished={rules.exportPublished}
         onExtract={() => proposalRef.current?.click()}

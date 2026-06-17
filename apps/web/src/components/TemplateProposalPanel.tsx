@@ -1,46 +1,31 @@
 import type {
+  DocumentRuleProposal,
+  DocumentRuleProposalField,
   RoleRuleProposal,
   RuleDraft,
-  RuleField,
-  RuleFieldKey,
   RuleProposal,
   RuleProposalField,
 } from "@word-auto/validator";
-import { formatRuleValue } from "./ruleConfigShared.js";
-
-const LEVEL_LABEL = {
-  high: "高",
-  medium: "中",
-  low: "低",
-} as const;
-
-const findDraftField = (
-  draft: RuleDraft,
-  roleKey: string,
-  fieldKey: RuleFieldKey,
-): RuleField | undefined =>
-  draft.roles.find((item) => item.role === roleKey)?.fields.find((item) => item.key === fieldKey);
-
-const formatCoverage = (field: RuleProposalField): string =>
-  `${field.sampleCount}/${field.totalCount}（覆盖率 ${(field.coverage * 100).toFixed(0)}%）`;
-
-const formatTime = (value: string): string =>
-  new Date(value).toLocaleString("zh-CN", { hour12: false });
+import type { ProposalFeedback } from "../lib/proposalFeedback.js";
+import {
+  DocumentProposalCard,
+  ProposalRoleCard,
+} from "./TemplateProposalCards.js";
 
 interface Props {
   draft: RuleDraft;
   proposal: RuleProposal | null;
+  proposalFeedback: ProposalFeedback | null;
   onExtract: () => void;
+  onAcceptDocument: (proposal: DocumentRuleProposal) => void;
+  onAcceptDocumentField: (proposal: DocumentRuleProposal, field: DocumentRuleProposalField) => void;
   onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
   onAcceptRole: (role: RoleRuleProposal) => void;
+  onClearFeedback: () => void;
 }
 
-type ProposalFieldCardProps = {
-  draft: RuleDraft;
-  field: RuleProposalField;
-  onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
-  role: RoleRuleProposal;
-};
+const formatTime = (value: string): string =>
+  new Date(value).toLocaleString("zh-CN", { hour12: false });
 
 function EmptyProposalState({ onExtract }: { onExtract: () => void }) {
   return (
@@ -48,12 +33,12 @@ function EmptyProposalState({ onExtract }: { onExtract: () => void }) {
       <div className="proposal-head">
         <div>
           <h2>模板候选提取</h2>
-          <p>上传标准模板或样本文档 `.docx`，按现有 parser + classify 聚合角色字段候选。</p>
+          <p>上传标准模板或样本文档 `.docx`，聚合页面设置和角色字段候选。</p>
         </div>
         <button className="primary" onClick={onExtract}>上传并提取候选</button>
       </div>
       <div className="proposal-empty">
-        当前还没有候选结果。提取后会展示字段建议值、覆盖率、冲突项和可信提示，并可接受到草稿。
+        当前还没有候选结果。提取后会展示建议值、当前草稿、差异、冲突项和可信提示。
       </div>
     </section>
   );
@@ -71,7 +56,7 @@ function ProposalHeader({
       <div>
         <h2>模板候选提取</h2>
         <div className="proposal-meta">
-          来源：{proposal.sourceName} · 解析段落 {proposal.paragraphCount} · 已识别 {proposal.classifiedCount} · 提取时间 {formatTime(proposal.extractedAt)}
+          来源：{proposal.sourceName} · 页面字段 {proposal.document?.fields.length ?? 0} · 角色 {proposal.roles.length} · 解析段落 {proposal.paragraphCount} · 已识别 {proposal.classifiedCount} · 提取时间 {formatTime(proposal.extractedAt)}
         </div>
       </div>
       <button className="primary" onClick={onExtract}>重新提取</button>
@@ -79,107 +64,49 @@ function ProposalHeader({
   );
 }
 
-function ProposalFieldCard({
-  draft,
-  field,
-  onAcceptField,
-  role,
-}: ProposalFieldCardProps) {
-  const current = findDraftField(draft, role.role, field.key);
-
-  return (
-    <div className="proposal-field">
-      <div className="proposal-field-main">
-        <div>
-          <div className="proposal-field-name">{current?.label ?? field.key}</div>
-          <div className="proposal-field-value">
-            候选：{formatRuleValue(field.proposedValue)}
-          </div>
-          <div className="proposal-field-current">
-            当前草稿：{current ? formatRuleValue(current.value) : "（未配置）"}
-          </div>
-        </div>
-        <button onClick={() => onAcceptField(role, field)}>接受</button>
-      </div>
-
-      <div className="proposal-field-stats">
-        <span className={`proposal-badge ${field.confidenceLevel}`}>
-          可信度 {LEVEL_LABEL[field.confidenceLevel]} · {field.confidence.toFixed(2)}
-        </span>
-        <span>{formatCoverage(field)}</span>
-        <span>检测到 {field.observedCount} 段显式取值</span>
-      </div>
-
-      <div className="proposal-field-hint">{field.confidenceHint}</div>
-
-      {field.conflicts && field.conflicts.length > 0 && (
-        <div className="proposal-conflicts">
-          冲突值：
-          {field.conflicts.map((item, index) => (
-            <span key={index}>
-              {formatRuleValue(item.value)} × {item.sampleCount}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="proposal-evidence">
-        {field.evidence.map((item, index) => (
-          <div key={index}>{item}</div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProposalRoleCard({
-  draft,
-  onAcceptField,
-  onAcceptRole,
-  role,
+function ProposalFeedbackPanel({
+  feedback,
+  onClear,
 }: {
-  draft: RuleDraft;
-  onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
-  onAcceptRole: (role: RoleRuleProposal) => void;
-  role: RoleRuleProposal;
+  feedback: ProposalFeedback | null;
+  onClear: () => void;
 }) {
+  if (!feedback) return null;
   return (
-    <article className="proposal-role">
-      <div className="proposal-role-head">
-        <div>
-          <div className="proposal-role-name">{role.label}</div>
-          <div className="proposal-role-meta">{role.role} · {role.totalCount} 段样本 · {role.fields.length} 个字段候选</div>
-        </div>
-        <button onClick={() => onAcceptRole(role)}>整角色接受到草稿</button>
+    <div className={`proposal-feedback ${feedback.kind}`}>
+      <div>
+        <div className="proposal-feedback-title">{feedback.title}</div>
+        {feedback.details.length > 0 && (
+          <div className="proposal-feedback-details">
+            {feedback.details.slice(0, 8).map((item, index) => (
+              <div key={index}>{item}</div>
+            ))}
+            {feedback.details.length > 8 && <div>另有 {feedback.details.length - 8} 项变更</div>}
+          </div>
+        )}
       </div>
-
-      <div className="proposal-fields">
-        {role.fields.map((field) => (
-          <ProposalFieldCard
-            key={field.key}
-            draft={draft}
-            field={field}
-            onAcceptField={onAcceptField}
-            role={role}
-          />
-        ))}
-      </div>
-    </article>
+      <button onClick={onClear}>关闭</button>
+    </div>
   );
 }
 
 export function TemplateProposalPanel({
   draft,
   proposal,
-  onExtract,
+  proposalFeedback,
+  onAcceptDocument,
+  onAcceptDocumentField,
   onAcceptField,
   onAcceptRole,
+  onClearFeedback,
+  onExtract,
 }: Props) {
   if (!proposal) return <EmptyProposalState onExtract={onExtract} />;
 
   return (
     <section className="card proposal-card">
       <ProposalHeader onExtract={onExtract} proposal={proposal} />
+      <ProposalFeedbackPanel feedback={proposalFeedback} onClear={onClearFeedback} />
 
       {proposal.notices.length > 0 && (
         <div className="proposal-notices">
@@ -190,6 +117,14 @@ export function TemplateProposalPanel({
       )}
 
       <div className="proposal-roles">
+        {proposal.document && (
+          <DocumentProposalCard
+            draft={draft}
+            onAcceptDocument={onAcceptDocument}
+            onAcceptDocumentField={onAcceptDocumentField}
+            proposal={proposal.document}
+          />
+        )}
         {proposal.roles.map((role) => (
           <ProposalRoleCard
             key={role.role}

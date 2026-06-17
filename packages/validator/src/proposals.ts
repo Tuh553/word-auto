@@ -1,29 +1,24 @@
 import type { DocModel, Paragraph } from "@word-auto/parser";
 import { classifyParagraphs } from "./classify.js";
+import { extractDocumentProposal } from "./proposals-document.js";
 import {
-  buildRuleField,
+  type CandidateSample,
+  type Scalar,
+  roundNumber,
+  summarizeSamples,
+} from "./proposals-shared.js";
+import {
   getRoleLabel,
-  RULE_FIELD_ORDER,
   RULE_FIELD_UNITS,
 } from "./rules.js";
 import type {
   Role,
   RoleRuleProposal,
-  RuleDraft,
-  RuleField,
   RuleFieldKey,
   RuleProposal,
   RuleProposalField,
   RuleValue,
 } from "./types.js";
-
-type Scalar = string | number | boolean;
-
-type CandidateSample = {
-  value: Scalar;
-  preview: string;
-  paraIndex: number;
-};
 
 type FieldSpec = {
   key: RuleFieldKey;
@@ -36,11 +31,6 @@ const textHasLatin = (text: string): boolean => /[A-Za-z]/.test(text);
 
 const previewText = (text: string): string =>
   text.replace(/\s+/g, " ").trim().slice(0, 24);
-
-const roundNumber = (value: number, digits = 2): number => {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-};
 
 const normalizeAlign = (alignment?: string): string | undefined => {
   if (!alignment) return undefined;
@@ -138,31 +128,11 @@ const FIELD_SPECS: FieldSpec[] = [
   },
 ];
 
-const toKey = (value: Scalar): string => JSON.stringify(value);
-
 const toRuleValue = (value: Scalar, unit: RuleValue["unit"]): RuleValue => ({
   mode: "exact",
   exact: value,
   unit,
 });
-
-const confidenceLevelOf = (confidence: number): "high" | "medium" | "low" => {
-  if (confidence >= 0.85) return "high";
-  if (confidence >= 0.6) return "medium";
-  return "low";
-};
-
-const confidenceHintOf = (
-  confidence: number,
-  coverage: number,
-  totalCount: number,
-  conflictCount: number,
-): string => {
-  if (totalCount < 2) return "样本过少，仅供人工参考";
-  if (confidence >= 0.85 && conflictCount === 0) return "主值集中，可直接进入草稿复核";
-  if (coverage >= 0.6) return "存在少量冲突，建议接受后结合原文抽查";
-  return "覆盖不足或冲突偏多，建议先检查样本质量与角色识别";
-};
 
 const extractFieldProposal = (
   role: Role,
@@ -176,65 +146,39 @@ const extractFieldProposal = (
       : [{
           value,
           preview: previewText(para.text),
-          paraIndex: para.index,
+          sampleIndex: para.index,
         }];
   });
-
-  if (samples.length === 0) return null;
-
-  const groups = new Map<string, CandidateSample[]>();
-  for (const sample of samples) {
-    const key = toKey(sample.value);
-    const arr = groups.get(key) ?? [];
-    arr.push(sample);
-    groups.set(key, arr);
-  }
-
-  const ordered = [...groups.entries()]
-    .map(([key, values]) => ({ key, values, value: JSON.parse(key) as Scalar }))
-    .sort((left, right) => right.values.length - left.values.length || left.key.localeCompare(right.key));
-
-  const primary = ordered[0];
-  const sampleCount = primary.values.length;
-  const observedCount = samples.length;
-  const totalCount = paragraphs.length;
-  const coverage = totalCount === 0 ? 0 : roundNumber(sampleCount / totalCount, 2);
-  const dominance = observedCount === 0 ? 0 : sampleCount / observedCount;
-  const sampleFactor = Math.min(1, observedCount / 5);
-  const confidence = roundNumber((dominance * 0.7 + coverage * 0.3) * (0.6 + sampleFactor * 0.4), 2);
-  const conflicts = ordered.slice(1).map((item) => ({
-    value: toRuleValue(item.value, spec.unit),
-    sampleCount: item.values.length,
-    evidence: item.values.slice(0, 3).map(
-      (sample) => `段落 ${sample.paraIndex}: ${sample.preview}`,
-    ),
-  }));
-  const evidence = primary.values.slice(0, 3).map(
-    (sample) => `段落 ${sample.paraIndex}: ${sample.preview}`,
-  );
+  const summary = summarizeSamples(samples, paragraphs.length);
+  if (!summary) return null;
 
   return {
     key: spec.key,
-    proposedValue: toRuleValue(primary.value, spec.unit),
-    confidence,
-    confidenceLevel: confidenceLevelOf(confidence),
-    confidenceHint: confidenceHintOf(confidence, coverage, totalCount, conflicts.length),
-    sampleCount,
-    coverage,
-    observedCount,
-    totalCount,
+    proposedValue: toRuleValue(summary.primaryValue, spec.unit),
+    confidence: summary.confidence,
+    confidenceLevel: summary.confidenceLevel,
+    confidenceHint: summary.confidenceHint,
+    sampleCount: summary.sampleCount,
+    coverage: summary.coverage,
+    observedCount: summary.observedCount,
+    totalCount: summary.totalCount,
     evidence: [
-      `角色「${getRoleLabel(role)}」共 ${totalCount} 段，其中 ${observedCount} 段检测到该字段，${sampleCount} 段命中主值`,
-      ...evidence,
+      `角色「${getRoleLabel(role)}」共 ${summary.totalCount} 段，其中 ${summary.observedCount} 段检测到该字段，${summary.sampleCount} 段命中主值`,
+      ...summary.evidence.map((item) => item.replace(/^样本 /, "段落 ")),
     ],
-    conflicts: conflicts.length > 0 ? conflicts : undefined,
+    conflicts: summary.conflicts.length > 0
+      ? summary.conflicts.map((item) => ({
+          value: toRuleValue(item.value, spec.unit),
+          sampleCount: item.sampleCount,
+          evidence: item.evidence.map((sample) => sample.replace(/^样本 /, "段落 ")),
+        }))
+      : undefined,
   };
 };
 
-export const extractRuleProposal = (
+const collectParagraphsByRole = (
   model: DocModel,
-  options: { sourceName?: string } = {},
-): RuleProposal => {
+): { byRole: Map<Role, Paragraph[]>; classifiedCount: number } => {
   const roles = classifyParagraphs(model.paragraphs);
   const byRole = new Map<Role, Paragraph[]>();
   let classifiedCount = 0;
@@ -248,15 +192,31 @@ export const extractRuleProposal = (
     byRole.set(role, list);
   });
 
+  return { byRole, classifiedCount };
+};
+
+const buildNotices = (
+  model: DocModel,
+  classifiedCount: number,
+  hasDocumentConflicts: boolean,
+): string[] => {
   const notices: string[] = [];
   if (classifiedCount < model.paragraphs.length) {
     notices.push(
       `有 ${model.paragraphs.length - classifiedCount} 段未被角色识别，候选结果只基于已识别段落`,
     );
   }
+  if (model.sections.length === 0) {
+    notices.push("未检测到分节页面设置，文档级页面候选无法自动提取");
+  } else if (hasDocumentConflicts) {
+    notices.push("部分页面设置在不同分节间存在冲突，接受前请结合模板检查是否需要统一");
+  }
   notices.push("行距候选仅统计显式固定/最小行距；多倍行距不会自动折算为 pt");
+  return notices;
+};
 
-  const roleProposals: RoleRuleProposal[] = [...byRole.entries()]
+const buildRoleProposals = (byRole: Map<Role, Paragraph[]>): RoleRuleProposal[] =>
+  [...byRole.entries()]
     .map(([role, paragraphs]) => ({
       role,
       label: getRoleLabel(role),
@@ -268,57 +228,23 @@ export const extractRuleProposal = (
     .filter((role) => role.fields.length > 0)
     .sort((left, right) => right.totalCount - left.totalCount || left.role.localeCompare(right.role));
 
+export const extractRuleProposal = (
+  model: DocModel,
+  options: { sourceName?: string } = {},
+): RuleProposal => {
+  const { byRole, classifiedCount } = collectParagraphsByRole(model);
+  const document = extractDocumentProposal(model);
+  const hasDocumentConflicts =
+    document?.fields.some((field) => field.conflicts && field.conflicts.length > 0) ?? false;
+
   return {
     sourceName: options.sourceName ?? "未命名文档",
     extractedAt: new Date().toISOString(),
     paragraphCount: model.paragraphs.length,
     classifiedCount,
     unclassifiedCount: model.paragraphs.length - classifiedCount,
-    notices,
-    roles: roleProposals,
+    notices: buildNotices(model, classifiedCount, hasDocumentConflicts),
+    document: document ?? undefined,
+    roles: buildRoleProposals(byRole),
   };
 };
-
-const sortFields = (fields: RuleField[]): RuleField[] =>
-  [...fields].sort(
-    (left, right) =>
-      RULE_FIELD_ORDER.indexOf(left.key) - RULE_FIELD_ORDER.indexOf(right.key),
-  );
-
-export const applyProposalFieldToDraft = (
-  draft: RuleDraft,
-  roleProposal: RoleRuleProposal,
-  fieldProposal: RuleProposalField,
-): RuleDraft => {
-  const next = structuredClone(draft);
-  let roleRule = next.roles.find((item) => item.role === roleProposal.role);
-  if (!roleRule) {
-    roleRule = {
-      role: roleProposal.role,
-      label: roleProposal.label,
-      fields: [],
-    };
-    next.roles.push(roleRule);
-  } else {
-    roleRule.label = roleProposal.label;
-  }
-
-  const existing = roleRule.fields.find((item) => item.key === fieldProposal.key);
-  if (existing) {
-    existing.enabled = true;
-    existing.value = structuredClone(fieldProposal.proposedValue);
-  } else {
-    roleRule.fields.push(buildRuleField(fieldProposal.key, structuredClone(fieldProposal.proposedValue)));
-    roleRule.fields = sortFields(roleRule.fields);
-  }
-  return next;
-};
-
-export const applyProposalRoleToDraft = (
-  draft: RuleDraft,
-  roleProposal: RoleRuleProposal,
-): RuleDraft =>
-  roleProposal.fields.reduce(
-    (current, field) => applyProposalFieldToDraft(current, roleProposal, field),
-    draft,
-  );

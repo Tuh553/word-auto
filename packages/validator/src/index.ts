@@ -26,13 +26,22 @@ export {
   type ListGroup,
 } from "./list-recognition.js";
 export {
+  DOCUMENT_FIELD_LABELS,
+  DOCUMENT_FIELD_ORDER,
   FIELD_LABELS,
+  HEADER_FIELD_LABELS,
+  HEADER_FIELD_ORDER,
+  PAGE_NUMBER_FIELD_LABELS,
+  PAGE_NUMBER_FIELD_ORDER,
   ROLE_LABELS,
   RULE_FIELD_ORDER,
   RULE_FIELD_UNITS,
   buildRuleField,
   defaultSeverityForField,
+  getDocumentFieldLabel,
   getFieldLabel,
+  getHeaderFieldLabel,
+  getPageNumberFieldLabel,
   getRoleLabel,
   isEditableRuleLibrary,
   normalizeRuleLibrary,
@@ -40,7 +49,13 @@ export {
 } from "./rules.js";
 export { lintRuleLibrary, RULE_LINT_CODES } from "./lint.js";
 export {
-  applyProposalFieldToDraft,
-  applyProposalRoleToDraft,
   extractRuleProposal,
 } from "./proposals.js";
+export {
+  applyDocumentProposalFieldToDraftWithResult,
+  applyDocumentProposalToDraftWithResult,
+  applyProposalFieldToDraft,
+  applyProposalFieldToDraftWithResult,
+  applyProposalRoleToDraft,
+  applyProposalRoleToDraftWithResult,
+} from "./proposals-apply.js";
