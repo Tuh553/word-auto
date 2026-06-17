@@ -6,7 +6,7 @@ import type {
   RuleValue,
 } from "@word-auto/validator";
 import { RuleConfigFieldCard } from "./RuleConfigFieldCard.js";
-import { SEV_LABEL, formatDateTime } from "./ruleConfigShared.js";
+import { RULE_SECTION_LABEL, SEV_LABEL, formatDateTime } from "./ruleConfigShared.js";
 
 export interface LibraryOption {
   id: string;
@@ -88,7 +88,7 @@ export function RuleConfigToolbar({
           </select>
         </div>
         <div className="rc-actions">
-          <button onClick={onImport}>导入 JSON</button>
+          <button onClick={onImport}>导入规则文件</button>
           <button onClick={onExportDraft}>导出草稿</button>
           <button onClick={onExportPublished}>导出生效</button>
           <button onClick={onSaveDraft}>保存草稿</button>
@@ -154,22 +154,22 @@ export function RuleConfigSectionTabs({
   const items: Array<{ key: RuleConfigSection; label: string; meta: string }> = [
     {
       key: "document",
-      label: "document",
+      label: RULE_SECTION_LABEL.document,
       meta: `${Object.keys(draft.document ?? {}).length} 项`,
     },
     {
       key: "pageNumbers",
-      label: "pageNumbers",
+      label: RULE_SECTION_LABEL.pageNumbers,
       meta: `${Object.keys(draft.pageNumbers ?? {}).length} 项`,
     },
     {
       key: "headers",
-      label: "headers",
+      label: RULE_SECTION_LABEL.headers,
       meta: `${Object.keys(draft.headers ?? {}).length} 项`,
     },
     {
       key: "roles",
-      label: "roles",
+      label: RULE_SECTION_LABEL.roles,
       meta: `${draft.roles.length} 个角色`,
     },
   ];
@@ -248,7 +248,7 @@ export function RuleConfigFieldPane({
         ) : (
           <>
             <div className="rc-fields-head">
-              {role.label} · {role.role}
+              {role.label}
             </div>
             {role.fields.map((field, fieldIdx) => (
               <RuleConfigFieldCard

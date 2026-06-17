@@ -1,14 +1,15 @@
-import type {
-  DocumentRuleKey,
-  DocumentRuleProposal,
-  DocumentRuleProposalField,
-  RoleRuleProposal,
-  RuleDraft,
-  RuleField,
-  RuleFieldKey,
-  RuleProposalField,
+import {
+  getFieldLabel,
+  type DocumentRuleKey,
+  type DocumentRuleProposal,
+  type DocumentRuleProposalField,
+  type RoleRuleProposal,
+  type RuleDraft,
+  type RuleField,
+  type RuleFieldKey,
+  type RuleProposalField,
 } from "@word-auto/validator";
-import { formatRuleValue } from "./ruleConfigShared.js";
+import { RULE_SECTION_LABEL, formatRuleValue } from "./ruleConfigShared.js";
 
 const LEVEL_LABEL = {
   high: "高",
@@ -214,7 +215,7 @@ function ProposalFieldCard({
         currentDisplay={current ? formatRuleValue(current.value) : "（未配置）"}
         currentExists={current != null}
         currentValue={currentValue}
-        label={current?.label ?? field.key}
+        label={current?.label ?? getFieldLabel(field.key)}
         onAccept={() => onAcceptField(role, field)}
         proposedDisplay={formatRuleValue(proposedValue)}
         proposedValue={proposedValue}
@@ -281,7 +282,7 @@ export function DocumentProposalCard({
         <div>
           <div className="proposal-role-name">{proposal.label}</div>
           <div className="proposal-role-meta">
-            document · {proposal.totalCount} 个分节样本 · {proposal.fields.length} 个字段候选
+            {RULE_SECTION_LABEL.document} · {proposal.totalCount} 个分节样本 · {proposal.fields.length} 个字段候选
           </div>
         </div>
         <button onClick={() => onAcceptDocument(proposal)}>整组接受到草稿</button>
@@ -318,7 +319,7 @@ export function ProposalRoleCard({
       <div className="proposal-role-head">
         <div>
           <div className="proposal-role-name">{role.label}</div>
-          <div className="proposal-role-meta">{role.role} · {role.totalCount} 段样本 · {role.fields.length} 个字段候选</div>
+          <div className="proposal-role-meta">{role.totalCount} 段样本 · {role.fields.length} 个字段候选</div>
         </div>
         <button onClick={() => onAcceptRole(role)}>整角色接受到草稿</button>
       </div>

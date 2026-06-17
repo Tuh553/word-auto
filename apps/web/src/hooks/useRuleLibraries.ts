@@ -180,7 +180,7 @@ const useRuleLibraryIoActions = ({
       `${currentLibrary.id}.draft.json`,
       serializeRuleLibrary(currentLibrary.draft),
     );
-    setRuleMessage("草稿 JSON 已导出");
+    setRuleMessage("草稿规则已导出");
   };
 
   const exportPublished = () => {
@@ -189,7 +189,7 @@ const useRuleLibraryIoActions = ({
       `${currentLibrary.id}.published.json`,
       serializeRuleLibrary(currentLibrary.published),
     );
-    setRuleMessage("生效规则 JSON 已导出");
+    setRuleMessage("生效规则已导出");
   };
 
   return { exportDraft, exportPublished, importLibrary };

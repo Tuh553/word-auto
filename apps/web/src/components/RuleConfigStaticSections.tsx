@@ -13,7 +13,13 @@ import {
   getHeaderFieldLabel,
   getPageNumberFieldLabel,
 } from "@word-auto/validator";
-import { MODE_LABEL, SEV_LABEL, formatRuleValue } from "./ruleConfigShared.js";
+import {
+  MODE_LABEL,
+  RULE_SECTION_LABEL,
+  SEV_LABEL,
+  VALUE_LABELS,
+  formatRuleValue,
+} from "./ruleConfigShared.js";
 import type { RuleConfigSection } from "./RuleConfigPanelSections.js";
 
 type PlainSectionPaneProps = {
@@ -25,6 +31,7 @@ type PlainSectionPaneProps = {
 const formatPlainValue = (value: unknown, unit?: string): string => {
   if (typeof value === "boolean") return value ? "是" : "否";
   if (value == null || value === "") return "（未配置）";
+  if (typeof value === "string") return `${VALUE_LABELS[value] ?? value}${unit ?? ""}`;
   return `${String(value)}${unit ?? ""}`;
 };
 
@@ -36,9 +43,9 @@ const plainStatus = (draftValue: unknown, publishedValue: unknown): string => {
 };
 
 const sectionTitle = (section: PlainSectionPaneProps["section"]): string => {
-  if (section === "document") return "document / 页面设置";
-  if (section === "pageNumbers") return "pageNumbers / 页码";
-  return "headers / 页眉";
+  if (section === "document") return RULE_SECTION_LABEL.document;
+  if (section === "pageNumbers") return RULE_SECTION_LABEL.pageNumbers;
+  return RULE_SECTION_LABEL.headers;
 };
 
 function PlainRuleRow({

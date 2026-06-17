@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { lintRuleLibrary } from "@word-auto/validator";
+import { getRoleLabel, lintRuleLibrary } from "@word-auto/validator";
 import type {
   EditableRuleLibrary,
   RuleDraft,
@@ -108,6 +108,13 @@ const patchDraftClone = (
   onChange(next);
 };
 
+const displayRoleLabel = (draft: RuleDraft, roleKey: string): string => {
+  const configuredLabel = draft.roles.find((item) => item.role === roleKey)?.label;
+  if (configuredLabel) return configuredLabel;
+  const fallback = getRoleLabel(roleKey);
+  return fallback === roleKey ? "未知角色" : fallback;
+};
+
 export function RuleConfigPanel({
   draft,
   published,
@@ -136,8 +143,7 @@ export function RuleConfigPanel({
     allItems.filter((item) => item.role === roleKey && item.field === fieldKey);
   const roleErrors = (roleKey: string): number =>
     lint.errors.filter((item) => item.role === roleKey).length;
-  const roleLabel = (roleKey: string): string =>
-    draft.roles.find((item) => item.role === roleKey)?.label ?? roleKey;
+  const roleLabel = (roleKey: string): string => displayRoleLabel(draft, roleKey);
 
   const patchField = (fieldIdx: number, patch: Partial<RuleField>): void => {
     patchDraftClone(draft, onChange, (next) => {

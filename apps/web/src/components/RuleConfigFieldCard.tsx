@@ -10,6 +10,7 @@ import {
   FONT_SUGGESTIONS,
   MODE_LABEL,
   SEV_LABEL,
+  VALUE_LABELS,
   formatOneOfList,
   formatRuleValue,
   modesForField,
@@ -67,7 +68,7 @@ function ExactEditor({
       >
         {ALIGN_OPTIONS.map((item) => (
           <option key={item} value={item}>
-            {item}
+            {VALUE_LABELS[item]}
           </option>
         ))}
       </select>
@@ -149,7 +150,7 @@ function OneOfEditor({
                 onPatchFieldValue(fieldIdx, { oneOf: toggleOneOfValue(field, item) })
               }
             />
-            {item}
+            {VALUE_LABELS[item]}
           </label>
         ))}
       </div>

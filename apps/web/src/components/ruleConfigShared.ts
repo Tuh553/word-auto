@@ -17,7 +17,24 @@ export const SEV_LABEL: Record<RuleFieldSeverity, string> = {
   info: "提示",
 };
 
+export const RULE_SECTION_LABEL = {
+  document: "页面设置",
+  pageNumbers: "页码规则",
+  headers: "页眉规则",
+  roles: "段落角色",
+} as const;
+
 export const ALIGN_OPTIONS = ["left", "center", "right", "justify"] as const;
+export const VALUE_LABELS: Record<string, string> = {
+  left: "左对齐",
+  center: "居中",
+  right: "右对齐",
+  justify: "两端对齐",
+  left_with_right_tab: "左文右码",
+  RomanUpper: "大写罗马数字",
+  RomanLower: "小写罗马数字",
+  Arabic: "阿拉伯数字",
+};
 export const BOOL_OPTIONS = [
   { label: "是", value: true },
   { label: "否", value: false },
@@ -37,7 +54,13 @@ const unitText = (unit?: string): string =>
 
 const formatScalar = (value: unknown): string => {
   if (typeof value === "boolean") return value ? "是" : "否";
+  if (typeof value === "string") return VALUE_LABELS[value] ?? value;
   return value == null ? "—" : String(value);
+};
+
+const formatRawScalar = (value: unknown): string => {
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return value == null ? "" : String(value);
 };
 
 export const formatRuleValue = (value: RuleValue): string => {
@@ -114,4 +137,4 @@ export const nextValueForMode = (
 };
 
 export const formatOneOfList = (field: RuleField): string =>
-  (field.value.oneOf ?? []).map((item) => formatScalar(item)).join(", ");
+  (field.value.oneOf ?? []).map((item) => formatRawScalar(item)).join(", ");

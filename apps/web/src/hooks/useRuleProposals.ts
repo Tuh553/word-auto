@@ -6,6 +6,7 @@ import {
   applyProposalFieldToDraftWithResult,
   applyProposalRoleToDraftWithResult,
   extractRuleProposal,
+  getFieldLabel,
   type DocumentRuleProposal,
   type DocumentRuleProposalField,
   type ProposalApplyResult,
@@ -21,6 +22,7 @@ import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 
 type ProposalRole = RuleProposal["roles"][number];
 type ProposalField = ProposalRole["fields"][number];
+type AcceptLabels = { scope: string; success: string; error: string };
 
 type RuleProposalOptions = {
   currentLibrary: RuleLibraryRecord | undefined;
@@ -52,6 +54,18 @@ const conflictCountOf = (
   fields: Array<{ conflicts?: unknown[] }>,
 ): number =>
   fields.filter((field) => (field.conflicts?.length ?? 0) > 0).length;
+
+const proposalFieldLabels = (
+  role: ProposalRole,
+  field: ProposalField,
+): AcceptLabels => {
+  const fieldLabel = getFieldLabel(field.key);
+  return {
+    scope: `${role.label} / ${fieldLabel}`,
+    success: `已处理 ${role.label} / ${fieldLabel} 候选`,
+    error: `接受 ${role.label} / ${fieldLabel} 失败`,
+  };
+};
 
 const handleExtractProposal = async (
   currentLibrary: RuleLibraryRecord | undefined,
@@ -91,7 +105,7 @@ const acceptDraftChange = (
     apply: (record: RuleLibraryRecord) => ProposalApplyResult;
     conflictCount: number;
     currentLibrary: RuleLibraryRecord | undefined;
-    labels: { scope: string; success: string; error: string };
+    labels: AcceptLabels;
     setters: Pick<ProposalSetters, "setProposalFeedback" | "setRuleMessage">;
     updateLibrary: RuleProposalOptions["updateLibrary"];
   },
@@ -131,11 +145,7 @@ export const useRuleProposals = ({
       apply: (record) => applyProposalFieldToDraftWithResult(record.draft, role, field),
       conflictCount: field.conflicts?.length ?? 0,
       currentLibrary,
-      labels: {
-        scope: `${role.label} / ${field.key}`,
-        success: `已处理 ${role.label} / ${field.key} 候选`,
-        error: `接受 ${role.label} / ${field.key} 失败`,
-      },
+      labels: proposalFieldLabels(role, field),
       setters,
       updateLibrary,
     });
