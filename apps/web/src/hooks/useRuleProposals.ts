@@ -35,17 +35,16 @@ type ProposalSetters = {
 };
 
 const updateDraftWithResult = (
+  currentLibrary: RuleLibraryRecord | undefined,
   updateLibrary: RuleProposalOptions["updateLibrary"],
   apply: (record: RuleLibraryRecord) => ProposalApplyResult,
 ): ProposalApplyResult | null => {
-  let result: ProposalApplyResult | null = null;
-  updateLibrary((record) => {
-    result = apply(record);
-    return {
-      ...record,
-      draft: result.draft,
-    };
-  });
+  if (!currentLibrary) return null;
+  const result = apply(currentLibrary);
+  updateLibrary((record) => ({
+    ...record,
+    draft: result.draft,
+  }));
   return result;
 };
 
@@ -88,18 +87,31 @@ const handleAcceptResult = (
 };
 
 const acceptDraftChange = (
-  updateLibrary: RuleProposalOptions["updateLibrary"],
-  apply: (record: RuleLibraryRecord) => ProposalApplyResult,
-  setters: Pick<ProposalSetters, "setProposalFeedback" | "setRuleMessage">,
-  labels: { scope: string; success: string; error: string },
-  conflictCount: number,
+  context: {
+    apply: (record: RuleLibraryRecord) => ProposalApplyResult;
+    conflictCount: number;
+    currentLibrary: RuleLibraryRecord | undefined;
+    labels: { scope: string; success: string; error: string };
+    setters: Pick<ProposalSetters, "setProposalFeedback" | "setRuleMessage">;
+    updateLibrary: RuleProposalOptions["updateLibrary"];
+  },
 ): void => {
   try {
-    const result = updateDraftWithResult(updateLibrary, apply);
-    handleAcceptResult(result, labels.scope, conflictCount, setters, labels.success);
+    const result = updateDraftWithResult(
+      context.currentLibrary,
+      context.updateLibrary,
+      context.apply,
+    );
+    handleAcceptResult(
+      result,
+      context.labels.scope,
+      context.conflictCount,
+      context.setters,
+      context.labels.success,
+    );
   } catch (cause) {
-    setters.setProposalFeedback(
-      errorProposalFeedback(labels.error, getFriendlyAnalyzeErrorMessage(cause)),
+    context.setters.setProposalFeedback(
+      errorProposalFeedback(context.labels.error, getFriendlyAnalyzeErrorMessage(cause)),
     );
   }
 };
@@ -115,62 +127,66 @@ export const useRuleProposals = ({
   const setters = { setProposalFeedback, setProposals, setRuleMessage };
 
   const acceptProposalField = (role: ProposalRole, field: ProposalField) => {
-    acceptDraftChange(
-      updateLibrary,
-      (record) => applyProposalFieldToDraftWithResult(record.draft, role, field),
-      setters,
-      {
+    acceptDraftChange({
+      apply: (record) => applyProposalFieldToDraftWithResult(record.draft, role, field),
+      conflictCount: field.conflicts?.length ?? 0,
+      currentLibrary,
+      labels: {
         scope: `${role.label} / ${field.key}`,
         success: `已处理 ${role.label} / ${field.key} 候选`,
         error: `接受 ${role.label} / ${field.key} 失败`,
       },
-      field.conflicts?.length ?? 0,
-    );
+      setters,
+      updateLibrary,
+    });
   };
 
   const acceptProposalRole = (role: ProposalRole) => {
-    acceptDraftChange(
-      updateLibrary,
-      (record) => applyProposalRoleToDraftWithResult(record.draft, role),
-      setters,
-      {
+    acceptDraftChange({
+      apply: (record) => applyProposalRoleToDraftWithResult(record.draft, role),
+      conflictCount: conflictCountOf(role.fields),
+      currentLibrary,
+      labels: {
         scope: role.label,
         success: `已处理 ${role.label} 候选`,
         error: `接受 ${role.label} 失败`,
       },
-      conflictCountOf(role.fields),
-    );
+      setters,
+      updateLibrary,
+    });
   };
 
   const acceptDocumentProposalField = (
     documentProposal: DocumentRuleProposal,
     field: DocumentRuleProposalField,
   ) => {
-    acceptDraftChange(
-      updateLibrary,
-      (record) => applyDocumentProposalFieldToDraftWithResult(record.draft, documentProposal, field),
-      setters,
-      {
+    acceptDraftChange({
+      apply: (record) => applyDocumentProposalFieldToDraftWithResult(record.draft, documentProposal, field),
+      conflictCount: field.conflicts?.length ?? 0,
+      currentLibrary,
+      labels: {
         scope: `${documentProposal.label} / ${field.label}`,
         success: `已处理 ${field.label} 页面设置候选`,
         error: `接受 ${field.label} 页面设置失败`,
       },
-      field.conflicts?.length ?? 0,
-    );
+      setters,
+      updateLibrary,
+    });
   };
 
   const acceptDocumentProposal = (documentProposal: DocumentRuleProposal) => {
-    acceptDraftChange(
-      updateLibrary,
-      (record) => applyDocumentProposalToDraftWithResult(record.draft, documentProposal),
-      setters,
-      {
+    acceptDraftChange({
+      apply: (record) => applyDocumentProposalToDraftWithResult(record.draft, documentProposal),
+      conflictCount: conflictCountOf(documentProposal.fields),
+      currentLibrary,
+      labels: {
         scope: documentProposal.label,
         success: `已处理 ${documentProposal.label} 候选`,
         error: `接受 ${documentProposal.label} 失败`,
       },
-      conflictCountOf(documentProposal.fields),
-    );
+      setters,
+      updateLibrary,
+    });
   };
 
   return {
