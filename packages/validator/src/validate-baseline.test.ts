@@ -15,6 +15,9 @@ const rulesPath = resolve(here, "../../../apps/web/src/templates/chongqing-thesi
 
 const ISSUE_DIST_BASELINE: Record<string, number> = {
   "document:page_number_alignment": 1,
+  "document:abstract_cn_chars": 1,
+  "document:references_count": 1,
+  "document:references_foreign_fraction": 1,
   // 编号连续性检测（新增）
   "table_caption:caption_sequence": 1,
   "keywords_cn:bold": 1,
@@ -44,13 +47,13 @@ test("标准模板校验基线：发布规则消费结果保持一致", () => {
     dist[key] = (dist[key] ?? 0) + 1;
   }
 
-  assert.equal(report.issues.length, 35);
+  assert.equal(report.issues.length, 38);
   assert.deepEqual(report.summary, {
-    error: 17,
-    warn: 12,
+    error: 18,
+    warn: 14,
     info: 6,
     byRole: {
-      document: 1,
+      document: 4,
       table_caption: 1,
       keywords_cn: 1,
       keywords_en: 1,

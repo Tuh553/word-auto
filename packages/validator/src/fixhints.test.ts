@@ -55,6 +55,23 @@ test("文档/页面级字段：统一标 manual", () => {
   );
 });
 
+test("统计型文档字段：统一标 manual 并给出内容调整建议", () => {
+  assert.deepEqual(
+    computeFixHint({ field: "keywords_cn_count", expected: "3-5 个", actual: 2 }),
+    {
+      suggestion: "请将中文关键词调整为 3-5 个，并使用规范分隔符分隔",
+      fixability: "manual",
+    },
+  );
+  assert.deepEqual(
+    computeFixHint({ field: "references_foreign_fraction", expected: "不低于 33.33%", actual: "25%" }),
+    {
+      suggestion: "请补充外文参考文献，使占比达到 不低于 33.33%",
+      fixability: "manual",
+    },
+  );
+});
+
 test("RuleValue 期望：oneOf / range 描述目标短语", () => {
   assert.match(
     computeFixHint({

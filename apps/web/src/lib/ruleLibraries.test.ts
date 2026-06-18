@@ -165,6 +165,33 @@ test("parseImportedRuleLibrary：保留 source.provenance 供检测报告消费"
   assert.equal((draftBody as { text?: string }).text, "正文 中文字体为宋体，小四号。");
 });
 
+test("parseImportedRuleLibrary：保留统计型规则供发布后检测消费", () => {
+  const imported = parseImportedRuleLibrary(
+    JSON.stringify({
+      id: "with-statistics",
+      name: "统计模板",
+      version: "1.0.0",
+      styles: {
+        body_text: { size_pt: 12 },
+      },
+      keywords: {
+        cn: { recommended_count_min: 3, recommended_count_max: 5 },
+      },
+      references: {
+        minimum_count: { master: 40 },
+        minimum_foreign_language_fraction: 0.3333,
+      },
+    }),
+    [],
+  );
+
+  assert.deepEqual(imported.published.statistics, {
+    keywords: { cn: { min: 3, max: 5 } },
+    references: { min_count: 40, min_foreign_fraction: 0.3333 },
+  });
+  assert.deepEqual(imported.draft.statistics, imported.published.statistics);
+});
+
 test("模板候选闭环：提取 -> 接受到草稿 -> 发布 -> 检测消费新规则", () => {
   const model = mkModel();
   const proposal = extractRuleProposal(model, { sourceName: "sample.docx" });

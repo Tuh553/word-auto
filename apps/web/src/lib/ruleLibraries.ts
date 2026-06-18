@@ -32,6 +32,7 @@ const toEditableLibrary = (
     document: normalized.document,
     pageNumbers: normalized.pageNumbers,
     headers: normalized.headers,
+    statistics: normalized.statistics,
     roles: normalized.roles,
   });
 };

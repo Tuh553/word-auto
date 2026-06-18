@@ -30,6 +30,18 @@ const legacy: LegacyRuleLibrary = {
     size_pt: 10.5,
     bottom_border: true,
   },
+  abstract: {
+    cn: { recommended_word_count: { master_min: 600, master_max: 800, doctor_min: 1200, doctor_max: 1500 } },
+    en: { recommended_word_count: { min: 300, max: 500 } },
+  },
+  keywords: {
+    cn: { recommended_count_min: 3, recommended_count_max: 5 },
+    en: { recommended_count_min: 3, recommended_count_max: 5 },
+  },
+  references: {
+    minimum_count: { master: 40, doctor: 80 },
+    minimum_foreign_language_fraction: 0.3333,
+  },
   styles: {
     body_text: {
       font_east_asia: "宋体",
@@ -71,6 +83,20 @@ test("normalizeRuleLibrary 旧结构转可编辑结构", () => {
   assert.deepEqual(compactObject(lib.document), legacy.document);
   assert.deepEqual(lib.pageNumbers, legacy.page_numbers);
   assert.deepEqual(lib.headers, legacy.headers);
+  assert.deepEqual(lib.statistics, {
+    abstract: {
+      cn: { min: 600, max: 800 },
+      en: { min: 300, max: 500 },
+    },
+    keywords: {
+      cn: { min: 3, max: 5 },
+      en: { min: 3, max: 5 },
+    },
+    references: {
+      min_count: 40,
+      min_foreign_fraction: 0.3333,
+    },
+  });
   assert.equal(lib.roles.length, 2);
 
   const cnFont = findField(lib.roles, "body_text", "fontFamilyCn");
@@ -100,6 +126,12 @@ test("toLegacyRuleLibrary round-trip 保留核心字段", () => {
   assert.deepEqual(compactObject(back.document), legacy.document);
   assert.deepEqual(back.page_numbers, legacy.page_numbers);
   assert.deepEqual(back.headers, legacy.headers);
+  assert.equal(back.abstract?.cn?.recommended_word_count?.min, 600);
+  assert.equal(back.abstract?.en?.recommended_word_count?.max, 500);
+  assert.equal(back.keywords?.cn?.recommended_count_min, 3);
+  assert.equal(back.keywords?.en?.recommended_count_max, 5);
+  assert.equal(back.references?.minimum_count, 40);
+  assert.equal(back.references?.minimum_foreign_language_fraction, 0.3333);
   assert.equal(back.styles.body_text.font_east_asia, "宋体");
   assert.equal(back.styles.body_text.size_pt, 12);
   assert.equal(back.styles.body_text.first_line_indent_chars, 2);

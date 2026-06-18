@@ -143,6 +143,12 @@ const DOCUMENT_FIX_HINTS: Record<string, FixHintBuilder> = {
   header_font_latin: (_issue, target) => buildManualFixHint(`请将页眉西文字体设为 ${target}`),
   header_size_pt: (_issue, target) => buildManualFixHint(`请将页眉字号设为 ${target}`),
   header_bottom_border: () => buildManualFixHint("请在页眉段落下方设置符合规范的下边框线"),
+  keywords_cn_count: (_issue, target) => buildManualFixHint(`请将中文关键词调整为 ${target}，并使用规范分隔符分隔`),
+  keywords_en_count: (_issue, target) => buildManualFixHint(`请将英文关键词调整为 ${target}，并使用规范分隔符分隔`),
+  abstract_cn_chars: (_issue, target) => buildManualFixHint(`请扩充或压缩中文摘要，使字数达到 ${target}`),
+  abstract_en_words: (_issue, target) => buildManualFixHint(`请扩充或压缩英文摘要，使词数达到 ${target}`),
+  references_count: (_issue, target) => buildManualFixHint(`请补充参考文献，使条数达到 ${target}`),
+  references_foreign_fraction: (_issue, target) => buildManualFixHint(`请补充外文参考文献，使占比达到 ${target}`),
   caption_reference: (issue) => {
     const actual = String(issue.actual ?? "");
     if (actual.includes("不存在")) {

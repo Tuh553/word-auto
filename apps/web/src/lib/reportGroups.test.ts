@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Issue } from "@word-auto/validator";
-import { buildReportGroups, findFirstNavigableIssue } from "./reportGroups.js";
+import { buildReportGroups, findFirstNavigableIssue, formatIssueField } from "./reportGroups.js";
 
 const SAMPLE_ISSUES: Issue[] = [
   {
@@ -77,4 +77,9 @@ test("findFirstNavigableIssue：跳过文档级问题，返回首个可定位段
 
   assert.equal(issue?.paraIndex, 1);
   assert.equal(issue?.role, "heading1");
+});
+
+test("formatIssueField：统计型字段使用中文标签", () => {
+  assert.equal(formatIssueField("keywords_cn_count"), "中文关键词数量");
+  assert.equal(formatIssueField("references_foreign_fraction"), "外文参考文献占比");
 });

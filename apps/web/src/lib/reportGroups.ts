@@ -88,6 +88,12 @@ const FIELD_LABELS: Record<string, string> = {
   header_size_pt: "页眉字号",
   header_bottom_border: "页眉线",
   caption_reference: "交叉引用",
+  keywords_cn_count: "中文关键词数量",
+  keywords_en_count: "英文关键词数量",
+  abstract_cn_chars: "中文摘要字数",
+  abstract_en_words: "英文摘要词数",
+  references_count: "参考文献条数",
+  references_foreign_fraction: "外文参考文献占比",
 };
 
 const SECTION_LABELS = {

@@ -1,4 +1,11 @@
 import type { Field, Paragraph } from "@word-auto/parser";
+import type {
+  LegacyAbstractRules,
+  LegacyKeywordRules,
+  LegacyReferenceRules,
+  StatisticsRuleSet,
+} from "./statistics-types.js";
+export type * from "./statistics-types.js";
 
 // 规则库类型（对应 chongqing-thesis-phase1.json）。只声明校验用得到的字段，其余宽松放行。
 
@@ -61,6 +68,10 @@ export interface RuleLibrary {
     bottom_border?: boolean;
     [k: string]: unknown;
   };
+  abstract?: LegacyAbstractRules;
+  keywords?: LegacyKeywordRules;
+  references?: LegacyReferenceRules;
+  statistics?: StatisticsRuleSet;
   styles: Record<string, StyleRule>;
   [k: string]: unknown;
 }
@@ -151,6 +162,7 @@ export interface EditableRuleLibrary {
   document?: DocumentRuleSet;
   pageNumbers?: PageNumberRuleSet;
   headers?: HeaderRuleSet;
+  statistics?: StatisticsRuleSet;
   roles: RoleRuleSet[];
 }
 

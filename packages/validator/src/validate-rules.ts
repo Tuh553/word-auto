@@ -55,6 +55,12 @@ const FIELD_PROVENANCE_KEYS: Record<string, string[]> = {
   header_font_latin: ["page_setup_comment"],
   header_size_pt: ["page_setup_comment"],
   header_bottom_border: ["page_setup_comment"],
+  keywords_cn_count: ["cn_keywords"],
+  keywords_en_count: ["en_keywords"],
+  abstract_cn_chars: ["cn_abstract_body"],
+  abstract_en_words: ["en_abstract_body"],
+  references_count: ["references"],
+  references_foreign_fraction: ["references"],
 };
 
 const readProvenanceText = (

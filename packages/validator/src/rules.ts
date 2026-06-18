@@ -14,6 +14,10 @@ import type {
   RuleSourceMetadata,
   StyleRule,
 } from "./types.js";
+import {
+  normalizeStatisticsRules,
+  statisticsToLegacy,
+} from "./statistics-rules.js";
 
 export const ROLE_LABELS: Record<Exclude<Role, "document">, string> = {
   heading: "标题（通用）",
@@ -298,6 +302,7 @@ export const normalizeRuleLibrary = (
     document: normalizeDocument(input.document),
     pageNumbers: normalizePageNumbers(input.page_numbers),
     headers: normalizeHeaders(input.headers),
+    statistics: normalizeStatisticsRules(input),
     roles: roleEntries(input.styles),
   };
 };
@@ -320,6 +325,7 @@ export const toLegacyRuleLibrary = (
     document: input.document,
     page_numbers: input.pageNumbers,
     headers: input.headers ? { ...input.headers } : undefined,
+    ...statisticsToLegacy(input.statistics),
     styles,
   };
 };

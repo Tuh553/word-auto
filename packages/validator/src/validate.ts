@@ -6,6 +6,7 @@ import { checkNoteConsistency } from "./notes-check.js";
 import { checkNumberingSequence } from "./numbering-check.js";
 import { checkCaptionReferenceValidity } from "./reference-check.js";
 import { isEditableRuleLibrary } from "./rules.js";
+import { checkDocumentStatistics } from "./statistics-check.js";
 import type {
   EditableRuleLibrary,
   Issue,
@@ -304,6 +305,7 @@ export const validateDoc = (
     ...checkPageNumbers(model, rules),
     ...checkHeaderFooter(model, rules),
     ...collectStructuredIssues(model, classified),
+    ...checkDocumentStatistics(classified, rules),
   ];
   const paragraphResult = collectParagraphIssues(model, classified, rules);
   issues.push(...paragraphResult.issues);
