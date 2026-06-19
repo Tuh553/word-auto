@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState, type RefObject } from "react";
-import { analyze } from "./lib/analyze.js";
 import { DetectWorkspace } from "./components/DetectWorkspace.js";
 import { RulesWorkspace } from "./components/RulesWorkspace.js";
 import { useDetectionFlow } from "./hooks/useDetectionFlow.js";
@@ -135,6 +134,7 @@ function DetectScreen({
       currentLibrary={rules.currentLibrary}
       error={detect.error}
       fileName={detect.file?.name ?? null}
+      isAnalyzing={detect.isAnalyzing}
       libraries={rules.libraries}
       over={detect.over}
       reportGroupBy={detect.reportGroupBy}
@@ -148,7 +148,9 @@ function DetectScreen({
       onOverChange={detect.setOver}
       onPickFile={detect.pickFile}
       onReset={detect.reset}
-      onRun={() => detect.runAnalysis(rules.currentLibrary?.published ?? null)}
+      onRun={() => {
+        void detect.runAnalysis(rules.currentLibrary?.published ?? null);
+      }}
       onSelectIssue={detect.selectParagraph}
       onSortByChange={detect.setReportSortBy}
       onStepChange={detect.setStep}
@@ -177,12 +179,14 @@ export default function App() {
   const handlePublish = () => {
     const publishedCurrent = rules.publishCurrentLibrary();
     if (!publishedCurrent || !detect.buffer || !detect.result) return;
-    try {
-      detect.applyResult(analyze(detect.buffer, publishedCurrent.published));
-      rules.setRuleMessage(`已发布 ${publishedCurrent.published.version}，并回灌到当前检测结果`);
-    } catch (cause) {
-      rules.setRuleMessage((cause as Error).message);
-    }
+    void detect
+      .runAnalysis(publishedCurrent.published, { advanceToResult: false })
+      .then((nextResult) => {
+        if (!nextResult) return;
+        rules.setRuleMessage(
+          `已发布 ${publishedCurrent.published.version}，并回灌到当前检测结果`,
+        );
+      });
   };
 
   return (

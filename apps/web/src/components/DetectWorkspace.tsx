@@ -15,6 +15,7 @@ type DetectWorkspaceProps = {
   currentLibrary: RuleLibraryRecord | undefined;
   error: string | null;
   fileName: string | null;
+  isAnalyzing: boolean;
   libraries: RuleLibraryRecord[];
   over: boolean;
   reportGroupBy: ReportGroupBy;
@@ -156,10 +157,14 @@ function TemplateStep({
 
 function SeverityStep({
   active,
+  isAnalyzing,
   onRun,
   onStepChange,
   onToggleSeverity,
-}: Pick<DetectWorkspaceProps, "active" | "onRun" | "onStepChange" | "onToggleSeverity">) {
+}: Pick<
+  DetectWorkspaceProps,
+  "active" | "isAnalyzing" | "onRun" | "onStepChange" | "onToggleSeverity"
+>) {
   return (
     <div className="card">
       <label style={{ fontSize: 14, display: "block", marginBottom: 8 }}>
@@ -171,16 +176,20 @@ function SeverityStep({
             <input
               type="checkbox"
               checked={active.has(severity)}
+              disabled={isAnalyzing}
               onChange={() => onToggleSeverity(severity)}
             />
             {getSeverityLabel(severity)}
           </label>
         ))}
       </div>
+      {isAnalyzing && <div className="template-hint">正在解析并检测，请稍候...</div>}
       <div className="btns">
-        <button onClick={() => onStepChange(1)}>上一步</button>
-        <button className="primary" onClick={onRun}>
-          开始检测
+        <button disabled={isAnalyzing} onClick={() => onStepChange(1)}>
+          上一步
+        </button>
+        <button className="primary" disabled={isAnalyzing} onClick={onRun}>
+          {isAnalyzing ? "检测中..." : "开始检测"}
         </button>
       </div>
     </div>
@@ -239,31 +248,64 @@ function ResultStep({
   );
 }
 
+function StepContent(props: DetectWorkspaceProps) {
+  if (props.step === 0) {
+    return (
+      <UploadStep
+        buffer={props.buffer}
+        fileName={props.fileName}
+        over={props.over}
+        onOverChange={props.onOverChange}
+        onPickFile={props.onPickFile}
+        onStepChange={props.onStepChange}
+      />
+    );
+  }
+  if (props.step === 1) {
+    return (
+      <TemplateStep
+        currentLibrary={props.currentLibrary}
+        libraries={props.libraries}
+        templateId={props.templateId}
+        unpublishedChanges={props.unpublishedChanges}
+        onStepChange={props.onStepChange}
+        onTemplateChange={props.onTemplateChange}
+      />
+    );
+  }
+  if (props.step === 2) {
+    return (
+      <SeverityStep
+        active={props.active}
+        isAnalyzing={props.isAnalyzing}
+        onRun={props.onRun}
+        onStepChange={props.onStepChange}
+        onToggleSeverity={props.onToggleSeverity}
+      />
+    );
+  }
+  if (props.step !== 3) return null;
+  return (
+    <ResultStep
+      active={props.active}
+      buffer={props.buffer}
+      reportGroupBy={props.reportGroupBy}
+      reportSortBy={props.reportSortBy}
+      result={props.result}
+      selectedText={props.selectedText}
+      onGroupByChange={props.onGroupByChange}
+      onReset={props.onReset}
+      onSelectIssue={props.onSelectIssue}
+      onSortByChange={props.onSortByChange}
+      onToggleSeverity={props.onToggleSeverity}
+    />
+  );
+}
+
 export function DetectWorkspace({
-  active,
-  buffer,
-  currentLibrary,
   error,
-  fileName,
-  libraries,
-  over,
-  reportGroupBy,
-  reportSortBy,
-  result,
-  selectedText,
   step,
-  templateId,
-  unpublishedChanges,
-  onGroupByChange,
-  onOverChange,
-  onPickFile,
-  onReset,
-  onRun,
-  onSelectIssue,
-  onSortByChange,
-  onStepChange,
-  onTemplateChange,
-  onToggleSeverity,
+  ...props
 }: DetectWorkspaceProps) {
   return (
     <>
@@ -272,49 +314,7 @@ export function DetectWorkspace({
       </p>
       <Stepper step={step} />
       {error && <div className="error-banner">{error}</div>}
-      {step === 0 && (
-        <UploadStep
-          buffer={buffer}
-          fileName={fileName}
-          over={over}
-          onOverChange={onOverChange}
-          onPickFile={onPickFile}
-          onStepChange={onStepChange}
-        />
-      )}
-      {step === 1 && (
-        <TemplateStep
-          currentLibrary={currentLibrary}
-          libraries={libraries}
-          templateId={templateId}
-          unpublishedChanges={unpublishedChanges}
-          onStepChange={onStepChange}
-          onTemplateChange={onTemplateChange}
-        />
-      )}
-      {step === 2 && (
-        <SeverityStep
-          active={active}
-          onRun={onRun}
-          onStepChange={onStepChange}
-          onToggleSeverity={onToggleSeverity}
-        />
-      )}
-      {step === 3 && (
-        <ResultStep
-          active={active}
-          buffer={buffer}
-          reportGroupBy={reportGroupBy}
-          reportSortBy={reportSortBy}
-          result={result}
-          selectedText={selectedText}
-          onGroupByChange={onGroupByChange}
-          onReset={onReset}
-          onSelectIssue={onSelectIssue}
-          onSortByChange={onSortByChange}
-          onToggleSeverity={onToggleSeverity}
-        />
-      )}
+      <StepContent {...props} error={error} step={step} />
     </>
   );
 }

@@ -11,6 +11,13 @@ export interface AnalyzeResult {
   report: ValidationReport;
 }
 
+export class FriendlyAnalyzeError extends Error {
+  constructor(readonly friendlyMessage: string) {
+    super(friendlyMessage);
+    this.name = "FriendlyAnalyzeError";
+  }
+}
+
 const PARSE_ERROR_MESSAGES: Record<ParseError["code"], string> = {
   NOT_ZIP: "上传的文件不是有效的 .docx 文档。请确认文件格式正确后重试。",
   ENCRYPTED: "检测到受密码保护的 Word 文档，当前不支持解析。请先另存为未加密的 .docx 后再上传。",
@@ -29,6 +36,9 @@ export const analyze = (
 };
 
 export const getFriendlyAnalyzeErrorMessage = (error: unknown): string => {
+  if (error instanceof FriendlyAnalyzeError) {
+    return error.friendlyMessage;
+  }
   if (error instanceof ParseError) {
     return PARSE_ERROR_MESSAGES[error.code];
   }

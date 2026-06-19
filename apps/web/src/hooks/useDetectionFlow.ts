@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  analyze,
   getFriendlyAnalyzeErrorMessage,
   type AnalyzeResult,
 } from "../lib/analyze.js";
+import { analyzeInWorker } from "../lib/analyzeWorkerClient.js";
 import {
   findFirstNavigableIssue,
   type ReportGroupBy,
@@ -14,6 +14,16 @@ import type { Severity } from "@word-auto/validator";
 
 const ALL_SEVERITIES: Severity[] = ["error", "warn", "info"];
 
+type RunAnalysisOptions = {
+  advanceToResult?: boolean;
+};
+
+type AnalysisRunnerParams = {
+  buffer: ArrayBuffer | null;
+  applyResult: (nextResult: AnalyzeResult, advanceToResult?: boolean) => void;
+  setError: (message: string | null) => void;
+};
+
 const getFirstNavigableText = (
   result: AnalyzeResult,
   active: Set<Severity>,
@@ -22,6 +32,50 @@ const getFirstNavigableText = (
     result.report.issues.filter((issue) => active.has(issue.severity)),
   );
   return firstIssue ? result.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null;
+};
+
+const useAnalysisRunner = ({
+  buffer,
+  applyResult,
+  setError,
+}: AnalysisRunnerParams) => {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const runIdRef = useRef(0);
+  const isAnalyzingRef = useRef(false);
+
+  const invalidateAnalysis = () => {
+    runIdRef.current++;
+    isAnalyzingRef.current = false;
+    setIsAnalyzing(false);
+  };
+
+  const runAnalysis = async (
+    publishedRules: RuleLibraryRecord["published"] | null,
+    options: RunAnalysisOptions = {},
+  ) => {
+    if (!buffer || !publishedRules || isAnalyzingRef.current) return null;
+    const runId = ++runIdRef.current;
+    isAnalyzingRef.current = true;
+    setIsAnalyzing(true);
+    setError(null);
+    try {
+      const nextResult = await analyzeInWorker(buffer, publishedRules);
+      if (runId !== runIdRef.current) return null;
+      applyResult(nextResult, options.advanceToResult ?? true);
+      return nextResult;
+    } catch (cause) {
+      if (runId !== runIdRef.current) return null;
+      setError(getFriendlyAnalyzeErrorMessage(cause));
+      return null;
+    } finally {
+      if (runId === runIdRef.current) {
+        isAnalyzingRef.current = false;
+        setIsAnalyzing(false);
+      }
+    }
+  };
+
+  return { invalidateAnalysis, isAnalyzing, runAnalysis };
 };
 
 export const useDetectionFlow = () => {
@@ -43,22 +97,17 @@ export const useDetectionFlow = () => {
     if (advanceToResult) setStep(3);
   };
 
+  const { invalidateAnalysis, isAnalyzing, runAnalysis } = useAnalysisRunner({
+    applyResult,
+    buffer,
+    setError,
+  });
+
   const pickFile = async (selectedFile: File) => {
+    invalidateAnalysis();
     setError(null);
     setFile(selectedFile);
     setBuffer(await selectedFile.arrayBuffer());
-  };
-
-  const runAnalysis = (publishedRules: RuleLibraryRecord["published"] | null) => {
-    if (!buffer || !publishedRules) return null;
-    try {
-      const nextResult = analyze(buffer, publishedRules);
-      applyResult(nextResult, true);
-      return nextResult;
-    } catch (cause) {
-      setError(getFriendlyAnalyzeErrorMessage(cause));
-      return null;
-    }
   };
 
   const selectParagraph = (paragraphIndex: number) => {
@@ -77,6 +126,7 @@ export const useDetectionFlow = () => {
   };
 
   const reset = () => {
+    invalidateAnalysis();
     setStep(0);
     setFile(null);
     setBuffer(null);
@@ -91,6 +141,7 @@ export const useDetectionFlow = () => {
     clearError: () => setError(null),
     error,
     file,
+    isAnalyzing,
     over,
     reportGroupBy,
     reportSortBy,
