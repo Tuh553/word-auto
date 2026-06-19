@@ -1,4 +1,5 @@
 import type { Issue, Role, Severity } from "@word-auto/validator";
+import type { PreviewHighlightTarget } from "./previewHighlight.js";
 
 export type ReportGroupBy = "section" | "role" | "severity" | "field";
 export type ReportSortBy = "paragraph" | "severity";
@@ -341,4 +342,19 @@ export const buildPreviewIssueTargets = (
     });
   }
   return [...targets.values()];
+};
+
+export const buildPreviewHighlightTarget = (
+  issue: Issue | undefined,
+  paragraphs: Array<{ text: string }>,
+): PreviewHighlightTarget | null => {
+  if (!issue || issue.paraIndex < 0) return null;
+  const text = paragraphs[issue.paraIndex]?.text;
+  if (!text) return null;
+  return {
+    affectedText: issue.affectedText ?? null,
+    issueKey: getIssueKey(issue),
+    paraIndex: issue.paraIndex,
+    text,
+  };
 };

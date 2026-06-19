@@ -7,6 +7,7 @@ import type {
   ReportGroupBy,
   ReportSortBy,
 } from "../lib/reportGroups.js";
+import type { PreviewHighlightTarget } from "../lib/previewHighlight.js";
 import type { AnalyzeResult } from "../lib/analyze.js";
 import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 
@@ -23,11 +24,11 @@ type DetectWorkspaceProps = {
   libraries: RuleLibraryRecord[];
   over: boolean;
   previewIssueTargets: PreviewIssueTarget[];
+  selectedPreviewTarget: PreviewHighlightTarget | null;
   reportGroupBy: ReportGroupBy;
   reportSortBy: ReportSortBy;
   result: AnalyzeResult | null;
   selectedIssueKey: string | null;
-  selectedText: string | null;
   step: number;
   templateId: string;
   unpublishedChanges: boolean;
@@ -210,7 +211,7 @@ function ResultStep({
   result,
   previewIssueTargets,
   selectedIssueKey,
-  selectedText,
+  selectedPreviewTarget,
   onGroupByChange,
   onReset,
   onSelectIssue,
@@ -225,7 +226,7 @@ function ResultStep({
   | "result"
   | "previewIssueTargets"
   | "selectedIssueKey"
-  | "selectedText"
+  | "selectedPreviewTarget"
   | "onGroupByChange"
   | "onReset"
   | "onSelectIssue"
@@ -243,7 +244,7 @@ function ResultStep({
         <div className="preview-wrap">
           <PreviewPanel
             buffer={buffer}
-            targetText={selectedText}
+            target={selectedPreviewTarget}
             targets={previewIssueTargets}
             onSelectTarget={onSelectIssue}
           />
@@ -310,7 +311,7 @@ function StepContent(props: DetectWorkspaceProps) {
       reportSortBy={props.reportSortBy}
       result={props.result}
       selectedIssueKey={props.selectedIssueKey}
-      selectedText={props.selectedText}
+      selectedPreviewTarget={props.selectedPreviewTarget}
       onGroupByChange={props.onGroupByChange}
       onReset={props.onReset}
       onSelectIssue={props.onSelectIssue}

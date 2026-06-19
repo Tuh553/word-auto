@@ -5,6 +5,7 @@ import {
 } from "../lib/analyze.js";
 import { analyzeInWorker } from "../lib/analyzeWorkerClient.js";
 import {
+  buildPreviewHighlightTarget,
   buildPreviewIssueTargets,
   findIssueByKey,
   findFirstNavigableIssue,
@@ -13,6 +14,7 @@ import {
   type ReportGroupBy,
   type ReportSortBy,
 } from "../lib/reportGroups.js";
+import type { PreviewHighlightTarget } from "../lib/previewHighlight.js";
 import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 import type { Severity } from "@word-auto/validator";
 
@@ -28,23 +30,22 @@ type AnalysisRunnerParams = {
   setError: (message: string | null) => void;
 };
 
-const getFirstNavigableText = (
+const getFirstNavigablePreviewTarget = (
   result: AnalyzeResult,
   active: Set<Severity>,
-): string | null => {
+): PreviewHighlightTarget | null => {
   const firstIssue = findFirstNavigableIssue(
     result.report.issues.filter((issue) => active.has(issue.severity)),
   );
-  return firstIssue ? result.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null;
+  return buildPreviewHighlightTarget(firstIssue, result.model.paragraphs);
 };
 
-const getIssueText = (
+const getIssuePreviewTarget = (
   result: AnalyzeResult,
   issueKey: string | null,
-): string | null => {
+): PreviewHighlightTarget | null => {
   const issue = findIssueByKey(result.report.issues, issueKey);
-  if (!issue || issue.paraIndex < 0) return null;
-  return result.model.paragraphs[issue.paraIndex]?.text ?? null;
+  return buildPreviewHighlightTarget(issue, result.model.paragraphs);
 };
 
 const getVisibleIssues = (
@@ -54,11 +55,12 @@ const getVisibleIssues = (
 
 const useIssueSelection = () => {
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
-  const [selectedText, setSelectedText] = useState<string | null>(null);
+  const [selectedPreviewTarget, setSelectedPreviewTarget] =
+    useState<PreviewHighlightTarget | null>(null);
 
   const clearSelection = () => {
     setSelectedIssueKey(null);
-    setSelectedText(null);
+    setSelectedPreviewTarget(null);
   };
 
   const selectResolvedIssue = (
@@ -72,8 +74,10 @@ const useIssueSelection = () => {
     );
     const issueKey = selectedIssue ? getIssueKey(selectedIssue) : null;
     setSelectedIssueKey(issueKey);
-    setSelectedText(
-      issueKey ? getIssueText(result, issueKey) : getFirstNavigableText(result, active),
+    setSelectedPreviewTarget(
+      issueKey
+        ? getIssuePreviewTarget(result, issueKey)
+        : getFirstNavigablePreviewTarget(result, active),
     );
   };
 
@@ -83,7 +87,7 @@ const useIssueSelection = () => {
       return;
     }
     setSelectedIssueKey(issueKey);
-    setSelectedText(getIssueText(result, issueKey));
+    setSelectedPreviewTarget(getIssuePreviewTarget(result, issueKey));
   };
 
   return {
@@ -91,7 +95,7 @@ const useIssueSelection = () => {
     selectIssue,
     selectResolvedIssue,
     selectedIssueKey,
-    selectedText,
+    selectedPreviewTarget,
   };
 };
 
@@ -210,7 +214,7 @@ export const useDetectionFlow = () => {
     result,
     previewIssueTargets,
     selectedIssueKey: selection.selectedIssueKey,
-    selectedText: selection.selectedText,
+    selectedPreviewTarget: selection.selectedPreviewTarget,
     step,
     applyResult,
     pickFile,

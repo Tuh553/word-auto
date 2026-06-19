@@ -142,7 +142,7 @@ function DetectScreen({
       reportSortBy={detect.reportSortBy}
       result={detect.result}
       selectedIssueKey={detect.selectedIssueKey}
-      selectedText={detect.selectedText}
+      selectedPreviewTarget={detect.selectedPreviewTarget}
       step={detect.step}
       templateId={rules.templateId}
       unpublishedChanges={rules.unpublishedChanges}

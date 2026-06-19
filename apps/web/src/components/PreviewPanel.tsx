@@ -1,21 +1,27 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { renderAsync } from "docx-preview";
 import type { PreviewIssueTarget } from "../lib/reportGroups.js";
+import {
+  findNormalizedTextRange,
+  findPreviewBlockTextIndex,
+  type PreviewHighlightTarget,
+} from "../lib/previewHighlight.js";
 
 interface Props {
   buffer: ArrayBuffer;
-  /** 要定位高亮的段落原文（文档级问题为 null，不定位） */
-  targetText: string | null;
+  /** 要定位高亮的段落与可选片段（文档级问题为 null，不定位） */
+  target: PreviewHighlightTarget | null;
   targets: PreviewIssueTarget[];
   onSelectTarget: (issueKey: string) => void;
 }
 
-const norm = (s: string | null | undefined): string =>
-  (s ?? "").replace(/\s+/g, "");
-
 const BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, td, li";
+const FRAGMENT_CLASS = "wa-fragment-hl";
 
-const getTextKey = (text: string): string => norm(text).slice(0, 18);
+interface TextPosition {
+  node: Text;
+  offset: number;
+}
 
 const resetPreviewTargets = (host: HTMLElement) => {
   host.querySelectorAll<HTMLElement>(".wa-preview-hit").forEach((block) => {
@@ -24,18 +30,77 @@ const resetPreviewTargets = (host: HTMLElement) => {
   });
 };
 
+const unwrapPreviewFragments = (host: HTMLElement) => {
+  host.querySelectorAll<HTMLElement>(`.${FRAGMENT_CLASS}`).forEach((marker) => {
+    const parent = marker.parentNode;
+    if (!parent) return;
+    while (marker.firstChild) parent.insertBefore(marker.firstChild, marker);
+    marker.remove();
+    parent.normalize();
+  });
+};
+
+const resetActiveHighlight = (host: HTMLElement) => {
+  unwrapPreviewFragments(host);
+  host.querySelectorAll(".wa-hl").forEach((node) => {
+    node.classList.remove("wa-hl");
+  });
+};
+
 const findBlockByText = (
   blocks: HTMLElement[],
   text: string,
 ): HTMLElement | undefined => {
-  const key = getTextKey(text);
-  if (key.length < 3) return undefined;
-  return blocks.find((block) => norm(block.textContent).includes(key));
+  const index = findPreviewBlockTextIndex(
+    blocks.map((block) => block.textContent ?? ""),
+    text,
+  );
+  return index < 0 ? undefined : blocks[index];
+};
+
+const findTextPosition = (
+  block: HTMLElement,
+  absoluteOffset: number,
+): TextPosition | null => {
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let seen = 0;
+  let current = walker.nextNode();
+  while (current) {
+    const node = current as Text;
+    const nextSeen = seen + node.data.length;
+    if (absoluteOffset >= seen && absoluteOffset <= nextSeen) {
+      return { node, offset: absoluteOffset - seen };
+    }
+    seen = nextSeen;
+    current = walker.nextNode();
+  }
+  return null;
+};
+
+const highlightTextFragment = (
+  block: HTMLElement,
+  affectedText: string | null | undefined,
+): HTMLElement | null => {
+  const text = block.textContent ?? "";
+  const range = findNormalizedTextRange(text, affectedText);
+  if (!range) return null;
+  const start = findTextPosition(block, range.start);
+  const end = findTextPosition(block, range.end);
+  if (!start || !end) return null;
+
+  const domRange = document.createRange();
+  domRange.setStart(start.node, start.offset);
+  domRange.setEnd(end.node, end.offset);
+  const marker = document.createElement("span");
+  marker.className = FRAGMENT_CLASS;
+  marker.append(domRange.extractContents());
+  domRange.insertNode(marker);
+  return marker;
 };
 
 export function PreviewPanel({
   buffer,
-  targetText,
+  target,
   targets,
   onSelectTarget,
 }: Props) {
@@ -92,14 +157,19 @@ export function PreviewPanel({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.querySelectorAll(".wa-hl").forEach((n) => n.classList.remove("wa-hl"));
-    if (!targetText) return;
+    resetActiveHighlight(el);
+    if (!target) return;
     const blocks = Array.from(el.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
-    const block = findBlockByText(blocks, targetText);
+    const block = findBlockByText(blocks, target.text);
     if (!block) return;
+    const fragment = highlightTextFragment(block, target.affectedText);
+    if (fragment) {
+      fragment.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     block.classList.add("wa-hl");
     block.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [renderVersion, targetText]);
+  }, [renderVersion, target]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof Element

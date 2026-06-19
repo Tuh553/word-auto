@@ -217,6 +217,13 @@ button:disabled {
   scroll-margin: 60px;
 }
 
+.preview .wa-fragment-hl {
+  outline: 2px solid var(--error);
+  outline-offset: 1px;
+  background: #fff3cd !important;
+  scroll-margin: 60px;
+}
+
 .preview .wa-preview-hit {
   cursor: pointer;
 }
