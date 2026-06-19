@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - **页眉/页脚样式校验**：校验页眉中文/西文字体、字号、页眉下边框，以及页码位置、页码西文字体和字号
 - **run 级混排检测**：段落内局部 run 字体/字号不合规时输出片段定位，报告展示受影响文本范围
 - **Web 预览片段级高亮**：选中带 `affectedText` 的 run 级 issue 时，在已定位段落内优先高亮对应片段，片段找不到时回退整段高亮
+- **表格全局顺序保留**：parser 按 OOXML 文档流输出正文与表格段落，表格段落继续标记 `inTable` 并分类为 `table_cell`
 - **代码审查报告**：通过 Claude Code 内置代码审查（extra-high effort，9个角度），发现并修复 7 个关键问题（详见 `code-review-findings.json`）
 
 ### Changed
@@ -62,6 +63,7 @@ All notable changes to this project will be documented in this file.
 **新增文件**：
 - `packages/parser/src/numbering.ts` - numbering.xml 解析引擎
 - `packages/parser/src/headerFooter.ts` - 页眉/页脚结构化解析
+- `packages/parser/src/documentFlow.ts` - 按文档流顺序收集正文与表格段落
 - `packages/validator/src/numbering-check.ts` - 编号连续性检测
 - `packages/validator/src/list-recognition.ts` - 列表识别
 - `packages/validator/src/numbering-check.test.ts` - 编号检测测试（12个用例）
@@ -87,17 +89,17 @@ All notable changes to this project will be documented in this file.
 - `packages/validator/src/classify.ts`, `fixhints.ts`, `lint.ts`, `numbering-check.ts` - 保持行为不变的结构拆分
 
 **测试覆盖**：
-- parser: 25 个测试 ✅
+- parser: 26 个测试 ✅
 - validator: 98 个测试 ✅
 - web: 40 个测试 ✅
-- **总计 163 个测试全部通过**
+- **总计 164 个测试全部通过**
 
 **质量保证**：
 - 类型检查：`pnpm typecheck` ✅
 - ESLint：`pnpm lint` ✅（`--max-warnings 0`）
 - 未用代码检查：`pnpm knip` ✅
 - 复制粘贴检查：`pnpm jscpd` ✅（0 clones）
-- 单元测试：`pnpm test` ✅（163/163）
+- 单元测试：`pnpm test` ✅（164/164）
 - 构建验证：`pnpm build` ✅
 - CI 门禁：`pnpm run ci` ✅
 - 代码审查：Claude Code extra-high effort（9个角度 × 72候选）✅

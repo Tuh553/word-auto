@@ -18,8 +18,8 @@ const BASELINE = {
   noteDefinitionCount: 1,
   noteReferenceParagraphIndexes: [125],
   firstNoteContent: "① 脚注文本脚注文本脚注文本脚注文本",
-  drawingParagraphIndexes: [0, 4, 22, 41, 59, 72, 136, 139, 150],
-  embeddedObjectParagraphIndexes: [136],
+  drawingParagraphIndexes: [0, 4, 22, 41, 59, 72, 171, 174, 185],
+  embeddedObjectParagraphIndexes: [171],
   mathParagraphIndexes: [],
   firstSection: {
     pageWidthTwips: 11906,

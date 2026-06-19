@@ -23,6 +23,10 @@ validator 的分类、lint、修复建议和编号检测热路径已拆出辅助
 2026-06-19 模板候选增强第一阶段：候选面板已展示新增/覆盖/启用/一致 diff，支持展开样本证据
 并标注低置信角色来源；候选字段/角色可忽略并持久化到 Web 本地 UI 状态。
 
+2026-06-19 表格全局顺序闭环：parser 已对 `word/document.xml` 文档流使用 preserve-order
+解析，按正文与表格在 OOXML 中的真实顺序输出 `DocModel.paragraphs`；表格段落继续标记
+`inTable` 并由 validator 识别为 `table_cell`。
+
 ## 总体排期
 
 | 阶段 | 工作量 | 关键里程碑 |
@@ -30,7 +34,7 @@ validator 的分类、lint、修复建议和编号检测热路径已拆出辅助
 | 阶段 1：解析能力增强 | 2-3 周 | 域/题注/交叉引用/脚注尾注解析、run 级混排检测 |
 | 阶段 2：校验与报告可信度提升 | 已完成 | 页眉/页脚样式检测、统计型检测、置信度标记 |
 | 阶段 3：规则库与模板候选 | 已完成 | 模板管理、候选 diff/证据/忽略已完成 |
-| 阶段 4：兜底与补充 | 1 周 | 表格全局顺序、附录细分 |
+| 阶段 4：兜底与补充 | 1 周 | 表格全局顺序已完成；附录细分待做 |
 | **总计** | **5-8 周** | P1 全部完成 |
 
 ---
@@ -491,21 +495,26 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 **目标**：保留表格与正文交错顺序
 
 **背景**：
-当前已提取表格内段落（`inTable` / `table_cell`），但未保留表格与正文的全局交错顺序。
+此前已提取表格内段落（`inTable` / `table_cell`），但未保留表格与正文的全局交错顺序。
 
 **任务清单**：
-- [ ] 修改 parser（`packages/parser/src/ooxml.ts`）：
-  - [ ] 设置 `preserveOrder: true`：表格段落保留在文档流原位置
-  - [ ] 扩展 `Paragraph` 类型：增加 `tableId?: string` 标记同一表格的段落
-- [ ] 扩充金标准：
-  - [ ] 增加含交错表格的样本文档（`templates/source/table-interleaved.docx`）
-  - [ ] 验证表格段落的全局顺序
-- [ ] validator 接入：按文档流顺序校验（不影响现有逻辑）
-- [ ] 金标准测试：验证表格全局顺序保留
+- [x] 修改 parser：
+  - [x] 对 `word/document.xml` 增加 preserve-order 解析，用于读取 body 子节点顺序
+  - [x] 将 preserve-order 节点转换回现有段落对象 shape，保持 `DocModel.paragraphs` 接口稳定
+  - [x] 不新增无消费者的 `Paragraph` 字段
+- [x] 扩充测试：
+  - [x] synthetic docx 覆盖“正文段落 A -> 表格段落 -> 正文段落 B”顺序
+  - [x] 更新标准模板 parser 金标准中随表格归位变化的结构信号索引
+- [x] validator 回归：确认 `inTable` 段落数与 `table_cell` 分类数一致
 
 **产出**：
 - 表格全局顺序保留
 - 金标准扩充
+
+**实现状态（2026-06-19）**：
+- 新增 `packages/parser/src/documentFlow.ts`，只负责按 preserve-order 文档流收集正文与表格段落。
+- 未改变 validator 业务语义；`classifyParagraphDetails` 仍优先将 `inTable` 段落判为 `table_cell`。
+- 未新增 `Paragraph` 字段，避免形成无消费者的第二套表格元数据。
 
 **验收标准**：
 - 表格段落在文档流中的位置正确
@@ -549,10 +558,6 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 
 ### 2. 工程风险
 
-**表格全局顺序影响现有逻辑**（中风险）：
-- 修改 `preserveOrder` 可能影响现有校验逻辑
-- 缓解：充分回归测试，确保金标准全部通过
-
 **金标准维护成本**（低风险）：
 - 每次行为变化都要更新金标准，维护成本增加
 - 缓解：自动化测试，CI 覆盖
@@ -576,6 +581,7 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 | 角色识别置信度完成 | 已完成 | 低置信启发式命中透传到报告 |
 | 模板管理完成 | 已完成 | UI 支持新建/复制/重命名/删除模板 |
 | 候选 diff 完成 | 已完成 | 能展示候选与草稿差异，支持忽略 |
+| 表格全局顺序完成 | 已完成 | 表格段落按文档流输出，`table_cell` 分类不回退 |
 | P1 全部完成 | 第 8 周 | 所有任务完成，`pnpm run ci` 通过，文档更新 |
 
 ---

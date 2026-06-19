@@ -100,7 +100,7 @@ pnpm run ci
 - ✅ 结构信号识别（`w:drawing` / OMML 公式 / `w:object` 嵌入对象）
 - ✅ 主题字体解析（`*Theme` 引用 → `theme1.xml` 实际字体名）
 - ✅ 自动编号解析（`numbering.xml` 抽象编号 + 编号实例）
-- ✅ 表格内段落提取（递归 `w:tbl>w:tr>w:tc>w:p`，标记 `inTable` 角色）
+- ✅ 表格内段落按文档流顺序提取（递归 `w:tbl>w:tr>w:tc>w:p`，标记 `inTable` 角色）
 - ✅ 兼容带单位测量值（`85.05pt` / `3cm` 等）
 
 ### 🎭 角色识别
@@ -150,7 +150,7 @@ pnpm run ci
 
 详见 [`docs/TODO.md`](./docs/TODO.md)。当前重点：
 
-- 📋 表格全局顺序与附录细分
+- 📋 附录细分
 - ⚡ Web 性能优化与交付物导出
 
 **不在计划内**：自动改写正文、套版功能（属于远期高风险阶段）。

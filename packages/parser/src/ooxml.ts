@@ -8,19 +8,27 @@ import type {
   SectionProps,
 } from "./types.js";
 
+const XML_ARRAY_TAGS = new Set(["w:p", "w:r", "w:style", "w:tbl", "w:tr", "w:tc"]);
+
 // 保留命名空间前缀（w:、w14: 等并存），属性前缀统一为 @_，属性值不做类型推断（字体名等需保持字符串）。
-const xmlParser = new XMLParser({
+const xmlParserOptions = {
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   parseAttributeValue: false,
   parseTagValue: false,
   trimValues: false,
   // 强制这些节点始终为数组，避免“单个 vs 多个”分支
-  isArray: (name) =>
-    ["w:p", "w:r", "w:style", "w:tbl", "w:tr", "w:tc"].includes(name),
+  isArray: (name: string) => XML_ARRAY_TAGS.has(name),
+};
+
+const xmlParser = new XMLParser(xmlParserOptions);
+const orderedXmlParser = new XMLParser({
+  ...xmlParserOptions,
+  preserveOrder: true,
 });
 
 export const parseXml = (text: string): any => xmlParser.parse(text);
+export const parseXmlPreserveOrder = (text: string): any => orderedXmlParser.parse(text);
 
 /** 读取元素属性 */
 export const attr = (node: any, name: string): string | undefined => {

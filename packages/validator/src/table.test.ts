@@ -24,6 +24,6 @@ test("表格段落：提取并标记 inTable / table_cell", () => {
 
   // inTable 段落数应与 table_cell 分类数严格一致
   assert.equal(tableCells, inTableCount);
-  // body 直接段落（270）保留，表格段落为追加
+  // 表格段落应保留在 paragraphs 中，并稳定识别为 table_cell
   assert.ok(model.paragraphs.length >= 270);
 });

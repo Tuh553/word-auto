@@ -1,4 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
+import { collectBodyParagraphsInDocumentOrder } from "./documentFlow.js";
 import { ParseError, isParseError } from "./errors.js";
 import { collectParagraphRunData, parseParagraphBookmarks, parseParagraphFields } from "./fields.js";
 import { parseHeaderFooterPart } from "./headerFooter.js";
@@ -17,6 +18,7 @@ import {
   parseRunProps,
   parseSectPr,
   parseXml,
+  parseXmlPreserveOrder,
 } from "./ooxml.js";
 import { computeEffective, computeRunEffective } from "./resolve.js";
 import { parseStyles } from "./styles.js";
@@ -86,6 +88,7 @@ const parseDocumentParts = (
   noteDefinitions: ReturnType<typeof parseNoteDefinitions>;
   numbering: NumberingDefinitions;
   root: any;
+  orderedRoot: any;
 } => {
   try {
     const theme = parseTheme(read("word/theme/theme1.xml") ?? "<a:theme/>");
@@ -107,6 +110,7 @@ const parseDocumentParts = (
       ),
     ];
     const root = parseXml(docXml);
+    const orderedRoot = parseXmlPreserveOrder(docXml);
     return {
       theme,
       styles,
@@ -115,6 +119,7 @@ const parseDocumentParts = (
       noteDefinitions,
       numbering,
       root,
+      orderedRoot,
     };
   } catch (error) {
     if (isParseError(error)) throw error;
@@ -215,23 +220,6 @@ const createParagraphBuilder = ({
   };
 };
 
-const appendTableParagraphs = (
-  container: any,
-  paragraphs: Paragraph[],
-  buildParagraph: (wp: any, inTable: boolean) => Paragraph,
-): void => {
-  for (const tbl of (container["w:tbl"] ?? []) as any[]) {
-    for (const tr of (tbl["w:tr"] ?? []) as any[]) {
-      for (const tc of (tr["w:tc"] ?? []) as any[]) {
-        for (const paragraph of (tc["w:p"] ?? []) as any[]) {
-          paragraphs.push(buildParagraph(paragraph, true));
-        }
-        appendTableParagraphs(tc, paragraphs, buildParagraph);
-      }
-    }
-  }
-};
-
 const collectSections = (body: any, wps: any[]): SectionProps[] => {
   const sectPrs: any[] = [];
   for (const wp of wps) {
@@ -297,6 +285,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     noteDefinitions,
     numbering,
     root,
+    orderedRoot,
   } = parseDocumentParts(
     read,
     docXmlText,
@@ -317,12 +306,7 @@ export const parseDocx = (buf: Uint8Array): DocModel => {
     noteLookups,
   });
 
-  // body 直接段落（保持原顺序与索引 0..N-1）
-  const paragraphs: Paragraph[] = wps.map((wp) => buildParagraph(wp, false));
-
-  // 表格内段落：递归 w:tbl > w:tr > w:tc > w:p，追加到末尾并标记 inTable。
-  // 复用同一套构造逻辑，单元格段落同样解析样式继承/字体/有效格式。
-  appendTableParagraphs(body, paragraphs, buildParagraph);
+  const paragraphs = collectBodyParagraphsInDocumentOrder(orderedRoot, buildParagraph);
 
   const sections = collectSections(body, wps);
   const headerFooterContext = {
