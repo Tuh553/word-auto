@@ -94,11 +94,15 @@ function RulesScreen({
         onAcceptRole={proposals.acceptProposalRole}
         onChangeDraft={rules.updateDraft}
         onClearProposalFeedback={proposals.clearProposalFeedback}
+        onCreateLibrary={rules.createLibrary}
+        onDeleteLibrary={rules.deleteLibrary}
+        onDuplicateLibrary={rules.duplicateLibrary}
         onExportDraft={rules.exportDraft}
         onExportPublished={rules.exportPublished}
         onExtract={() => proposalRef.current?.click()}
         onImport={() => importRef.current?.click()}
         onPublish={onPublish}
+        onRenameLibrary={rules.renameLibrary}
         onSaveDraft={rules.saveDraft}
         onSelectLibrary={rules.selectLibrary}
       />

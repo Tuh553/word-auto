@@ -29,6 +29,9 @@ interface Props {
   draftDirty: boolean;
   unpublishedChanges: boolean;
   libraryOptions: LibraryOption[];
+  onCreateLibrary: (name: string) => void;
+  onDeleteLibrary: () => void;
+  onDuplicateLibrary: (name?: string) => void;
   statusMessage: string | null;
   onSelectLibrary: (id: string) => void;
   onChange: (draft: RuleDraft) => void;
@@ -37,6 +40,7 @@ interface Props {
   onImport: () => void;
   onExportDraft: () => void;
   onExportPublished: () => void;
+  onRenameLibrary: (name: string) => void;
 }
 
 type EditorProps = {
@@ -115,6 +119,49 @@ const displayRoleLabel = (draft: RuleDraft, roleKey: string): string => {
   return fallback === roleKey ? "未知角色" : fallback;
 };
 
+const useRuleConfigPanelModel = (
+  draft: RuleDraft,
+  onChange: (draft: RuleDraft) => void,
+) => {
+  const [roleIdx, setRoleIdx] = useState(0);
+  const [activeSection, setActiveSection] = useState<RuleConfigSection>("roles");
+  const lint = useMemo(() => lintRuleLibrary(draft), [draft]);
+  const safeRoleIdx = Math.min(roleIdx, Math.max(draft.roles.length - 1, 0));
+  const role = draft.roles[safeRoleIdx];
+  const allItems: RuleLintItem[] = [...lint.errors, ...lint.warnings, ...lint.infos];
+  const globalItems = allItems.filter((item) => !item.field);
+  const fieldItems = (roleKey: string, fieldKey: string): RuleLintItem[] =>
+    allItems.filter((item) => item.role === roleKey && item.field === fieldKey);
+  const roleErrors = (roleKey: string): number =>
+    lint.errors.filter((item) => item.role === roleKey).length;
+  const roleLabel = (roleKey: string): string => displayRoleLabel(draft, roleKey);
+  const patchField = (fieldIdx: number, patch: Partial<RuleField>): void => {
+    patchDraftClone(draft, onChange, (next) => {
+      Object.assign(next.roles[safeRoleIdx].fields[fieldIdx], patch);
+    });
+  };
+  const patchFieldValue = (fieldIdx: number, patch: Partial<RuleValue>): void => {
+    patchDraftClone(draft, onChange, (next) => {
+      Object.assign(next.roles[safeRoleIdx].fields[fieldIdx].value, patch);
+    });
+  };
+
+  return {
+    activeSection,
+    fieldItems,
+    globalItems,
+    lint,
+    patchField,
+    patchFieldValue,
+    role,
+    roleErrors,
+    roleLabel,
+    safeRoleIdx,
+    setActiveSection,
+    setRoleIdx,
+  };
+};
+
 export function RuleConfigPanel({
   draft,
   published,
@@ -122,6 +169,9 @@ export function RuleConfigPanel({
   draftDirty,
   unpublishedChanges,
   libraryOptions,
+  onCreateLibrary,
+  onDeleteLibrary,
+  onDuplicateLibrary,
   statusMessage,
   onSelectLibrary,
   onChange,
@@ -130,32 +180,9 @@ export function RuleConfigPanel({
   onImport,
   onExportDraft,
   onExportPublished,
+  onRenameLibrary,
 }: Props) {
-  const [roleIdx, setRoleIdx] = useState(0);
-  const [activeSection, setActiveSection] = useState<RuleConfigSection>("roles");
-  const lint = useMemo(() => lintRuleLibrary(draft), [draft]);
-  const safeRoleIdx = Math.min(roleIdx, Math.max(draft.roles.length - 1, 0));
-  const role = draft.roles[safeRoleIdx];
-
-  const allItems: RuleLintItem[] = [...lint.errors, ...lint.warnings, ...lint.infos];
-  const globalItems = allItems.filter((item) => !item.field);
-  const fieldItems = (roleKey: string, fieldKey: string): RuleLintItem[] =>
-    allItems.filter((item) => item.role === roleKey && item.field === fieldKey);
-  const roleErrors = (roleKey: string): number =>
-    lint.errors.filter((item) => item.role === roleKey).length;
-  const roleLabel = (roleKey: string): string => displayRoleLabel(draft, roleKey);
-
-  const patchField = (fieldIdx: number, patch: Partial<RuleField>): void => {
-    patchDraftClone(draft, onChange, (next) => {
-      Object.assign(next.roles[safeRoleIdx].fields[fieldIdx], patch);
-    });
-  };
-
-  const patchFieldValue = (fieldIdx: number, patch: Partial<RuleValue>): void => {
-    patchDraftClone(draft, onChange, (next) => {
-      Object.assign(next.roles[safeRoleIdx].fields[fieldIdx].value, patch);
-    });
-  };
+  const model = useRuleConfigPanelModel(draft, onChange);
 
   return (
     <div className="card">
@@ -163,11 +190,15 @@ export function RuleConfigPanel({
         draft={draft}
         draftDirty={draftDirty}
         libraryOptions={libraryOptions}
-        lint={lint}
+        lint={model.lint}
+        onCreateLibrary={onCreateLibrary}
+        onDeleteLibrary={onDeleteLibrary}
+        onDuplicateLibrary={onDuplicateLibrary}
         onExportDraft={onExportDraft}
         onExportPublished={onExportPublished}
         onImport={onImport}
         onPublish={onPublish}
+        onRenameLibrary={onRenameLibrary}
         onSaveDraft={onSaveDraft}
         onSelectLibrary={onSelectLibrary}
         publishedUpdatedAt={publishedUpdatedAt}
@@ -176,22 +207,25 @@ export function RuleConfigPanel({
       />
       <RuleConfigSummary
         draft={draft}
-        lint={lint}
+        lint={model.lint}
         publishedVersion={published.version}
       />
-      <RuleConfigGlobalIssues items={globalItems} roleLabel={roleLabel} />
+      <RuleConfigGlobalIssues
+        items={model.globalItems}
+        roleLabel={model.roleLabel}
+      />
       <RuleConfigEditor
-        activeSection={activeSection}
+        activeSection={model.activeSection}
         draft={draft}
-        fieldItems={fieldItems}
-        onPatchField={patchField}
-        onPatchFieldValue={patchFieldValue}
-        onSectionChange={setActiveSection}
+        fieldItems={model.fieldItems}
+        onPatchField={model.patchField}
+        onPatchFieldValue={model.patchFieldValue}
+        onSectionChange={model.setActiveSection}
         published={published}
-        role={role}
-        roleErrors={roleErrors}
-        safeRoleIdx={safeRoleIdx}
-        setRoleIdx={setRoleIdx}
+        role={model.role}
+        roleErrors={model.roleErrors}
+        safeRoleIdx={model.safeRoleIdx}
+        setRoleIdx={model.setRoleIdx}
       />
     </div>
   );

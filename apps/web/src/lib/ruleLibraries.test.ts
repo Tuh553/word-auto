@@ -4,10 +4,24 @@ import type { DocModel, Paragraph } from "@word-auto/parser";
 import {
   applyProposalFieldToDraft,
   extractRuleProposal,
+  lintRuleLibrary,
   validateDoc,
   type EditableRuleLibrary,
 } from "@word-auto/validator";
-import { parseImportedRuleLibrary, publishDraft, type RuleLibraryRecord } from "./ruleLibraries.js";
+import {
+  createBlankRuleLibraryRecord,
+  deleteRuleLibraryRecord,
+  duplicateRuleLibraryRecord,
+  isBuiltinRuleLibrary,
+  loadRuleLibraryRecords,
+  loadSelectedRuleLibraryId,
+  parseImportedRuleLibrary,
+  publishDraft,
+  renameRuleLibraryRecord,
+  saveRuleLibraryRecords,
+  saveSelectedRuleLibraryId,
+  type RuleLibraryRecord,
+} from "./ruleLibraries.js";
 
 const mkPara = (
   text: string,
@@ -45,6 +59,8 @@ const mkModel = (): DocModel => ({
   headers: [],
   numbering: { abstractNums: new Map(), nums: new Map() },
 });
+
+const BUILTIN_TEMPLATE_ID = "chongqing-university-professional-thesis-phase-1";
 
 const mkRecord = (): RuleLibraryRecord => ({
   id: "demo",
@@ -93,6 +109,29 @@ const mkRecord = (): RuleLibraryRecord => ({
   },
 });
 
+const withMockStorage = (run: () => void): void => {
+  const holder = globalThis as typeof globalThis & { window?: unknown };
+  const previous = holder.window;
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => store.set(key, value),
+      },
+    },
+  });
+  try {
+    run();
+  } finally {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: previous,
+    });
+  }
+};
+
 test("publishDraft：草稿发布后立即影响检测消费的生效规则", () => {
   const model = mkModel();
   const before = validateDoc(model, mkRecord().published);
@@ -103,6 +142,71 @@ test("publishDraft：草稿发布后立即影响检测消费的生效规则", ()
   assert.equal(after.issues.length, 0);
   assert.equal(published.published.version, "1.0.1");
   assert.equal(published.draft.version, "1.0.1");
+});
+
+test("createBlankRuleLibraryRecord：新建模板可选中、可持久化且草稿可发布", () => {
+  withMockStorage(() => {
+    const record = createBlankRuleLibraryRecord("新模板", [mkRecord()]);
+
+    assert.equal(record.published.name, "新模板");
+    assert.equal(record.draft.name, "新模板");
+    assert.equal(lintRuleLibrary(record.draft).ok, true);
+
+    saveRuleLibraryRecords([record]);
+    saveSelectedRuleLibraryId(record.id);
+    const loaded = loadRuleLibraryRecords();
+    const selectedId = loadSelectedRuleLibraryId(loaded);
+
+    assert.ok(loaded.some((item) => item.id === record.id));
+    assert.equal(selectedId, record.id);
+  });
+});
+
+test("duplicateRuleLibraryRecord：复制为独立自定义模板，修改副本不影响原模板", () => {
+  const source = mkRecord();
+  const copy = duplicateRuleLibraryRecord(source, [source], "Demo Copy");
+
+  copy.draft.roles[0].fields[0].value.exact = 9;
+
+  assert.equal(copy.id, "demo-copy");
+  assert.equal(copy.published.name, "Demo Copy");
+  assert.equal(copy.draft.name, "Demo Copy");
+  assert.equal(copy.published.basedOn, source.published.id);
+  assert.equal(source.draft.roles[0].fields[0].value.exact, 10.5);
+  assert.equal(isBuiltinRuleLibrary(copy.id), false);
+});
+
+test("renameRuleLibraryRecord：同步更新 published 与 draft 名称", () => {
+  const renamed = renameRuleLibraryRecord(mkRecord(), "新名称");
+
+  assert.equal(renamed.published.name, "新名称");
+  assert.equal(renamed.draft.name, "新名称");
+});
+
+test("deleteRuleLibraryRecord：删除自定义模板后优先切回内置模板", () => {
+  const builtin = createBlankRuleLibraryRecord("内置占位", []);
+  const custom = mkRecord();
+  const records = [
+    {
+      ...builtin,
+      id: BUILTIN_TEMPLATE_ID,
+      published: { ...builtin.published, id: BUILTIN_TEMPLATE_ID },
+      draft: { ...builtin.draft, id: BUILTIN_TEMPLATE_ID },
+    },
+    custom,
+  ];
+
+  const result = deleteRuleLibraryRecord(records, custom.id);
+
+  assert.deepEqual(result.records.map((item) => item.id), [BUILTIN_TEMPLATE_ID]);
+  assert.equal(result.nextTemplateId, BUILTIN_TEMPLATE_ID);
+});
+
+test("deleteRuleLibraryRecord：内置模板不可删除", () => {
+  assert.throws(
+    () => deleteRuleLibraryRecord([], BUILTIN_TEMPLATE_ID),
+    /内置模板不能删除/,
+  );
 });
 
 test("parseImportedRuleLibrary：支持 BOM JSON 并避免 id 冲突", () => {

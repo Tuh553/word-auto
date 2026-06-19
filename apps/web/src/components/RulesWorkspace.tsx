@@ -6,6 +6,7 @@ import type {
   RuleProposal,
 } from "@word-auto/validator";
 import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
+import { isBuiltinRuleLibrary } from "../lib/ruleLibraries.js";
 
 type ProposalRole = RuleProposal["roles"][number];
 type ProposalField = ProposalRole["fields"][number];
@@ -29,11 +30,15 @@ type RulesWorkspaceProps = {
   onAcceptRole: (role: ProposalRole) => void;
   onChangeDraft: (draft: RuleLibraryRecord["draft"]) => void;
   onClearProposalFeedback: () => void;
+  onCreateLibrary: (name: string) => void;
+  onDeleteLibrary: () => void;
+  onDuplicateLibrary: (name?: string) => void;
   onExportDraft: () => void;
   onExportPublished: () => void;
   onExtract: () => void;
   onImport: () => void;
   onPublish: () => void;
+  onRenameLibrary: (name: string) => void;
   onSaveDraft: () => void;
   onSelectLibrary: (id: string) => void;
 };
@@ -52,11 +57,15 @@ export function RulesWorkspace({
   onAcceptRole,
   onChangeDraft,
   onClearProposalFeedback,
+  onCreateLibrary,
+  onDeleteLibrary,
+  onDuplicateLibrary,
   onExportDraft,
   onExportPublished,
   onExtract,
   onImport,
   onPublish,
+  onRenameLibrary,
   onSaveDraft,
   onSelectLibrary,
 }: RulesWorkspaceProps) {
@@ -72,17 +81,22 @@ export function RulesWorkspace({
         unpublishedChanges={unpublishedChanges}
         libraryOptions={libraries.map((item) => ({
           id: item.id,
+          isBuiltin: isBuiltinRuleLibrary(item.id),
           name: item.published.name,
           version: item.published.version,
         }))}
         statusMessage={ruleMessage}
         onSelectLibrary={onSelectLibrary}
         onChange={onChangeDraft}
+        onCreateLibrary={onCreateLibrary}
+        onDeleteLibrary={onDeleteLibrary}
+        onDuplicateLibrary={onDuplicateLibrary}
         onSaveDraft={onSaveDraft}
         onPublish={onPublish}
         onImport={onImport}
         onExportDraft={onExportDraft}
         onExportPublished={onExportPublished}
+        onRenameLibrary={onRenameLibrary}
       />
       <TemplateProposalPanel
         draft={currentLibrary.draft}

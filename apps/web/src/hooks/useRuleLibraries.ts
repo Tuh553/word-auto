@@ -1,10 +1,16 @@
 import { useState } from "react";
 import {
+  createBlankRuleLibraryRecord,
+  deleteRuleLibraryRecord,
+  duplicateRuleLibraryRecord,
   hasUnpublishedChanges,
+  loadSelectedRuleLibraryId,
   parseImportedRuleLibrary,
   publishDraft,
+  renameRuleLibraryRecord,
   sameDraftAsSaved,
   saveRuleLibraryRecords,
+  saveSelectedRuleLibraryId,
   serializeRuleLibrary,
   stripDraftMeta,
   touchDraft,
@@ -26,7 +32,9 @@ const useRuleLibraryState = (initialLibraries: RuleLibraryRecord[]) => {
   const [savedLibraries, setSavedLibraries] = useState(
     structuredClone(initialLibraries),
   );
-  const [templateId, setTemplateId] = useState(initialLibraries[0]?.id ?? "");
+  const [templateId, setTemplateIdState] = useState(() =>
+    loadSelectedRuleLibraryId(initialLibraries),
+  );
   const [ruleMessage, setRuleMessage] = useState<string | null>(null);
 
   const currentLibrary = libraries.find((item) => item.id === templateId) ?? libraries[0];
@@ -37,6 +45,10 @@ const useRuleLibraryState = (initialLibraries: RuleLibraryRecord[]) => {
     setLibraries(next);
     setSavedLibraries(structuredClone(next));
     saveRuleLibraryRecords(next);
+  };
+  const setTemplateId = (id: string) => {
+    setTemplateIdState(id);
+    saveSelectedRuleLibraryId(id);
   };
 
   return {
@@ -112,6 +124,65 @@ const useRuleLibraryActions = ({
     unpublishedChanges,
     updateDraft,
     updateLibrary,
+  };
+};
+
+const useRuleLibraryTemplateActions = ({
+  currentLibrary,
+  libraries,
+  persistLibraries,
+  setRuleMessage,
+  setTemplateId,
+}: Pick<
+  ReturnType<typeof useRuleLibraryState>,
+  "currentLibrary" | "libraries" | "persistLibraries" | "setRuleMessage" | "setTemplateId"
+>) => {
+  const createLibrary = (name: string) => {
+    const nextRecord = createBlankRuleLibraryRecord(name, libraries);
+    persistLibraries([...libraries, nextRecord]);
+    setTemplateId(nextRecord.id);
+    setRuleMessage(`已新建模板「${nextRecord.published.name}」`);
+  };
+
+  const duplicateLibrary = (name?: string) => {
+    if (!currentLibrary) return;
+    const nextRecord = duplicateRuleLibraryRecord(currentLibrary, libraries, name);
+    persistLibraries([...libraries, nextRecord]);
+    setTemplateId(nextRecord.id);
+    setRuleMessage(`已复制为「${nextRecord.published.name}」`);
+  };
+
+  const renameLibrary = (name: string) => {
+    if (!currentLibrary) return;
+    try {
+      const renamed = renameRuleLibraryRecord(currentLibrary, name);
+      const next = libraries.map((item) =>
+        item.id === currentLibrary.id ? renamed : item,
+      );
+      persistLibraries(next);
+      setRuleMessage(`已重命名为「${renamed.published.name}」`);
+    } catch (cause) {
+      setRuleMessage((cause as Error).message);
+    }
+  };
+
+  const deleteLibrary = () => {
+    if (!currentLibrary) return;
+    try {
+      const result = deleteRuleLibraryRecord(libraries, currentLibrary.id);
+      persistLibraries(result.records);
+      setTemplateId(result.nextTemplateId);
+      setRuleMessage(`已删除模板「${currentLibrary.published.name}」`);
+    } catch (cause) {
+      setRuleMessage((cause as Error).message);
+    }
+  };
+
+  return {
+    deleteLibrary,
+    createLibrary,
+    duplicateLibrary,
+    renameLibrary,
   };
 };
 
@@ -201,6 +272,7 @@ export const useRuleLibraries = (initialLibraries: RuleLibraryRecord[]) => {
   return {
     ...state,
     ...actions,
+    ...useRuleLibraryTemplateActions(state),
     ...useRuleLibraryPublishActions(actions),
     ...useRuleLibraryIoActions(actions),
   };

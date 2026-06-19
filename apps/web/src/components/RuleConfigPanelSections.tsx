@@ -10,6 +10,7 @@ import { RULE_SECTION_LABEL, SEV_LABEL, formatDateTime } from "./ruleConfigShare
 
 export interface LibraryOption {
   id: string;
+  isBuiltin: boolean;
   name: string;
   version: string;
 }
@@ -22,10 +23,14 @@ type ToolbarProps = {
   draftDirty: boolean;
   libraryOptions: LibraryOption[];
   lint: RuleLintResult;
+  onCreateLibrary: (name: string) => void;
+  onDeleteLibrary: () => void;
+  onDuplicateLibrary: (name?: string) => void;
   onExportDraft: () => void;
   onExportPublished: () => void;
   onImport: () => void;
   onPublish: () => void;
+  onRenameLibrary: (name: string) => void;
   onSaveDraft: () => void;
   onSelectLibrary: (id: string) => void;
   publishedUpdatedAt: string;
@@ -64,16 +69,42 @@ export function RuleConfigToolbar({
   draftDirty,
   libraryOptions,
   lint,
+  onCreateLibrary,
+  onDeleteLibrary,
+  onDuplicateLibrary,
   onExportDraft,
   onExportPublished,
   onImport,
   onPublish,
+  onRenameLibrary,
   onSaveDraft,
   onSelectLibrary,
   publishedUpdatedAt,
   statusMessage,
   unpublishedChanges,
 }: ToolbarProps) {
+  const currentOption = libraryOptions.find((item) => item.id === draft.id);
+  const askName = (message: string, initialValue: string): string | null => {
+    const name = window.prompt(message, initialValue)?.trim();
+    return name ? name : null;
+  };
+  const handleCreate = () => {
+    const name = askName("新模板名称", "新建模板");
+    if (name) onCreateLibrary(name);
+  };
+  const handleDuplicate = () => {
+    const name = askName("复制后的模板名称", `${draft.name} 副本`);
+    if (name) onDuplicateLibrary(name);
+  };
+  const handleRename = () => {
+    const name = askName("新的模板名称", draft.name);
+    if (name) onRenameLibrary(name);
+  };
+  const handleDelete = () => {
+    if (!window.confirm(`确定删除模板「${draft.name}」？此操作不可撤销。`)) return;
+    onDeleteLibrary();
+  };
+
   return (
     <div className="rc-toolbar">
       <div className="rc-toolbar-main">
@@ -82,12 +113,18 @@ export function RuleConfigToolbar({
           <select value={draft.id} onChange={(event) => onSelectLibrary(event.target.value)}>
             {libraryOptions.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} · v{item.version}
+                {item.name} · v{item.version}{item.isBuiltin ? " · 内置" : ""}
               </option>
             ))}
           </select>
         </div>
         <div className="rc-actions">
+          <button onClick={handleCreate}>新建模板</button>
+          <button onClick={handleDuplicate}>复制模板</button>
+          <button onClick={handleRename}>重命名</button>
+          <button onClick={handleDelete} disabled={currentOption?.isBuiltin ?? true}>
+            删除模板
+          </button>
           <button onClick={onImport}>导入规则文件</button>
           <button onClick={onExportDraft}>导出草稿</button>
           <button onClick={onExportPublished}>导出生效</button>
