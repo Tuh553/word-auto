@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Severity, ValidationReport } from "@word-auto/validator";
 import { ReportPanel } from "../components/ReportPanel.js";
-import type { ReportGroupBy, ReportSortBy } from "./reportGroups.js";
+import { getIssueKey, type ReportGroupBy, type ReportSortBy } from "./reportGroups.js";
 
 const mkReport = (
   provenance?: string,
@@ -49,6 +49,7 @@ test("ReportPanel：issue 有 provenance 时渲染可展开的规范依据", () 
     active: ALL_SEVERITIES,
     groupBy: DEFAULT_GROUP_BY,
     sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: null,
     onToggle: () => {},
     onGroupByChange: () => {},
     onSortByChange: () => {},
@@ -66,6 +67,7 @@ test("ReportPanel：issue 无 provenance 时不渲染依据区块", () => {
     active: ALL_SEVERITIES,
     groupBy: DEFAULT_GROUP_BY,
     sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: null,
     onToggle: () => {},
     onGroupByChange: () => {},
     onSortByChange: () => {},
@@ -82,6 +84,7 @@ test("ReportPanel：渲染修复建议文案与可修复性标签", () => {
     active: ALL_SEVERITIES,
     groupBy: DEFAULT_GROUP_BY,
     sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: null,
     onToggle: () => {},
     onGroupByChange: () => {},
     onSortByChange: () => {},
@@ -102,6 +105,7 @@ test("ReportPanel：低置信 issue 渲染角色识别提示", () => {
     active: ALL_SEVERITIES,
     groupBy: DEFAULT_GROUP_BY,
     sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: null,
     onToggle: () => {},
     onGroupByChange: () => {},
     onSortByChange: () => {},
@@ -117,6 +121,7 @@ test("ReportPanel：非低置信 issue 不渲染角色识别提示", () => {
     active: ALL_SEVERITIES,
     groupBy: DEFAULT_GROUP_BY,
     sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: null,
     onToggle: () => {},
     onGroupByChange: () => {},
     onSortByChange: () => {},
@@ -165,6 +170,7 @@ test("ReportPanel：渲染分组与排序控件，并按语义章节输出分组
     active: ALL_SEVERITIES,
     groupBy: DEFAULT_GROUP_BY,
     sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: null,
     onToggle: () => {},
     onGroupByChange: () => {},
     onSortByChange: () => {},
@@ -175,4 +181,22 @@ test("ReportPanel：渲染分组与排序控件，并按语义章节输出分组
   assert.match(html, /组内排序/);
   assert.match(html, /正文/);
   assert.match(html, /参考文献/);
+});
+
+test("ReportPanel：当前选中 issue 渲染 selected 状态", () => {
+  const report = mkReport();
+  const html = renderToStaticMarkup(createElement(ReportPanel, {
+    report,
+    active: ALL_SEVERITIES,
+    groupBy: DEFAULT_GROUP_BY,
+    sortBy: DEFAULT_SORT_BY,
+    selectedIssueKey: getIssueKey(report.issues[0]!),
+    onToggle: () => {},
+    onGroupByChange: () => {},
+    onSortByChange: () => {},
+    onSelect: () => {},
+  }));
+
+  assert.match(html, /issue error selected/);
+  assert.match(html, /data-issue-key=/);
 });

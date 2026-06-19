@@ -5,7 +5,11 @@ import {
 } from "../lib/analyze.js";
 import { analyzeInWorker } from "../lib/analyzeWorkerClient.js";
 import {
+  buildPreviewIssueTargets,
+  findIssueByKey,
   findFirstNavigableIssue,
+  getIssueKey,
+  resolveSelectedIssue,
   type ReportGroupBy,
   type ReportSortBy,
 } from "../lib/reportGroups.js";
@@ -32,6 +36,63 @@ const getFirstNavigableText = (
     result.report.issues.filter((issue) => active.has(issue.severity)),
   );
   return firstIssue ? result.model.paragraphs[firstIssue.paraIndex]?.text ?? null : null;
+};
+
+const getIssueText = (
+  result: AnalyzeResult,
+  issueKey: string | null,
+): string | null => {
+  const issue = findIssueByKey(result.report.issues, issueKey);
+  if (!issue || issue.paraIndex < 0) return null;
+  return result.model.paragraphs[issue.paraIndex]?.text ?? null;
+};
+
+const getVisibleIssues = (
+  result: AnalyzeResult,
+  active: Set<Severity>,
+) => result.report.issues.filter((issue) => active.has(issue.severity));
+
+const useIssueSelection = () => {
+  const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
+  const [selectedText, setSelectedText] = useState<string | null>(null);
+
+  const clearSelection = () => {
+    setSelectedIssueKey(null);
+    setSelectedText(null);
+  };
+
+  const selectResolvedIssue = (
+    result: AnalyzeResult,
+    active: Set<Severity>,
+    preferredIssueKey = selectedIssueKey,
+  ) => {
+    const selectedIssue = resolveSelectedIssue(
+      getVisibleIssues(result, active),
+      preferredIssueKey,
+    );
+    const issueKey = selectedIssue ? getIssueKey(selectedIssue) : null;
+    setSelectedIssueKey(issueKey);
+    setSelectedText(
+      issueKey ? getIssueText(result, issueKey) : getFirstNavigableText(result, active),
+    );
+  };
+
+  const selectIssue = (result: AnalyzeResult | null, issueKey: string | null) => {
+    if (!result || !issueKey) {
+      clearSelection();
+      return;
+    }
+    setSelectedIssueKey(issueKey);
+    setSelectedText(getIssueText(result, issueKey));
+  };
+
+  return {
+    clearSelection,
+    selectIssue,
+    selectResolvedIssue,
+    selectedIssueKey,
+    selectedText,
+  };
 };
 
 const useAnalysisRunner = ({
@@ -87,13 +148,13 @@ export const useDetectionFlow = () => {
   const [reportSortBy, setReportSortBy] = useState<ReportSortBy>("paragraph");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedText, setSelectedText] = useState<string | null>(null);
+  const selection = useIssueSelection();
   const [over, setOver] = useState(false);
 
   const applyResult = (nextResult: AnalyzeResult, advanceToResult = false) => {
     setResult(nextResult);
     setError(null);
-    setSelectedText(getFirstNavigableText(nextResult, active));
+    selection.selectResolvedIssue(nextResult, active);
     if (advanceToResult) setStep(3);
   };
 
@@ -110,12 +171,8 @@ export const useDetectionFlow = () => {
     setBuffer(await selectedFile.arrayBuffer());
   };
 
-  const selectParagraph = (paragraphIndex: number) => {
-    if (!result || paragraphIndex < 0) {
-      setSelectedText(null);
-      return;
-    }
-    setSelectedText(result.model.paragraphs[paragraphIndex]?.text ?? null);
+  const selectIssue = (issueKey: string | null) => {
+    selection.selectIssue(result, issueKey);
   };
 
   const toggleSeverity = (severity: Severity) => {
@@ -123,6 +180,7 @@ export const useDetectionFlow = () => {
     if (next.has(severity)) next.delete(severity);
     else next.add(severity);
     setActive(next);
+    if (result) selection.selectResolvedIssue(result, next, selection.selectedIssueKey);
   };
 
   const reset = () => {
@@ -132,8 +190,12 @@ export const useDetectionFlow = () => {
     setBuffer(null);
     setResult(null);
     setError(null);
-    setSelectedText(null);
+    selection.clearSelection();
   };
+
+  const previewIssueTargets = result
+    ? buildPreviewIssueTargets(getVisibleIssues(result, active), result.model.paragraphs)
+    : [];
 
   return {
     active,
@@ -146,13 +208,15 @@ export const useDetectionFlow = () => {
     reportGroupBy,
     reportSortBy,
     result,
-    selectedText,
+    previewIssueTargets,
+    selectedIssueKey: selection.selectedIssueKey,
+    selectedText: selection.selectedText,
     step,
     applyResult,
     pickFile,
     reset,
     runAnalysis,
-    selectParagraph,
+    selectIssue,
     setOver,
     setReportGroupBy,
     setReportSortBy,

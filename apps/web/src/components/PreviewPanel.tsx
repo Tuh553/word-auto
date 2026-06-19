@@ -1,17 +1,46 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { renderAsync } from "docx-preview";
+import type { PreviewIssueTarget } from "../lib/reportGroups.js";
 
 interface Props {
   buffer: ArrayBuffer;
   /** 要定位高亮的段落原文（文档级问题为 null，不定位） */
   targetText: string | null;
+  targets: PreviewIssueTarget[];
+  onSelectTarget: (issueKey: string) => void;
 }
 
 const norm = (s: string | null | undefined): string =>
   (s ?? "").replace(/\s+/g, "");
 
-export function PreviewPanel({ buffer, targetText }: Props) {
+const BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, td, li";
+
+const getTextKey = (text: string): string => norm(text).slice(0, 18);
+
+const resetPreviewTargets = (host: HTMLElement) => {
+  host.querySelectorAll<HTMLElement>(".wa-preview-hit").forEach((block) => {
+    block.classList.remove("wa-preview-hit");
+    delete block.dataset.issueKey;
+  });
+};
+
+const findBlockByText = (
+  blocks: HTMLElement[],
+  text: string,
+): HTMLElement | undefined => {
+  const key = getTextKey(text);
+  if (key.length < 3) return undefined;
+  return blocks.find((block) => norm(block.textContent).includes(key));
+};
+
+export function PreviewPanel({
+  buffer,
+  targetText,
+  targets,
+  onSelectTarget,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const [renderVersion, setRenderVersion] = useState(0);
 
   // 用 docx-preview 默认配置（默认即分页渲染、保留页高），不再自行覆盖
   // ignoreHeight/breakPages/experimental 等——那些覆盖反而破坏分页布局。
@@ -36,6 +65,7 @@ export function PreviewPanel({ buffer, targetText }: Props) {
           const fs = parseFloat(cs.fontSize);
           if (lh && fs && lh < fs) el.style.lineHeight = "normal";
         });
+        setRenderVersion((version) => version + 1);
       })
       .catch((e: unknown) => {
         if (!stale) host.textContent = "预览渲染失败：" + (e as Error).message;
@@ -45,23 +75,39 @@ export function PreviewPanel({ buffer, targetText }: Props) {
     };
   }, [buffer]);
 
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    resetPreviewTargets(el);
+    const blocks = Array.from(el.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
+    for (const target of targets) {
+      const block = findBlockByText(blocks, target.text);
+      if (!block || block.dataset.issueKey) continue;
+      block.classList.add("wa-preview-hit");
+      block.dataset.issueKey = target.issueKey;
+    }
+  }, [renderVersion, targets]);
+
   // 按段落原文匹配定位（不依赖序号，避免与渲染 DOM 错位）
   useEffect(() => {
     const el = ref.current;
-    if (!el || !targetText) return;
-    const key = norm(targetText).slice(0, 18);
-    if (key.length < 3) return;
-
+    if (!el) return;
     el.querySelectorAll(".wa-hl").forEach((n) => n.classList.remove("wa-hl"));
-    const blocks = el.querySelectorAll("p, h1, h2, h3, h4, h5, h6, td, li");
-    for (const b of Array.from(blocks)) {
-      if (norm(b.textContent).includes(key)) {
-        b.classList.add("wa-hl");
-        b.scrollIntoView({ behavior: "smooth", block: "center" });
-        break;
-      }
-    }
-  }, [targetText]);
+    if (!targetText) return;
+    const blocks = Array.from(el.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
+    const block = findBlockByText(blocks, targetText);
+    if (!block) return;
+    block.classList.add("wa-hl");
+    block.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [renderVersion, targetText]);
 
-  return <div className="preview" ref={ref} />;
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>(".wa-preview-hit")
+      : null;
+    const issueKey = target?.dataset.issueKey;
+    if (issueKey) onSelectTarget(issueKey);
+  };
+
+  return <div className="preview" ref={ref} onClick={handleClick} />;
 }

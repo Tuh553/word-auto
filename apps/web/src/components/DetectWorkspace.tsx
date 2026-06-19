@@ -2,7 +2,11 @@ import { useRef } from "react";
 import { PreviewPanel } from "./PreviewPanel.js";
 import { ReportPanel } from "./ReportPanel.js";
 import type { Severity } from "@word-auto/validator";
-import type { ReportGroupBy, ReportSortBy } from "../lib/reportGroups.js";
+import type {
+  PreviewIssueTarget,
+  ReportGroupBy,
+  ReportSortBy,
+} from "../lib/reportGroups.js";
 import type { AnalyzeResult } from "../lib/analyze.js";
 import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 
@@ -18,9 +22,11 @@ type DetectWorkspaceProps = {
   isAnalyzing: boolean;
   libraries: RuleLibraryRecord[];
   over: boolean;
+  previewIssueTargets: PreviewIssueTarget[];
   reportGroupBy: ReportGroupBy;
   reportSortBy: ReportSortBy;
   result: AnalyzeResult | null;
+  selectedIssueKey: string | null;
   selectedText: string | null;
   step: number;
   templateId: string;
@@ -30,7 +36,7 @@ type DetectWorkspaceProps = {
   onPickFile: (file: File) => Promise<void>;
   onReset: () => void;
   onRun: () => void;
-  onSelectIssue: (paragraphIndex: number) => void;
+  onSelectIssue: (issueKey: string | null) => void;
   onSortByChange: (value: ReportSortBy) => void;
   onStepChange: (step: number) => void;
   onTemplateChange: (id: string) => void;
@@ -202,6 +208,8 @@ function ResultStep({
   reportGroupBy,
   reportSortBy,
   result,
+  previewIssueTargets,
+  selectedIssueKey,
   selectedText,
   onGroupByChange,
   onReset,
@@ -215,6 +223,8 @@ function ResultStep({
   | "reportGroupBy"
   | "reportSortBy"
   | "result"
+  | "previewIssueTargets"
+  | "selectedIssueKey"
   | "selectedText"
   | "onGroupByChange"
   | "onReset"
@@ -231,13 +241,19 @@ function ResultStep({
       </div>
       <div className="result">
         <div className="preview-wrap">
-          <PreviewPanel buffer={buffer} targetText={selectedText} />
+          <PreviewPanel
+            buffer={buffer}
+            targetText={selectedText}
+            targets={previewIssueTargets}
+            onSelectTarget={onSelectIssue}
+          />
         </div>
         <ReportPanel
           report={result.report}
           active={active}
           groupBy={reportGroupBy}
           sortBy={reportSortBy}
+          selectedIssueKey={selectedIssueKey}
           onToggle={onToggleSeverity}
           onGroupByChange={onGroupByChange}
           onSortByChange={onSortByChange}
@@ -289,9 +305,11 @@ function StepContent(props: DetectWorkspaceProps) {
     <ResultStep
       active={props.active}
       buffer={props.buffer}
+      previewIssueTargets={props.previewIssueTargets}
       reportGroupBy={props.reportGroupBy}
       reportSortBy={props.reportSortBy}
       result={props.result}
+      selectedIssueKey={props.selectedIssueKey}
       selectedText={props.selectedText}
       onGroupByChange={props.onGroupByChange}
       onReset={props.onReset}

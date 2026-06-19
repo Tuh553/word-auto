@@ -9,6 +9,12 @@ export interface ReportIssueGroup {
   issues: Issue[];
 }
 
+export interface PreviewIssueTarget {
+  issueKey: string;
+  paraIndex: number;
+  text: string;
+}
+
 const SEVERITY_LABELS: Record<Severity, string> = {
   error: "错误",
   warn: "警告",
@@ -286,3 +292,53 @@ export const buildReportGroups = (
 
 export const findFirstNavigableIssue = (issues: Issue[]): Issue | undefined =>
   sortIssues(issues, "paragraph").find((issue) => issue.paraIndex >= 0);
+
+export const getIssueKey = (issue: Issue): string =>
+  [
+    issue.paraIndex,
+    issue.severity,
+    issue.role,
+    issue.field,
+    issue.message,
+    JSON.stringify(issue.expected),
+    JSON.stringify(issue.actual),
+    issue.affectedText ?? issue.textPreview,
+  ]
+    .map((part) => encodeURIComponent(String(part ?? "")))
+    .join("|");
+
+export const findIssueByKey = (
+  issues: Issue[],
+  issueKey: string | null,
+): Issue | undefined =>
+  issueKey ? issues.find((issue) => getIssueKey(issue) === issueKey) : undefined;
+
+export const findVisibleIssueForParagraph = (
+  issues: Issue[],
+  paraIndex: number,
+): Issue | undefined =>
+  sortIssues(issues, "paragraph").find((issue) => issue.paraIndex === paraIndex);
+
+export const resolveSelectedIssue = (
+  issues: Issue[],
+  selectedIssueKey: string | null,
+): Issue | undefined =>
+  findIssueByKey(issues, selectedIssueKey) ?? findFirstNavigableIssue(issues);
+
+export const buildPreviewIssueTargets = (
+  issues: Issue[],
+  paragraphs: Array<{ text: string }>,
+): PreviewIssueTarget[] => {
+  const targets = new Map<number, PreviewIssueTarget>();
+  for (const issue of sortIssues(issues, "paragraph")) {
+    if (issue.paraIndex < 0 || targets.has(issue.paraIndex)) continue;
+    const text = paragraphs[issue.paraIndex]?.text;
+    if (!text) continue;
+    targets.set(issue.paraIndex, {
+      issueKey: getIssueKey(issue),
+      paraIndex: issue.paraIndex,
+      text,
+    });
+  }
+  return [...targets.values()];
+};

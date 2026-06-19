@@ -1,8 +1,10 @@
+import { useEffect, useRef } from "react";
 import type { Severity, ValidationReport } from "@word-auto/validator";
 import {
   buildReportGroups,
   formatIssueField,
   formatIssueRole,
+  getIssueKey,
   type ReportGroupBy,
   type ReportSortBy,
 } from "../lib/reportGroups.js";
@@ -18,10 +20,11 @@ interface Props {
   active: Set<Severity>;
   groupBy: ReportGroupBy;
   sortBy: ReportSortBy;
+  selectedIssueKey: string | null;
   onToggle: (s: Severity) => void;
   onGroupByChange: (groupBy: ReportGroupBy) => void;
   onSortByChange: (sortBy: ReportSortBy) => void;
-  onSelect: (paraIndex: number) => void;
+  onSelect: (issueKey: string) => void;
 }
 
 const GROUP_OPTIONS: Array<{ value: ReportGroupBy; label: string }> = [
@@ -126,16 +129,21 @@ function ReportSummary({
 }
 
 function ReportIssueCard({
+  isSelected,
   issue,
+  issueKey,
   onSelect,
 }: {
+  isSelected: boolean;
   issue: ValidationReport["issues"][number];
-  onSelect: (paraIndex: number) => void;
+  issueKey: string;
+  onSelect: (issueKey: string) => void;
 }) {
   return (
     <div
-      className={`issue ${issue.severity}`}
-      onClick={() => onSelect(issue.paraIndex)}
+      className={`issue ${issue.severity} ${isSelected ? "selected" : ""}`}
+      data-issue-key={issueKey}
+      onClick={() => onSelect(issueKey)}
     >
       <div className="top">
         <span className={`badge ${issue.severity}`}>{SEV[issue.severity]}</span>
@@ -181,10 +189,12 @@ function ReportIssueCard({
 
 function ReportGroups({
   groups,
+  selectedIssueKey,
   onSelect,
 }: {
   groups: ReturnType<typeof buildReportGroups>;
-  onSelect: (paraIndex: number) => void;
+  selectedIssueKey: string | null;
+  onSelect: (issueKey: string) => void;
 }) {
   return (
     <>
@@ -197,7 +207,9 @@ function ReportGroups({
           {group.issues.map((issue, index) => (
             <ReportIssueCard
               key={`${group.key}:${index}:${issue.paraIndex}:${issue.field}`}
+              isSelected={getIssueKey(issue) === selectedIssueKey}
               issue={issue}
+              issueKey={getIssueKey(issue)}
               onSelect={onSelect}
             />
           ))}
@@ -212,17 +224,28 @@ export function ReportPanel({
   active,
   groupBy,
   sortBy,
+  selectedIssueKey,
   onToggle,
   onGroupByChange,
   onSortByChange,
   onSelect,
 }: Props) {
+  const reportRef = useRef<HTMLDivElement>(null);
   const { summary } = report;
   const issues = report.issues.filter((i) => active.has(i.severity));
   const groups = buildReportGroups(issues, groupBy, sortBy);
 
+  useEffect(() => {
+    if (!selectedIssueKey) return;
+    const items = reportRef.current?.querySelectorAll<HTMLElement>("[data-issue-key]");
+    const selected = Array.from(items ?? []).find(
+      (item) => item.dataset.issueKey === selectedIssueKey,
+    );
+    selected?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [groups, selectedIssueKey]);
+
   return (
-    <div className="report-wrap">
+    <div className="report-wrap" ref={reportRef}>
       <ReportStats summary={summary} />
       <SeverityChips active={active} onToggle={onToggle} />
       <ReportToolbar
@@ -241,7 +264,11 @@ export function ReportPanel({
       {issues.length === 0 ? (
         <div className="empty">没有符合筛选条件的问题 🎉</div>
       ) : (
-        <ReportGroups groups={groups} onSelect={onSelect} />
+        <ReportGroups
+          groups={groups}
+          selectedIssueKey={selectedIssueKey}
+          onSelect={onSelect}
+        />
       )}
     </div>
   );

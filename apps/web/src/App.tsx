@@ -137,9 +137,11 @@ function DetectScreen({
       isAnalyzing={detect.isAnalyzing}
       libraries={rules.libraries}
       over={detect.over}
+      previewIssueTargets={detect.previewIssueTargets}
       reportGroupBy={detect.reportGroupBy}
       reportSortBy={detect.reportSortBy}
       result={detect.result}
+      selectedIssueKey={detect.selectedIssueKey}
       selectedText={detect.selectedText}
       step={detect.step}
       templateId={rules.templateId}
@@ -151,7 +153,7 @@ function DetectScreen({
       onRun={() => {
         void detect.runAnalysis(rules.currentLibrary?.published ?? null);
       }}
-      onSelectIssue={detect.selectParagraph}
+      onSelectIssue={detect.selectIssue}
       onSortByChange={detect.setReportSortBy}
       onStepChange={detect.setStep}
       onTemplateChange={(id) => {
