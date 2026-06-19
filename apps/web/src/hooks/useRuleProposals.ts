@@ -18,6 +18,13 @@ import {
   formatProposalApplyResult,
   type ProposalFeedback,
 } from "../lib/proposalFeedback.js";
+import {
+  addIgnoredProposalKey,
+  loadIgnoredProposalKeys,
+  removeIgnoredProposalKey,
+  saveIgnoredProposalKeys,
+  type ProposalIgnoreKey,
+} from "../lib/proposalIgnores.js";
 import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 
 type ProposalRole = RuleProposal["roles"][number];
@@ -130,6 +137,38 @@ const acceptDraftChange = (
   }
 };
 
+const useProposalIgnoreActions = (
+  setProposalFeedback: (feedback: ProposalFeedback | null) => void,
+  setRuleMessage: (message: string | null) => void,
+) => {
+  const [ignoredProposalKeys, setIgnoredProposalKeys] = useState(loadIgnoredProposalKeys);
+  const [showIgnoredProposals, setShowIgnoredProposals] = useState(false);
+  const persistIgnoredKeys = (next: Set<ProposalIgnoreKey>) => {
+    setIgnoredProposalKeys(next);
+    saveIgnoredProposalKeys(next);
+  };
+
+  const ignoreProposal = (key: ProposalIgnoreKey) => {
+    persistIgnoredKeys(addIgnoredProposalKey(ignoredProposalKeys, key));
+    setProposalFeedback(null);
+    setRuleMessage("已忽略该候选");
+  };
+
+  const restoreProposal = (key: ProposalIgnoreKey) => {
+    persistIgnoredKeys(removeIgnoredProposalKey(ignoredProposalKeys, key));
+    setProposalFeedback(null);
+    setRuleMessage("已恢复该候选");
+  };
+
+  return {
+    ignoredProposalKeys,
+    ignoreProposal,
+    restoreProposal,
+    showIgnoredProposals,
+    toggleIgnoredProposals: () => setShowIgnoredProposals((value) => !value),
+  };
+};
+
 export const useRuleProposals = ({
   currentLibrary,
   setRuleMessage,
@@ -139,6 +178,7 @@ export const useRuleProposals = ({
   const [proposalFeedback, setProposalFeedback] = useState<ProposalFeedback | null>(null);
   const currentProposal = currentLibrary ? proposals[currentLibrary.id] ?? null : null;
   const setters = { setProposalFeedback, setProposals, setRuleMessage };
+  const ignoreActions = useProposalIgnoreActions(setProposalFeedback, setRuleMessage);
 
   const acceptProposalField = (role: ProposalRole, field: ProposalField) => {
     acceptDraftChange({
@@ -202,6 +242,7 @@ export const useRuleProposals = ({
   return {
     currentProposal,
     proposalFeedback,
+    ...ignoreActions,
     clearProposalFeedback: () => setProposalFeedback(null),
     acceptDocumentProposal,
     acceptDocumentProposalField,

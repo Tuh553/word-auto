@@ -115,6 +115,35 @@ export interface RuleField {
   note?: string;
 }
 
+export interface RuleProposalEvidenceSample {
+  sampleIndex: number;
+  text: string;
+  value: string | number | boolean;
+  role?: Role;
+  roleLabel?: string;
+  roleConfidence?: RoleConfidence;
+  roleConfidenceReason?: string;
+}
+
+export interface RuleProposalConflict<T> {
+  value: T;
+  sampleCount: number;
+  evidence: string[];
+  evidenceSamples?: RuleProposalEvidenceSample[];
+}
+
+export interface RuleProposalFieldStats {
+  confidence: number;
+  confidenceLevel: "high" | "medium" | "low";
+  confidenceHint: string;
+  sampleCount: number;
+  coverage: number;
+  observedCount: number;
+  totalCount: number;
+  evidence: string[];
+  evidenceSamples?: RuleProposalEvidenceSample[];
+}
+
 export interface RoleRuleSet {
   role: string;
   label: string;
@@ -171,42 +200,18 @@ export interface RuleDraft extends EditableRuleLibrary {
   updatedAt?: string;
 }
 
-export interface RuleProposalField {
+export interface RuleProposalField extends RuleProposalFieldStats {
   key: RuleFieldKey;
   proposedValue: RuleValue;
-  confidence: number;
-  confidenceLevel: "high" | "medium" | "low";
-  confidenceHint: string;
-  sampleCount: number;
-  coverage: number;
-  observedCount: number;
-  totalCount: number;
-  evidence: string[];
-  conflicts?: Array<{
-    value: RuleValue;
-    sampleCount: number;
-    evidence: string[];
-  }>;
+  conflicts?: Array<RuleProposalConflict<RuleValue>>;
 }
 
-export interface DocumentRuleProposalField {
+export interface DocumentRuleProposalField extends RuleProposalFieldStats {
   key: DocumentRuleKey;
   label: string;
   unit: "cm" | "enum";
   proposedValue: string | number;
-  confidence: number;
-  confidenceLevel: "high" | "medium" | "low";
-  confidenceHint: string;
-  sampleCount: number;
-  coverage: number;
-  observedCount: number;
-  totalCount: number;
-  evidence: string[];
-  conflicts?: Array<{
-    value: string | number;
-    sampleCount: number;
-    evidence: string[];
-  }>;
+  conflicts?: Array<RuleProposalConflict<string | number>>;
 }
 
 export interface DocumentRuleProposal {

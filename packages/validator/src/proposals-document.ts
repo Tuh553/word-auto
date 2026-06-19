@@ -93,6 +93,7 @@ const extractDocumentFieldProposal = (
           value,
           preview: `分节 ${index + 1}`,
           sampleIndex: index + 1,
+          text: `分节 ${index + 1}`,
         }];
   });
   const summary = summarizeSamples(samples, sections.length);
@@ -114,11 +115,13 @@ const extractDocumentFieldProposal = (
       `页面设置共 ${summary.totalCount} 个分节，其中 ${summary.observedCount} 个分节检测到该字段，${summary.sampleCount} 个分节命中主值`,
       ...summary.evidence,
     ],
+    evidenceSamples: summary.evidenceSamples,
     conflicts: summary.conflicts.length > 0
       ? summary.conflicts.map((item) => ({
           value: item.value as string | number,
           sampleCount: item.sampleCount,
           evidence: item.evidence,
+          evidenceSamples: item.evidenceSamples,
         }))
       : undefined,
   };

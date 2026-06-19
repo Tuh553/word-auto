@@ -61,4 +61,6 @@ export {
   applyProposalFieldToDraftWithResult,
   applyProposalRoleToDraft,
   applyProposalRoleToDraftWithResult,
+  diffDocumentProposalFieldForDraft,
+  diffProposalFieldForDraft,
 } from "./proposals-apply.js";

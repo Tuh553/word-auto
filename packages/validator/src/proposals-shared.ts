@@ -1,9 +1,16 @@
+import type { Role, RoleConfidence, RuleProposalEvidenceSample } from "./types.js";
+
 export type Scalar = string | number | boolean;
 
 export type CandidateSample = {
   value: Scalar;
   preview: string;
   sampleIndex: number;
+  text?: string;
+  role?: Role;
+  roleLabel?: string;
+  roleConfidence?: RoleConfidence;
+  roleConfidenceReason?: string;
 };
 
 export const roundNumber = (value: number, digits = 2): number => {
@@ -39,9 +46,15 @@ export const summarizeSamples = (
   confidence: number;
   confidenceHint: string;
   confidenceLevel: "high" | "medium" | "low";
-  conflicts: Array<{ value: Scalar; sampleCount: number; evidence: string[] }>;
+  conflicts: Array<{
+    value: Scalar;
+    sampleCount: number;
+    evidence: string[];
+    evidenceSamples: RuleProposalEvidenceSample[];
+  }>;
   coverage: number;
   evidence: string[];
+  evidenceSamples: RuleProposalEvidenceSample[];
   observedCount: number;
   sampleCount: number;
   totalCount: number;
@@ -67,12 +80,23 @@ export const summarizeSamples = (
   const dominance = observedCount === 0 ? 0 : sampleCount / observedCount;
   const sampleFactor = Math.min(1, observedCount / 5);
   const confidence = roundNumber((dominance * 0.7 + coverage * 0.3) * (0.6 + sampleFactor * 0.4), 2);
+  const toEvidenceSamples = (values: CandidateSample[]): RuleProposalEvidenceSample[] =>
+    values.slice(0, 5).map((sample) => ({
+      sampleIndex: sample.sampleIndex,
+      text: sample.text ?? sample.preview,
+      value: sample.value,
+      role: sample.role,
+      roleLabel: sample.roleLabel,
+      roleConfidence: sample.roleConfidence,
+      roleConfidenceReason: sample.roleConfidenceReason,
+    }));
   const conflicts = ordered.slice(1).map((item) => ({
     value: item.value,
     sampleCount: item.values.length,
     evidence: item.values.slice(0, 3).map(
       (sample) => `样本 ${sample.sampleIndex}: ${sample.preview}`,
     ),
+    evidenceSamples: toEvidenceSamples(item.values),
   }));
   const evidence = primary.values.slice(0, 3).map(
     (sample) => `样本 ${sample.sampleIndex}: ${sample.preview}`,
@@ -86,6 +110,7 @@ export const summarizeSamples = (
     conflicts,
     coverage,
     evidence,
+    evidenceSamples: toEvidenceSamples(primary.values),
     observedCount,
     sampleCount,
     totalCount,

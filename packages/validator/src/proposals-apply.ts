@@ -94,6 +94,13 @@ export const applyProposalFieldToDraftWithResult = (
 ): ProposalApplyResult =>
   applyRoleField(draft, roleProposal, fieldProposal);
 
+export const diffProposalFieldForDraft = (
+  draft: RuleDraft,
+  roleProposal: RoleRuleProposal,
+  fieldProposal: RuleProposalField,
+): ProposalApplyChange =>
+  applyRoleField(draft, roleProposal, fieldProposal).changes[0];
+
 export const applyDocumentProposalFieldToDraftWithResult = (
   draft: RuleDraft,
   documentProposal: DocumentRuleProposal,
@@ -120,6 +127,13 @@ export const applyDocumentProposalFieldToDraftWithResult = (
     status,
   }]);
 };
+
+export const diffDocumentProposalFieldForDraft = (
+  draft: RuleDraft,
+  documentProposal: DocumentRuleProposal,
+  fieldProposal: DocumentRuleProposalField,
+): ProposalApplyChange =>
+  applyDocumentProposalFieldToDraftWithResult(draft, documentProposal, fieldProposal).changes[0];
 
 export const applyProposalRoleToDraft = (
   draft: RuleDraft,

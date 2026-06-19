@@ -7,6 +7,12 @@ import type {
   RuleProposalField,
 } from "@word-auto/validator";
 import type { ProposalFeedback } from "../lib/proposalFeedback.js";
+import type { ProposalIgnoreKey } from "../lib/proposalIgnores.js";
+import {
+  documentFieldProposalIgnoreKey,
+  roleFieldProposalIgnoreKey,
+  roleProposalIgnoreKey,
+} from "../lib/proposalIgnores.js";
 import {
   DocumentProposalCard,
   ProposalRoleCard,
@@ -14,14 +20,20 @@ import {
 
 interface Props {
   draft: RuleDraft;
+  ignoredProposalKeys: Set<ProposalIgnoreKey>;
   proposal: RuleProposal | null;
   proposalFeedback: ProposalFeedback | null;
+  showIgnoredProposals: boolean;
+  templateId: string;
   onExtract: () => void;
   onAcceptDocument: (proposal: DocumentRuleProposal) => void;
   onAcceptDocumentField: (proposal: DocumentRuleProposal, field: DocumentRuleProposalField) => void;
   onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
   onAcceptRole: (role: RoleRuleProposal) => void;
   onClearFeedback: () => void;
+  onIgnoreProposal: (key: ProposalIgnoreKey) => void;
+  onRestoreProposal: (key: ProposalIgnoreKey) => void;
+  onToggleIgnoredProposals: () => void;
 }
 
 const formatTime = (value: string): string =>
@@ -90,18 +102,159 @@ function ProposalFeedbackPanel({
   );
 }
 
+const documentFieldKeys = (
+  templateId: string,
+  proposal: DocumentRuleProposal,
+): Map<string, ProposalIgnoreKey> =>
+  new Map(proposal.fields.map((field) => [
+    field.key,
+    documentFieldProposalIgnoreKey(templateId, field.key),
+  ]));
+
+const roleFieldKeys = (
+  templateId: string,
+  role: RoleRuleProposal,
+): Map<string, ProposalIgnoreKey> =>
+  new Map(role.fields.map((field) => [
+    field.key,
+    roleFieldProposalIgnoreKey(templateId, role.role, field.key),
+  ]));
+
+const splitDocumentProposal = (
+  templateId: string,
+  proposal: DocumentRuleProposal | undefined,
+  ignoredKeys: Set<ProposalIgnoreKey>,
+): {
+  ignored?: DocumentRuleProposal;
+  visible?: DocumentRuleProposal;
+} => {
+  if (!proposal) return {};
+  const keys = documentFieldKeys(templateId, proposal);
+  const visibleFields = proposal.fields.filter((field) => !ignoredKeys.has(keys.get(field.key) ?? ""));
+  const ignoredFields = proposal.fields.filter((field) => ignoredKeys.has(keys.get(field.key) ?? ""));
+  return {
+    visible: visibleFields.length > 0 ? { ...proposal, fields: visibleFields } : undefined,
+    ignored: ignoredFields.length > 0 ? { ...proposal, fields: ignoredFields } : undefined,
+  };
+};
+
+const splitRoleProposal = (
+  templateId: string,
+  role: RoleRuleProposal,
+  ignoredKeys: Set<ProposalIgnoreKey>,
+): {
+  ignored?: RoleRuleProposal;
+  roleKey: ProposalIgnoreKey;
+  visible?: RoleRuleProposal;
+} => {
+  const roleKey = roleProposalIgnoreKey(templateId, role.role);
+  const fieldKeys = roleFieldKeys(templateId, role);
+  if (ignoredKeys.has(roleKey)) return { ignored: role, roleKey };
+  const visibleFields = role.fields.filter((field) => !ignoredKeys.has(fieldKeys.get(field.key) ?? ""));
+  const ignoredFields = role.fields.filter((field) => ignoredKeys.has(fieldKeys.get(field.key) ?? ""));
+  return {
+    roleKey,
+    visible: visibleFields.length > 0 ? { ...role, fields: visibleFields } : undefined,
+    ignored: ignoredFields.length > 0 ? { ...role, fields: ignoredFields } : undefined,
+  };
+};
+
+type ProposalListProps = {
+  draft: RuleDraft;
+  documentSplit: ReturnType<typeof splitDocumentProposal>;
+  mode: "visible" | "ignored";
+  roleSplits: Array<ReturnType<typeof splitRoleProposal>>;
+  templateId: string;
+  onAcceptDocument: (proposal: DocumentRuleProposal) => void;
+  onAcceptDocumentField: (proposal: DocumentRuleProposal, field: DocumentRuleProposalField) => void;
+  onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
+  onAcceptRole: (role: RoleRuleProposal) => void;
+  onIgnoreProposal: (key: ProposalIgnoreKey) => void;
+  onRestoreProposal: (key: ProposalIgnoreKey) => void;
+};
+
+const proposalListClass = (mode: ProposalListProps["mode"]): string =>
+  mode === "visible" ? "proposal-roles" : "proposal-ignored";
+
+function ProposalList({
+  draft,
+  documentSplit,
+  mode,
+  roleSplits,
+  templateId,
+  onAcceptDocument,
+  onAcceptDocumentField,
+  onAcceptField,
+  onAcceptRole,
+  onIgnoreProposal,
+  onRestoreProposal,
+}: ProposalListProps) {
+  const documentProposal = mode === "visible" ? documentSplit.visible : documentSplit.ignored;
+  const roleKey = mode === "visible" ? "visible" : "ignored";
+  const ignored = mode === "ignored";
+
+  return (
+    <div className={proposalListClass(mode)}>
+      {ignored && <div className="proposal-ignored-title">已忽略</div>}
+      {documentProposal && (
+        <DocumentProposalCard
+          draft={draft}
+          fieldIgnoreKeys={documentFieldKeys(templateId, documentProposal)}
+          ignored={ignored}
+          onAcceptDocument={onAcceptDocument}
+          onAcceptDocumentField={onAcceptDocumentField}
+          onIgnoreField={onIgnoreProposal}
+          onRestoreField={onRestoreProposal}
+          proposal={documentProposal}
+        />
+      )}
+      {roleSplits.map((split) => split[roleKey] && (
+        <ProposalRoleCard
+          key={split[roleKey].role}
+          draft={draft}
+          fieldIgnoreKeys={roleFieldKeys(templateId, split[roleKey])}
+          ignored={ignored}
+          onAcceptField={onAcceptField}
+          onAcceptRole={onAcceptRole}
+          onIgnoreField={onIgnoreProposal}
+          onIgnoreRole={() => onIgnoreProposal(split.roleKey)}
+          onRestoreField={onRestoreProposal}
+          onRestoreRole={() => onRestoreProposal(split.roleKey)}
+          role={split[roleKey]}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function TemplateProposalPanel({
   draft,
+  ignoredProposalKeys,
   proposal,
   proposalFeedback,
+  showIgnoredProposals,
+  templateId,
   onAcceptDocument,
   onAcceptDocumentField,
   onAcceptField,
   onAcceptRole,
   onClearFeedback,
   onExtract,
+  onIgnoreProposal,
+  onRestoreProposal,
+  onToggleIgnoredProposals,
 }: Props) {
   if (!proposal) return <EmptyProposalState onExtract={onExtract} />;
+  const documentSplit = splitDocumentProposal(templateId, proposal.document, ignoredProposalKeys);
+  const roleSplits = proposal.roles.map((role) =>
+    splitRoleProposal(templateId, role, ignoredProposalKeys),
+  );
+  const ignoredCount =
+    (documentSplit.ignored?.fields.length ?? 0) +
+    roleSplits.reduce(
+      (count, item) => count + (item.ignored ? item.ignored.fields.length : 0),
+      0,
+    );
 
   return (
     <section className="card proposal-card">
@@ -116,25 +269,43 @@ export function TemplateProposalPanel({
         </div>
       )}
 
-      <div className="proposal-roles">
-        {proposal.document && (
-          <DocumentProposalCard
-            draft={draft}
-            onAcceptDocument={onAcceptDocument}
-            onAcceptDocumentField={onAcceptDocumentField}
-            proposal={proposal.document}
-          />
-        )}
-        {proposal.roles.map((role) => (
-          <ProposalRoleCard
-            key={role.role}
-            draft={draft}
-            onAcceptField={onAcceptField}
-            onAcceptRole={onAcceptRole}
-            role={role}
-          />
-        ))}
-      </div>
+      {ignoredCount > 0 && (
+        <div className="proposal-ignore-toggle">
+          <span>已忽略 {ignoredCount} 个候选</span>
+          <button onClick={onToggleIgnoredProposals}>
+            {showIgnoredProposals ? "隐藏已忽略" : "显示已忽略"}
+          </button>
+        </div>
+      )}
+
+      <ProposalList
+        draft={draft}
+        documentSplit={documentSplit}
+        mode="visible"
+        roleSplits={roleSplits}
+        templateId={templateId}
+        onAcceptDocument={onAcceptDocument}
+        onAcceptDocumentField={onAcceptDocumentField}
+        onAcceptField={onAcceptField}
+        onAcceptRole={onAcceptRole}
+        onIgnoreProposal={onIgnoreProposal}
+        onRestoreProposal={onRestoreProposal}
+      />
+      {showIgnoredProposals && ignoredCount > 0 && (
+        <ProposalList
+          draft={draft}
+          documentSplit={documentSplit}
+          mode="ignored"
+          roleSplits={roleSplits}
+          templateId={templateId}
+          onAcceptDocument={onAcceptDocument}
+          onAcceptDocumentField={onAcceptDocumentField}
+          onAcceptField={onAcceptField}
+          onAcceptRole={onAcceptRole}
+          onIgnoreProposal={onIgnoreProposal}
+          onRestoreProposal={onRestoreProposal}
+        />
+      )}
     </section>
   );
 }

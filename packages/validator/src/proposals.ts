@@ -13,6 +13,7 @@ import {
 } from "./rules.js";
 import type {
   Role,
+  ClassifiedParagraphDetail,
   RoleRuleProposal,
   RuleFieldKey,
   RuleProposal,
@@ -136,10 +137,11 @@ const toRuleValue = (value: Scalar, unit: RuleValue["unit"]): RuleValue => ({
 
 const extractFieldProposal = (
   role: Role,
-  paragraphs: Paragraph[],
+  details: ClassifiedParagraphDetail[],
   spec: FieldSpec,
 ): RuleProposalField | null => {
-  const samples: CandidateSample[] = paragraphs.flatMap((para) => {
+  const samples: CandidateSample[] = details.flatMap((detail) => {
+    const para = detail.para;
     const value = spec.read(para);
     return value == null
       ? []
@@ -147,9 +149,14 @@ const extractFieldProposal = (
           value,
           preview: previewText(para.text),
           sampleIndex: para.index,
+          text: para.text,
+          role,
+          roleLabel: getRoleLabel(role),
+          roleConfidence: detail.confidence,
+          roleConfidenceReason: detail.reason,
         }];
   });
-  const summary = summarizeSamples(samples, paragraphs.length);
+  const summary = summarizeSamples(samples, details.length);
   if (!summary) return null;
 
   return {
@@ -166,11 +173,13 @@ const extractFieldProposal = (
       `角色「${getRoleLabel(role)}」共 ${summary.totalCount} 段，其中 ${summary.observedCount} 段检测到该字段，${summary.sampleCount} 段命中主值`,
       ...summary.evidence.map((item) => item.replace(/^样本 /, "段落 ")),
     ],
+    evidenceSamples: summary.evidenceSamples,
     conflicts: summary.conflicts.length > 0
       ? summary.conflicts.map((item) => ({
           value: toRuleValue(item.value, spec.unit),
           sampleCount: item.sampleCount,
           evidence: item.evidence.map((sample) => sample.replace(/^样本 /, "段落 ")),
+          evidenceSamples: item.evidenceSamples,
         }))
       : undefined,
   };
@@ -179,21 +188,21 @@ const extractFieldProposal = (
 const collectParagraphsByRole = (
   model: DocModel,
 ): {
-  byRole: Map<Role, Paragraph[]>;
+  byRole: Map<Role, ClassifiedParagraphDetail[]>;
   classifiedCount: number;
   lowConfidenceCount: number;
 } => {
   const classified = classifyParagraphDetails(model.paragraphs);
-  const byRole = new Map<Role, Paragraph[]>();
+  const byRole = new Map<Role, ClassifiedParagraphDetail[]>();
   let classifiedCount = 0;
   let lowConfidenceCount = 0;
 
-  classified.forEach(({ confidence, para, role }) => {
+  classified.forEach(({ confidence, para, reason, role }) => {
     if (!role) return;
     classifiedCount++;
     if (confidence === "low") lowConfidenceCount++;
     const list = byRole.get(role) ?? [];
-    list.push(para);
+    list.push({ confidence, para, reason, role });
     byRole.set(role, list);
   });
 
@@ -226,14 +235,14 @@ const buildNotices = (
   return notices;
 };
 
-const buildRoleProposals = (byRole: Map<Role, Paragraph[]>): RoleRuleProposal[] =>
+const buildRoleProposals = (byRole: Map<Role, ClassifiedParagraphDetail[]>): RoleRuleProposal[] =>
   [...byRole.entries()]
-    .map(([role, paragraphs]) => ({
+    .map(([role, details]) => ({
       role,
       label: getRoleLabel(role),
-      totalCount: paragraphs.length,
+      totalCount: details.length,
       fields: FIELD_SPECS
-        .map((spec) => extractFieldProposal(role, paragraphs, spec))
+        .map((spec) => extractFieldProposal(role, details, spec))
         .filter((item): item is RuleProposalField => item != null),
     }))
     .filter((role) => role.fields.length > 0)

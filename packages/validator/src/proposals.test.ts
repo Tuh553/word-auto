@@ -8,6 +8,8 @@ import {
   applyProposalFieldToDraftWithResult,
   applyProposalRoleToDraft,
   applyProposalRoleToDraftWithResult,
+  diffDocumentProposalFieldForDraft,
+  diffProposalFieldForDraft,
   extractRuleProposal,
   type RoleRuleProposal,
   type RuleDraft,
@@ -21,9 +23,10 @@ const mkPara = (
     sizePt?: number;
     lineHeightPt?: number;
     bold?: boolean;
+    index?: number;
   } = {},
 ): Paragraph => ({
-  index: 0,
+  index: opts.index ?? 0,
   styleId: undefined,
   styleName: undefined,
   directPara: {},
@@ -126,10 +129,10 @@ test("extractRuleProposal：对齐缺失时不再默认提取为 left", () => {
 test("extractRuleProposal：低置信角色样本进入候选 notice", () => {
   const model = {
     paragraphs: [
-      mkPara("摘要"),
-      mkPara("这是摘要正文"),
-      mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
-      mkPara("图1-1 系统架构图", { alignment: "center", sizePt: 10.5 }),
+      mkPara("摘要", { index: 0 }),
+      mkPara("这是摘要正文", { index: 1 }),
+      mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16, index: 2 }),
+      mkPara("图1-1 系统架构图", { alignment: "center", sizePt: 10.5, index: 3 }),
     ],
     styles: new Map(),
     docDefaults: {},
@@ -139,8 +142,19 @@ test("extractRuleProposal：低置信角色样本进入候选 notice", () => {
   };
 
   const proposal = extractRuleProposal(model, { sourceName: "sample.docx" });
+  const figure = proposal.roles.find((item) => item.role === "figure_caption");
+  const size = figure?.fields.find((item) => item.key === "fontSizePt");
 
   assert.match(proposal.notices.join("\n"), /1 段角色识别置信度低/);
+  assert.deepEqual(size?.evidenceSamples?.[0], {
+    sampleIndex: 3,
+    text: "图1-1 系统架构图",
+    value: 10.5,
+    role: "figure_caption",
+    roleLabel: "图题注",
+    roleConfidence: "low",
+    roleConfidenceReason: "仅按文本题注模式判断",
+  });
 });
 
 test("extractRuleProposal：提取 document 页面设置候选并识别分节冲突", () => {
@@ -312,4 +326,84 @@ test("apply*WithResult：返回新增/覆盖/启用状态，支持 document 与 
   assert.equal(roleResult.changes[1].status, "added");
   assert.equal(documentFieldResult.changes[0].status, "updated");
   assert.equal(documentResult.draft.document?.margin_top_cm, 3);
+});
+
+test("diff*ForDraft：只读判断新增、覆盖、启用和无变化", () => {
+  const roleProposal: RoleRuleProposal = {
+    role: "body_text",
+    label: "正文",
+    totalCount: 1,
+    fields: [
+      {
+        key: "fontSizePt",
+        proposedValue: { mode: "exact", exact: 12, unit: "pt" },
+        confidence: 0.9,
+        confidenceLevel: "high",
+        confidenceHint: "主值集中",
+        sampleCount: 1,
+        coverage: 1,
+        observedCount: 1,
+        totalCount: 1,
+        evidence: [],
+      },
+      {
+        key: "align",
+        proposedValue: { mode: "exact", exact: "justify", unit: "enum" },
+        confidence: 0.9,
+        confidenceLevel: "high",
+        confidenceHint: "主值集中",
+        sampleCount: 1,
+        coverage: 1,
+        observedCount: 1,
+        totalCount: 1,
+        evidence: [],
+      },
+    ],
+  };
+  const draft = mkDraft();
+  draft.roles[0].fields[0].enabled = false;
+  draft.document = { margin_top_cm: 2.5, margin_bottom_cm: 3 };
+  const documentProposal = {
+    key: "document" as const,
+    label: "文档设置",
+    totalCount: 1,
+    fields: [
+      {
+        key: "margin_top_cm" as const,
+        label: "上边距",
+        unit: "cm" as const,
+        proposedValue: 3,
+        confidence: 1,
+        confidenceLevel: "high" as const,
+        confidenceHint: "主值集中",
+        sampleCount: 1,
+        coverage: 1,
+        observedCount: 1,
+        totalCount: 1,
+        evidence: [],
+      },
+      {
+        key: "margin_left_cm" as const,
+        label: "左边距",
+        unit: "cm" as const,
+        proposedValue: 2.5,
+        confidence: 1,
+        confidenceLevel: "high" as const,
+        confidenceHint: "主值集中",
+        sampleCount: 1,
+        coverage: 1,
+        observedCount: 1,
+        totalCount: 1,
+        evidence: [],
+      },
+    ],
+  };
+
+  assert.equal(diffProposalFieldForDraft(draft, roleProposal, roleProposal.fields[0]).status, "enabled");
+  assert.equal(diffProposalFieldForDraft(draft, roleProposal, roleProposal.fields[1]).status, "added");
+  assert.equal(diffDocumentProposalFieldForDraft(draft, documentProposal, documentProposal.fields[0]).status, "updated");
+  assert.equal(diffDocumentProposalFieldForDraft(draft, documentProposal, documentProposal.fields[1]).status, "added");
+
+  draft.roles[0].fields[0].enabled = true;
+  assert.equal(diffProposalFieldForDraft(draft, roleProposal, roleProposal.fields[0]).status, "unchanged");
 });

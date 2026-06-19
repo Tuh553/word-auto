@@ -84,9 +84,11 @@ function RulesScreen({
         currentLibrary={rules.currentLibrary}
         currentProposal={proposals.currentProposal}
         draftDirty={rules.draftDirty}
+        ignoredProposalKeys={proposals.ignoredProposalKeys}
         libraries={rules.libraries}
         proposalFeedback={proposals.proposalFeedback}
         ruleMessage={rules.ruleMessage}
+        showIgnoredProposals={proposals.showIgnoredProposals}
         unpublishedChanges={rules.unpublishedChanges}
         onAcceptDocument={proposals.acceptDocumentProposal}
         onAcceptDocumentField={proposals.acceptDocumentProposalField}
@@ -100,11 +102,14 @@ function RulesScreen({
         onExportDraft={rules.exportDraft}
         onExportPublished={rules.exportPublished}
         onExtract={() => proposalRef.current?.click()}
+        onIgnoreProposal={proposals.ignoreProposal}
         onImport={() => importRef.current?.click()}
         onPublish={onPublish}
         onRenameLibrary={rules.renameLibrary}
+        onRestoreProposal={proposals.restoreProposal}
         onSaveDraft={rules.saveDraft}
         onSelectLibrary={rules.selectLibrary}
+        onToggleIgnoredProposals={proposals.toggleIgnoredProposals}
       />
       <RuleFileInputs
         importRef={importRef}

@@ -1,8 +1,10 @@
 import {
+  diffDocumentProposalFieldForDraft,
+  diffProposalFieldForDraft,
   getFieldLabel,
-  type DocumentRuleKey,
   type DocumentRuleProposal,
   type DocumentRuleProposalField,
+  type ProposalApplyChange,
   type RoleRuleProposal,
   type RuleDraft,
   type RuleField,
@@ -10,6 +12,7 @@ import {
   type RuleProposalField,
 } from "@word-auto/validator";
 import { RULE_SECTION_LABEL, formatRuleValue } from "./ruleConfigShared.js";
+import { ProposalEvidenceDetails } from "./TemplateProposalEvidence.js";
 
 const LEVEL_LABEL = {
   high: "高",
@@ -20,7 +23,10 @@ const LEVEL_LABEL = {
 type ProposalFieldCardProps = {
   draft: RuleDraft;
   field: RuleProposalField;
+  ignored: boolean;
   onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
+  onIgnoreField: () => void;
+  onRestoreField: () => void;
   role: RoleRuleProposal;
 };
 
@@ -31,6 +37,7 @@ type ProposalFieldDetailsProps = {
   conflictTexts: string[];
   coverage: number;
   evidence: string[];
+  evidenceSamples: RuleProposalField["evidenceSamples"];
   observedCount: number;
   sampleCount: number;
   totalCount: number;
@@ -38,12 +45,13 @@ type ProposalFieldDetailsProps = {
 
 type ProposalFieldHeaderProps = {
   currentDisplay: string;
-  currentExists: boolean;
-  currentValue: unknown;
+  diff: ProposalApplyChange;
   label: string;
   onAccept: () => void;
+  onIgnore: () => void;
+  onRestore: () => void;
   proposedDisplay: string;
-  proposedValue: unknown;
+  ignored: boolean;
 };
 
 type ProposalDetailSource = Pick<
@@ -53,6 +61,7 @@ type ProposalDetailSource = Pick<
   | "confidenceLevel"
   | "coverage"
   | "evidence"
+  | "evidenceSamples"
   | "observedCount"
   | "sampleCount"
   | "totalCount"
@@ -79,16 +88,11 @@ const formatScalar = (value: unknown, unit?: string): string => {
   return `${String(value)}${suffix}`;
 };
 
-const sameValue = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
-const diffLabel = (
-  current: unknown,
-  proposed: unknown,
-  currentExists: boolean,
-): string => {
-  if (!currentExists) return "将新增";
-  return sameValue(current, proposed) ? "无变化" : "将覆盖";
+const DIFF_LABEL: Record<ProposalApplyChange["status"], string> = {
+  added: "新增字段",
+  updated: "覆盖已有值",
+  enabled: "启用已禁用字段",
+  unchanged: "与当前值一致",
 };
 
 function ProposalFieldMeta({
@@ -124,6 +128,7 @@ function ProposalFieldDetails({
   conflictTexts,
   coverage,
   evidence,
+  evidenceSamples,
   observedCount,
   sampleCount,
   totalCount,
@@ -149,35 +154,43 @@ function ProposalFieldDetails({
         </div>
       )}
 
-      <div className="proposal-evidence">
-        {evidence.map((item, index) => (
-          <div key={index}>{item}</div>
-        ))}
-      </div>
+      <ProposalEvidenceDetails evidence={evidence} samples={evidenceSamples} />
     </>
   );
 }
 
 function ProposalFieldHeader({
   currentDisplay,
-  currentExists,
-  currentValue,
+  diff,
+  ignored,
   label,
   onAccept,
+  onIgnore,
+  onRestore,
   proposedDisplay,
-  proposedValue,
 }: ProposalFieldHeaderProps) {
   return (
     <div className="proposal-field-main">
       <div>
         <div className="proposal-field-name">
           {label}
-          <span className="proposal-diff">{diffLabel(currentValue, proposedValue, currentExists)}</span>
+          <span className={`proposal-diff ${diff.status}`}>{DIFF_LABEL[diff.status]}</span>
         </div>
         <div className="proposal-field-value">候选：{proposedDisplay}</div>
-        <div className="proposal-field-current">当前草稿：{currentDisplay}</div>
+        <div className="proposal-field-current">
+          当前草稿：{currentDisplay}
+        </div>
       </div>
-      <button onClick={onAccept}>接受字段</button>
+      <div className="proposal-field-actions">
+        {ignored ? (
+          <button onClick={onRestore}>取消忽略</button>
+        ) : (
+          <>
+            <button onClick={onIgnore}>忽略</button>
+            <button onClick={onAccept}>接受字段</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -193,6 +206,7 @@ const renderProposalFieldDetails = (
     conflictTexts={conflictTexts}
     coverage={field.coverage}
     evidence={field.evidence}
+    evidenceSamples={field.evidenceSamples}
     observedCount={field.observedCount}
     sampleCount={field.sampleCount}
     totalCount={field.totalCount}
@@ -202,23 +216,26 @@ const renderProposalFieldDetails = (
 function ProposalFieldCard({
   draft,
   field,
+  ignored,
   onAcceptField,
+  onIgnoreField,
+  onRestoreField,
   role,
 }: ProposalFieldCardProps) {
   const current = findDraftField(draft, role.role, field.key);
-  const currentValue = current?.value;
-  const proposedValue = field.proposedValue;
+  const diff = diffProposalFieldForDraft(draft, role, field);
 
   return (
-    <div className="proposal-field">
+    <div className={`proposal-field ${ignored ? "ignored" : ""}`}>
       <ProposalFieldHeader
         currentDisplay={current ? formatRuleValue(current.value) : "（未配置）"}
-        currentExists={current != null}
-        currentValue={currentValue}
+        diff={diff}
+        ignored={ignored}
         label={current?.label ?? getFieldLabel(field.key)}
         onAccept={() => onAcceptField(role, field)}
-        proposedDisplay={formatRuleValue(proposedValue)}
-        proposedValue={proposedValue}
+        onIgnore={onIgnoreField}
+        onRestore={onRestoreField}
+        proposedDisplay={formatRuleValue(field.proposedValue)}
       />
       {renderProposalFieldDetails(
         field,
@@ -233,27 +250,33 @@ function ProposalFieldCard({
 function DocumentProposalFieldCard({
   draft,
   field,
+  ignored,
   onAcceptDocumentField,
+  onIgnoreField,
+  onRestoreField,
   proposal,
 }: {
   draft: RuleDraft;
   field: DocumentRuleProposalField;
+  ignored: boolean;
   onAcceptDocumentField: (proposal: DocumentRuleProposal, field: DocumentRuleProposalField) => void;
+  onIgnoreField: () => void;
+  onRestoreField: () => void;
   proposal: DocumentRuleProposal;
 }) {
-  const currentValue = draft.document?.[field.key as DocumentRuleKey];
-  const currentExists = currentValue != null;
+  const diff = diffDocumentProposalFieldForDraft(draft, proposal, field);
 
   return (
-    <div className="proposal-field">
+    <div className={`proposal-field ${ignored ? "ignored" : ""}`}>
       <ProposalFieldHeader
-        currentDisplay={formatScalar(currentValue, field.unit)}
-        currentExists={currentExists}
-        currentValue={currentValue}
+        currentDisplay={formatScalar(diff.previousValue, field.unit)}
+        diff={diff}
+        ignored={ignored}
         label={field.label}
         onAccept={() => onAcceptDocumentField(proposal, field)}
+        onIgnore={onIgnoreField}
+        onRestore={onRestoreField}
         proposedDisplay={formatScalar(field.proposedValue, field.unit)}
-        proposedValue={field.proposedValue}
       />
       {renderProposalFieldDetails(
         field,
@@ -267,17 +290,25 @@ function DocumentProposalFieldCard({
 
 export function DocumentProposalCard({
   draft,
+  fieldIgnoreKeys,
+  ignored,
   onAcceptDocument,
   onAcceptDocumentField,
+  onIgnoreField,
+  onRestoreField,
   proposal,
 }: {
   draft: RuleDraft;
+  fieldIgnoreKeys: Map<string, string>;
+  ignored: boolean;
   onAcceptDocument: (proposal: DocumentRuleProposal) => void;
   onAcceptDocumentField: (proposal: DocumentRuleProposal, field: DocumentRuleProposalField) => void;
+  onIgnoreField: (key: string) => void;
+  onRestoreField: (key: string) => void;
   proposal: DocumentRuleProposal;
 }) {
   return (
-    <article className="proposal-role">
+    <article className={`proposal-role ${ignored ? "ignored" : ""}`}>
       <div className="proposal-role-head">
         <div>
           <div className="proposal-role-name">{proposal.label}</div>
@@ -285,7 +316,7 @@ export function DocumentProposalCard({
             {RULE_SECTION_LABEL.document} · {proposal.totalCount} 个分节样本 · {proposal.fields.length} 个字段候选
           </div>
         </div>
-        <button onClick={() => onAcceptDocument(proposal)}>整组接受到草稿</button>
+        {!ignored && <button onClick={() => onAcceptDocument(proposal)}>整组接受到草稿</button>}
       </div>
 
       <div className="proposal-fields">
@@ -294,7 +325,10 @@ export function DocumentProposalCard({
             key={field.key}
             draft={draft}
             field={field}
+            ignored={ignored}
             onAcceptDocumentField={onAcceptDocumentField}
+            onIgnoreField={() => onIgnoreField(fieldIgnoreKeys.get(field.key) ?? "")}
+            onRestoreField={() => onRestoreField(fieldIgnoreKeys.get(field.key) ?? "")}
             proposal={proposal}
           />
         ))}
@@ -305,23 +339,44 @@ export function DocumentProposalCard({
 
 export function ProposalRoleCard({
   draft,
+  fieldIgnoreKeys,
+  ignored,
   onAcceptField,
+  onIgnoreField,
+  onIgnoreRole,
+  onRestoreField,
+  onRestoreRole,
   onAcceptRole,
   role,
 }: {
   draft: RuleDraft;
+  fieldIgnoreKeys: Map<string, string>;
+  ignored: boolean;
   onAcceptField: (role: RoleRuleProposal, field: RuleProposalField) => void;
+  onIgnoreField: (key: string) => void;
+  onIgnoreRole: () => void;
+  onRestoreField: (key: string) => void;
+  onRestoreRole: () => void;
   onAcceptRole: (role: RoleRuleProposal) => void;
   role: RoleRuleProposal;
 }) {
   return (
-    <article className="proposal-role">
+    <article className={`proposal-role ${ignored ? "ignored" : ""}`}>
       <div className="proposal-role-head">
         <div>
           <div className="proposal-role-name">{role.label}</div>
           <div className="proposal-role-meta">{role.totalCount} 段样本 · {role.fields.length} 个字段候选</div>
         </div>
-        <button onClick={() => onAcceptRole(role)}>整角色接受到草稿</button>
+        <div className="proposal-field-actions">
+          {ignored ? (
+            <button onClick={onRestoreRole}>取消忽略角色</button>
+          ) : (
+            <>
+              <button onClick={onIgnoreRole}>忽略角色</button>
+              <button onClick={() => onAcceptRole(role)}>整角色接受到草稿</button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="proposal-fields">
@@ -330,7 +385,10 @@ export function ProposalRoleCard({
             key={field.key}
             draft={draft}
             field={field}
+            ignored={ignored}
             onAcceptField={onAcceptField}
+            onIgnoreField={() => onIgnoreField(fieldIgnoreKeys.get(field.key) ?? "")}
+            onRestoreField={() => onRestoreField(fieldIgnoreKeys.get(field.key) ?? "")}
             role={role}
           />
         ))}
