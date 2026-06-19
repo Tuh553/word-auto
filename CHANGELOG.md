@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - **页眉/页脚结构化解析**：解析 `header*.xml` / `footer*.xml`，输出左/中/右基础位置、页脚纯文本与 `PAGE` 页码域识别，保留旧 `headers` 纯文本兼容字段
 - **页眉/页脚样式校验**：校验页眉中文/西文字体、字号、页眉下边框，以及页码位置、页码西文字体和字号
 - **run 级混排检测**：段落内局部 run 字体/字号不合规时输出片段定位，报告展示受影响文本范围
+- **Web 预览片段级高亮**：选中带 `affectedText` 的 run 级 issue 时，在已定位段落内优先高亮对应片段，片段找不到时回退整段高亮
 - **代码审查报告**：通过 Claude Code 内置代码审查（extra-high effort，9个角度），发现并修复 7 个关键问题（详见 `code-review-findings.json`）
 
 ### Changed
@@ -75,27 +76,28 @@ All notable changes to this project will be documented in this file.
 - `apps/web/src/hooks/useDetectionFlow.ts` - 检测流程状态与动作
 - `apps/web/src/hooks/useRuleLibraries.ts` - 规则库草稿、发布、导入导出状态与动作
 - `apps/web/src/hooks/useRuleProposals.ts` - 模板候选提取与接受动作
+- `apps/web/src/lib/previewHighlight.ts` - Web 预览段落与片段匹配 helper
 
 **修改文件**：
 - `packages/parser/src/index.ts`, `types.ts`, `ooxml.ts` - 集成编号解析与结构化页眉页脚输出
 - `packages/validator/src/index.ts`, `types.ts`, `validate.ts`, `rules.ts`, `numbering-check.ts` - 集成编号检测与结构化页眉检测
 - `packages/validator/src/*.test.ts` - 更新测试基线
-- `apps/web/src/lib/reportGroups.ts` - 支持编号字段分组并修复排序冲突
+- `apps/web/src/lib/reportGroups.ts` - 支持编号字段分组、预览片段目标选择并修复排序冲突
 - `apps/web/src/App.tsx`, `ReportPanel.tsx`, `RuleConfigPanel.tsx`, `TemplateProposalPanel.tsx` - 组件瘦身与复用 shared helper
 - `packages/validator/src/classify.ts`, `fixhints.ts`, `lint.ts`, `numbering-check.ts` - 保持行为不变的结构拆分
 
 **测试覆盖**：
 - parser: 25 个测试 ✅
-- validator: 78 个测试 ✅
-- web: 13 个测试 ✅
-- **总计 116 个测试全部通过**
+- validator: 98 个测试 ✅
+- web: 40 个测试 ✅
+- **总计 163 个测试全部通过**
 
 **质量保证**：
 - 类型检查：`pnpm typecheck` ✅
 - ESLint：`pnpm lint` ✅（`--max-warnings 0`）
 - 未用代码检查：`pnpm knip` ✅
 - 复制粘贴检查：`pnpm jscpd` ✅（0 clones）
-- 单元测试：`pnpm test` ✅（108/108）
+- 单元测试：`pnpm test` ✅（163/163）
 - 构建验证：`pnpm build` ✅
 - CI 门禁：`pnpm run ci` ✅
 - 代码审查：Claude Code extra-high effort（9个角度 × 72候选）✅
