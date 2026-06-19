@@ -10,12 +10,12 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 - 栈：Node/TS + pnpm monorepo + `tsx`；前端 React + Vite。
 - 引擎铁律：**绝不用 Word COM**，纯 OOXML（`fflate` + `fast-xml-parser`）。
 
-## 已完成 ✅（截至 2026-06-19）
+## 已完成 ✅（截至 2026-06-20）
 
 | 模块 | 说明 |
 | --- | --- |
 | `packages/parser` | docx→文档模型；样式继承；**run 级有效格式（每个 run 继承 docDefaults / 样式链 / 段落标记格式 / run 直接格式）**；主题字体；`sectPr` 页面设置；带单位测量值；分节页码；**结构化页眉/页脚解析（左/中/右基础位置 + `PAGE` 页码域）**；**段落域解析（复杂域 / 简单域，输出 `REF` / `SEQ` / `PAGEREF` / `PAGE` / `HYPERLINK` 等类型、显示文本与 run 区间）**；**段落书签提取（`w:bookmarkStart`）**；**脚注 / 尾注解析（`footnotes.xml` / `endnotes.xml` 定义 + 段落 `w:footnoteReference` / `w:endnoteReference` 引用位置与正文回填）**；**`numbering.xml` 自动编号解析（abstractNum / num / numPr）**；**表格内段落按文档流顺序提取并标记 `inTable` / `table_cell`**；**段落结构信号定位（`w:drawing` / OMML / `w:object`）**；**解析错误分流（`NOT_ZIP` / `ENCRYPTED` / `LEGACY_DOC` / `CORRUPT` / `NOT_DOCX`）** |
-| `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色** + **结构化置信度 `high`/`medium`/`low`**）；规则比对；按脚本降噪；**run 级混排检测（局部字体/字号异常定位到 run 区间并输出 `affectedText`）**；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；**基于结构化左侧页眉的页眉内容检测**；**页眉/页脚样式检测（字体、字号、页眉线、页码位置/字体/字号）**；**统计型文档检测（关键词数量、摘要字数/词数、参考文献条数、外文占比）**；行距缺失提示；**标题题序连续性检测**；**图表题注连号校验（优先使用 `SEQ` 域编号，正则仅作无域兜底）**；**题注-交叉引用关联图（图 / 表 / 公式 `SEQ` ↔ `REF` / `PAGEREF`）**；**`REF` / `PAGEREF` 有效性校验（缺失书签 / 非题注目标书签）**；**脚注 / 尾注基础一致性校验（失效引用、孤立定义）**；**列表识别**；**图题注 drawing 邻接 / 公式对象信号联动分类**；**issue 透传规则依据 `source.provenance`、角色置信度与修复建议**；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；**模板候选提取 `extractRuleProposal`（含低置信样本 notice、结构化样本证据与只读 diff helper）**；核心分类、lint、修复建议与编号检测已拆出辅助函数降低复杂度 |
+| `packages/validator` | 角色识别（封面区跳过 + TOC1/2/3 + `table_cell` + **特殊正文元素独立角色** + **致谢/附录/成果正式后置章节角色** + **附录内部小标题 / 清单 / 落款细分角色** + **结构化置信度 `high`/`medium`/`low`**）；规则比对；按脚本降噪；**run 级混排检测（局部字体/字号异常定位到 run 区间并输出 `affectedText`）**；文档级检测（页边距/页眉页脚距/装订线/纸张）；分节页码；**基于结构化左侧页眉的页眉内容检测**；**页眉/页脚样式检测（字体、字号、页眉线、页码位置/字体/字号）**；**统计型文档检测（关键词数量、摘要字数/词数、参考文献条数、外文占比）**；行距缺失提示；**标题题序连续性检测**；**图表题注连号校验（优先使用 `SEQ` 域编号，正则仅作无域兜底）**；**题注-交叉引用关联图（图 / 表 / 公式 `SEQ` ↔ `REF` / `PAGEREF`）**；**`REF` / `PAGEREF` 有效性校验（缺失书签 / 非题注目标书签）**；**脚注 / 尾注基础一致性校验（失效引用、孤立定义）**；**列表识别**；**图题注 drawing 邻接 / 公式对象信号联动分类**；**issue 透传规则依据 `source.provenance`、角色置信度与修复建议**；**可编辑规则模型 + 旧规则兼容层**；**规则合法性校验 `lintRuleLibrary`**；**模板候选提取 `extractRuleProposal`（含低置信样本 notice、结构化样本证据与只读 diff helper）**；核心分类、lint、修复建议与编号检测已拆出辅助函数降低复杂度 |
 | `apps/cli` | PoC：报告 + 页面/页码实测；`parseArgs` 参数解析；`--help` / `--rules` / `--out`；中文错误输出；非零退出码；规则库 BOM strip |
 | `apps/web` | React 18.3.1 + Vite 6 纯前端；四步流程；docx-preview 预览 + 文本匹配高亮（见下，已攻克渲染问题）；**run 级 / 片段级 issue 会优先高亮目标段落内的 `affectedText`，找不到片段时回退整段高亮**；规则配置页；字段值编辑；`mode` 切换；草稿保存/发布；发布后回灌检测；**多模板管理（切换、新建、复制、重命名、删除自定义模板；内置模板不可删除）**；自定义规则库 JSON 导入/导出；**模板候选面板（候选 diff、证据下钻、持久忽略、低置信样本提示）**；**报告项可展开查看规范依据 provenance**；**报告项展示修复建议与可修复性标签**；**低置信角色识别 issue 显著提示**；**报告支持按语义章节 / 角色 / 严重级 / 字段分组与组内排序，并默认定位首个问题**；**上传/候选提取错误分流中文提示**；`App` 已瘦身为导航和编排，检测、规则库、候选提取分别拆入 `useDetectionFlow` / `useRuleLibraries` / `useRuleProposals`，UI 拆为 `DetectWorkspace` / `RulesWorkspace` / 规则字段子组件 |
 | 标准模板 | `templates/source/*.docx`，校准依据 + 检测金标准 |
@@ -56,10 +56,9 @@ word-auto 进度表。**新对话先读这里**，再读 `AGENTS.md`（工程约
 
 完整 TODO 已整理到 [`docs/TODO.md`](docs/TODO.md)。当前优先级摘要：
 
-1. 附录细分：附录内部小标题、成果清单、落款等角色。
-2. Web 体验：Web Worker、报告与预览双向滚动、批量检测、带批注 docx 导出。
-3. CLI 增强后的回归：继续补 CLI 级测试或 smoke 基线，避免后续参数行为回退。
-4. （远期、高风险）自动套版改写——务必无损保留分节、域、题注、交叉引用、编号，绝不引入 Word COM。
+1. Web 体验：Web Worker、报告与预览双向滚动、批量检测、带批注 docx 导出。
+2. CLI 增强后的回归：继续补 CLI 级测试或 smoke 基线，避免后续参数行为回退。
+3. （远期、高风险）自动套版改写——务必无损保留分节、域、题注、交叉引用、编号，绝不引入 Word COM。
 
 ## 已知坑（详见 AGENTS.md）
 

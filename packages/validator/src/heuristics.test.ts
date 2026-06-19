@@ -17,6 +17,7 @@ const mkPara = (
     alignment?: string;
     sizePt?: number;
     inTable?: boolean;
+    numbering?: Paragraph["numbering"];
     drawingCount?: number;
     mathCount?: number;
     embeddedObjectCount?: number;
@@ -40,6 +41,7 @@ const mkPara = (
     sizePt: opts.sizePt,
   },
   inTable: opts.inTable,
+  numbering: opts.numbering,
 });
 
 const mkModel = (paragraphs: Paragraph[]): DocModel => ({
@@ -116,6 +118,102 @@ test("特殊正文元素：图注/表注/资料来源/公式编号从 body_text 
     "body_text",
     "source_note",
     "formula_line",
+  ]);
+});
+
+test("附录细分：附录标题后的小标题由大纲级别识别", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("附录A"),
+    mkPara("A.1 调查问卷", { outlineLevel: 1 }),
+    mkPara("无法可靠细分的附录说明"),
+  ];
+
+  assert.deepEqual(classifyParagraphs(paras), [
+    "abstract_title_cn",
+    "abstract_body_cn",
+    "appendix_heading",
+    "appendix_subheading",
+    "appendix_body",
+  ]);
+});
+
+test("附录细分：附录内编号和材料条目识别为附录清单", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("附录A"),
+    mkPara("1. 原始访谈记录"),
+    mkPara("材料一：实验数据表", {
+      numbering: { numId: "1", ilvl: 0 },
+    }),
+  ];
+
+  assert.deepEqual(classifyParagraphs(paras), [
+    "abstract_title_cn",
+    "abstract_body_cn",
+    "appendix_heading",
+    "appendix_list_item",
+    "appendix_list_item",
+  ]);
+});
+
+test("附录细分：附录末尾落款和日期识别为附录落款", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("附录A"),
+    mkPara("作者：张三"),
+    mkPara("重庆2026年6月20日"),
+  ];
+
+  assert.deepEqual(classifyParagraphs(paras), [
+    "abstract_title_cn",
+    "abstract_body_cn",
+    "appendix_heading",
+    "appendix_signature",
+    "appendix_signature",
+  ]);
+});
+
+test("附录细分：非附录上下文不触发附录专属角色", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0 }),
+    mkPara("A.1 调查问卷", { outlineLevel: 1 }),
+    mkPara("1. 原始访谈记录"),
+    mkPara("日期：2026年6月20日"),
+    mkPara("攻读学位期间取得的研究成果"),
+    mkPara("1. 已发表论文"),
+  ];
+
+  assert.deepEqual(classifyParagraphs(paras), [
+    "abstract_title_cn",
+    "abstract_body_cn",
+    "heading1",
+    "heading2",
+    "body_text",
+    "body_text",
+    "achievement_heading",
+    "achievement_body",
+  ]);
+});
+
+test("附录细分：表格单元格仍优先识别为 table_cell", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("附录A"),
+    mkPara("1. 表格内材料", { inTable: true }),
+  ];
+
+  assert.deepEqual(classifyParagraphs(paras), [
+    "abstract_title_cn",
+    "abstract_body_cn",
+    "appendix_heading",
+    "table_cell",
   ]);
 });
 

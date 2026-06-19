@@ -1,6 +1,6 @@
 # TODO
 
-最后更新：2026-06-19
+最后更新：2026-06-20
 
 本文是当前 TODO 的集中入口。历史 PRD / roadmap 仍保留设计背景，但后续排期以本文和
 [`PROGRESS.md`](../PROGRESS.md) 为准。
@@ -39,6 +39,9 @@
   `useDetectionFlow` / `useRuleLibraries` / `useRuleProposals` 分离，后续做 Worker 或多模板管理时不再堆叠到单文件。
 - Web 预览片段高亮：选中带 `affectedText` 的 run 级 issue 时，预览会在目标段落内优先高亮对应文本片段；
   片段匹配失败时回退整段高亮。
+- 附录细分：validator 已在附录上下文内识别 `appendix_subheading`、`appendix_list_item`、
+  `appendix_signature`，并保留旧 `appendix_body` 兜底；标准模板中 3 个附录清单项已从
+  `appendix_body` 拆出为 `appendix_list_item`。
 
 ## P0：保持安全网有效
 
@@ -50,9 +53,9 @@
 
 **详细开发计划见 [`docs/P1-PLAN.md`](./P1-PLAN.md)，总工作量 5-8 周。**
 
-### P1 核心目标
+### P1 状态
 
-1. **附录细分**：拆分附录内部小标题、成果清单、落款等角色
+P1 已完成，后续重点转入 Web 体验与交付。
 
 ## P2：Web 体验与交付
 

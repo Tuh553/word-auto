@@ -33,6 +33,14 @@ const EQUATION_NUMBER =
   /(?:\(|（)\d+(?:[-－—.．]\d+)*(?:\)|）)$/;
 const MATH_OPERATOR =
   /[=+\-*/×÷≤≥≠≈∑∫√]/;
+const APPENDIX_LIST_MARKER =
+  /^(?:[（(]?[0-9一二三四五六七八九十]+[）).、．.]|[①②③④⑤⑥⑦⑧⑨⑩]|[-•·●▪◆◇■□])\s*\S+/;
+const APPENDIX_MATERIAL_ITEM =
+  /^(?:材料|附件|附表|附图)\s*[一二三四五六七八九十0-9]+(?:[:：\s]|$)/;
+const APPENDIX_SIGNATURE_LABEL =
+  /^(?:姓名|署名|作者|申请人|填表人|签名|日期|时间|地点|单位)[:：]\S{1,40}$/;
+const APPENDIX_FULL_DATE =
+  /^(?:[一-鿿]{2,8}\s*)?(?:20|19)\d{2}年\d{1,2}月\d{1,2}日$/;
 
 type Section =
   | "cover"
@@ -230,6 +238,43 @@ const outlineRole = (p: Paragraph): SectionRole | null => {
   return null;
 };
 
+const isAppendixSubheading = (p: Paragraph, text: string): boolean =>
+  headingLevel(p) !== null && text.length <= 80;
+
+const isAppendixListItem = (p: Paragraph, text: string): boolean =>
+  p.numbering != null ||
+  APPENDIX_LIST_MARKER.test(text) ||
+  APPENDIX_MATERIAL_ITEM.test(text);
+
+const isAppendixSignature = (text: string): boolean =>
+  text.length <= 50 &&
+  (APPENDIX_SIGNATURE_LABEL.test(text) || APPENDIX_FULL_DATE.test(text));
+
+const appendixRole = (p: Paragraph, text: string): RoleDetail | null => {
+  if (isAppendixSubheading(p, text)) {
+    return {
+      role: "appendix_subheading",
+      confidence: "high",
+      reason: "附录上下文内由大纲级别或标题样式判断",
+    };
+  }
+  if (isAppendixListItem(p, text)) {
+    return {
+      role: "appendix_list_item",
+      confidence: p.numbering ? "high" : "medium",
+      reason: p.numbering ? "附录上下文内由自动编号判断" : "附录上下文内由清单文本模式判断",
+    };
+  }
+  if (isAppendixSignature(text)) {
+    return {
+      role: "appendix_signature",
+      confidence: "medium",
+      reason: "附录上下文内由短落款或日期模式判断",
+    };
+  }
+  return null;
+};
+
 const bodyRoleForSection = (section: BodySection, text: string): RoleDetail => {
   if (section !== "body") {
     return {
@@ -298,6 +343,14 @@ export const classifyParagraphDetails = (paras: Paragraph[]): ClassifiedParagrap
     if (keyword) {
       out.push(detail(p, keyword, "medium", "关键词文本模式命中"));
       continue;
+    }
+
+    if (section === "appendix") {
+      const appendixDetail = appendixRole(p, compactText);
+      if (appendixDetail) {
+        out.push(detail(p, appendixDetail.role, appendixDetail.confidence, appendixDetail.reason));
+        continue;
+      }
     }
 
     const outline = outlineRole(p);

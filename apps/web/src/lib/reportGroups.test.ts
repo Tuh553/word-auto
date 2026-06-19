@@ -8,6 +8,7 @@ import {
   findFirstNavigableIssue,
   findVisibleIssueForParagraph,
   formatIssueField,
+  formatIssueRole,
   getIssueKey,
   resolveSelectedIssue,
 } from "./reportGroups.js";
@@ -91,6 +92,51 @@ test("findFirstNavigableIssue：跳过文档级问题，返回首个可定位段
 test("formatIssueField：统计型字段使用中文标签", () => {
   assert.equal(formatIssueField("keywords_cn_count"), "中文关键词数量");
   assert.equal(formatIssueField("references_foreign_fraction"), "外文参考文献占比");
+});
+
+test("附录细分角色：报告标签和语义章节分组正常", () => {
+  const issues: Issue[] = [
+    {
+      paraIndex: 10,
+      role: "appendix_subheading",
+      field: "size_pt",
+      expected: 12,
+      actual: 10.5,
+      severity: "warn",
+      message: "附录小标题字号问题",
+      textPreview: "A.1 调查问卷",
+    },
+    {
+      paraIndex: 11,
+      role: "appendix_list_item",
+      field: "alignment",
+      expected: "left",
+      actual: "center",
+      severity: "warn",
+      message: "附录清单对齐问题",
+      textPreview: "1. 原始访谈记录",
+    },
+    {
+      paraIndex: 12,
+      role: "appendix_signature",
+      field: "font_east_asia",
+      expected: "宋体",
+      actual: "黑体",
+      severity: "warn",
+      message: "附录落款字体问题",
+      textPreview: "日期：2026年6月20日",
+    },
+  ];
+
+  const groups = buildReportGroups(issues, "section", "paragraph");
+
+  assert.equal(formatIssueRole("appendix_subheading"), "附录小标题");
+  assert.equal(formatIssueRole("appendix_list_item"), "附录清单");
+  assert.equal(formatIssueRole("appendix_signature"), "附录落款");
+  assert.deepEqual(
+    groups.map((group) => [group.key, group.label, group.issues.length]),
+    [["appendix", "附录", 3]],
+  );
 });
 
 test("findVisibleIssueForParagraph：同一段多个 issue 时返回确定的首个可见问题", () => {

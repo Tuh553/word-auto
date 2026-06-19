@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const sourceDir = resolve(here, "../../../templates/source");
 const docxName = readdirSync(sourceDir).find((f) => f.endsWith(".docx"));
 
-// 当前基线（2026-06-11）：包含表格段落、特殊正文元素与正式后置章节角色
+// 当前基线（2026-06-20）：包含表格段落、特殊正文元素与附录细分角色
 const BASELINE: Record<string, number> = {
   "(null)": 174,
   abstract_title_cn: 1,
@@ -33,7 +33,8 @@ const BASELINE: Record<string, number> = {
   reference_heading: 1,
   reference_body: 1,
   appendix_heading: 1,
-  appendix_body: 9,
+  appendix_body: 6,
+  appendix_list_item: 3,
   acknowledgement_heading: 1,
   acknowledgement_body: 4,
   table_cell: 173,

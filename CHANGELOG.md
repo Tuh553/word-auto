@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - **run 级混排检测**：段落内局部 run 字体/字号不合规时输出片段定位，报告展示受影响文本范围
 - **Web 预览片段级高亮**：选中带 `affectedText` 的 run 级 issue 时，在已定位段落内优先高亮对应片段，片段找不到时回退整段高亮
 - **表格全局顺序保留**：parser 按 OOXML 文档流输出正文与表格段落，表格段落继续标记 `inTable` 并分类为 `table_cell`
+- **附录细分角色识别**：validator 在附录上下文内识别附录小标题、材料/条目清单、落款或日期署名段落；表格段落仍优先为 `table_cell`
 - **代码审查报告**：通过 Claude Code 内置代码审查（extra-high effort，9个角度），发现并修复 7 个关键问题（详见 `code-review-findings.json`）
 
 ### Changed
@@ -26,6 +27,7 @@ All notable changes to this project will be documented in this file.
   - `DocModel` 新增 `numbering: NumberingDefinitions` 字段
   - `DocModel` 新增结构化 `headerParts` / `footerParts` 输出，并保留旧 `headers` 纯文本字段
   - `Role` 类型新增 `"heading"` 和 `"unknown"` 枚举值
+  - `Role` 类型新增 `"appendix_subheading"`、`"appendix_list_item"`、`"appendix_signature"` 枚举值
   - `ClassifiedParagraph` 的 `role` 字段改为可空类型（`Role | null`）
   - `ValidationIssue` 的 `role` 字段收窄为严格 `Role` 类型
 - **run 有效格式解析**：`Paragraph.runs` 增加继承后的 `effective`，供正文混排检测和页眉/页脚片段样式检测复用
@@ -35,6 +37,7 @@ All notable changes to this project will be documented in this file.
 - **题注连号策略明确**：图 / 表题注优先消费 `SEQ` 域编号，段落正则仅作为无域样本兜底
 - **测试基线更新**：新增 parser `PAGEREF` synthetic 用例与 validator 引用有效性用例，标准模板当前仍保留 1 个表题注连号问题
 - **数据流统一**：`classified` 数组与主校验循环对 undefined 角色的处理逻辑统一（均跳过）
+- **标准模板分类基线更新**：3 个附录清单项从 `appendix_body` 拆出为 `appendix_list_item`，总 issue 数和严重级别不变
 
 ### Fixed
 
@@ -90,9 +93,9 @@ All notable changes to this project will be documented in this file.
 
 **测试覆盖**：
 - parser: 26 个测试 ✅
-- validator: 98 个测试 ✅
-- web: 40 个测试 ✅
-- **总计 164 个测试全部通过**
+- validator: 103 个测试 ✅
+- web: 41 个测试 ✅
+- **总计 170 个测试全部通过**
 
 **质量保证**：
 - 类型检查：`pnpm typecheck` ✅

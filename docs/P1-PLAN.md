@@ -1,6 +1,6 @@
 # P1 开发计划
 
-最后更新：2026-06-19
+最后更新：2026-06-20
 
 本文档是 P1（优先级 1）阶段的详细开发计划，聚焦**解析准确率**、**校验与报告可信度**、**规则库与模板候选**三大方向。
 
@@ -27,6 +27,10 @@ validator 的分类、lint、修复建议和编号检测热路径已拆出辅助
 解析，按正文与表格在 OOXML 中的真实顺序输出 `DocModel.paragraphs`；表格段落继续标记
 `inTable` 并由 validator 识别为 `table_cell`。
 
+2026-06-20 附录细分闭环：validator 已在附录上下文内拆分 `appendix_subheading`、
+`appendix_list_item`、`appendix_signature`，旧 `appendix_body` 保持兜底；新增角色的规则
+fallback 继续兼容 `appendix_body` / `back_matter_body`。
+
 ## 总体排期
 
 | 阶段 | 工作量 | 关键里程碑 |
@@ -34,7 +38,7 @@ validator 的分类、lint、修复建议和编号检测热路径已拆出辅助
 | 阶段 1：解析能力增强 | 2-3 周 | 域/题注/交叉引用/脚注尾注解析、run 级混排检测 |
 | 阶段 2：校验与报告可信度提升 | 已完成 | 页眉/页脚样式检测、统计型检测、置信度标记 |
 | 阶段 3：规则库与模板候选 | 已完成 | 模板管理、候选 diff/证据/忽略已完成 |
-| 阶段 4：兜底与补充 | 1 周 | 表格全局顺序已完成；附录细分待做 |
+| 阶段 4：兜底与补充 | 已完成 | 表格全局顺序与附录细分已完成 |
 | **总计** | **5-8 周** | P1 全部完成 |
 
 ---
@@ -530,20 +534,25 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 当前附录内容统一为 `appendix_body`，无法区分内部结构。
 
 **任务清单**：
-- [ ] 扩展角色分类（`packages/validator/src/classify.ts`）：
-  - [ ] 识别附录内小标题（`heading2`/`heading3` 在附录章节内）
-  - [ ] 识别成果清单：基于编号格式、关键词（论文/专利/软著）
-  - [ ] 识别落款：基于日期格式、位置（附录末尾）
-- [ ] validator 接入：附录细分角色校验
-- [ ] 金标准测试：验证附录细分准确性
+- [x] 扩展角色分类（`packages/validator/src/classify.ts`）：
+  - [x] 识别附录内小标题：仅在附录上下文内消费大纲级别 / 标题样式
+  - [x] 识别附录材料 / 条目清单：基于自动编号、编号文本或“材料 / 附件”条目模式
+  - [x] 识别落款：保守匹配姓名、日期、地点等短段落
+- [x] validator 接入：新增角色 fallback 到 `appendix_body`，再兼容旧 `back_matter_body`
+- [x] 金标准测试：标准模板中 3 个附录清单项从 `appendix_body` 拆出为 `appendix_list_item`
 
 **产出**：
 - 附录细分角色
 - 分类逻辑
 - 校验规则
 
+**实现状态（2026-06-20）**：
+- 新增角色：`appendix_subheading`、`appendix_list_item`、`appendix_signature`。
+- 分类只在 `section === "appendix"` 时触发；正文、参考文献、致谢和成果章节不触发附录专属角色。
+- `inTable` 段落仍最优先分类为 `table_cell`，不进入附录状态机。
+
 **验收标准**：
-- 能识别附录内小标题、成果清单、落款
+- 能识别附录内小标题、清单、落款
 - `pnpm run ci` 通过
 
 ---
@@ -582,7 +591,7 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 | 模板管理完成 | 已完成 | UI 支持新建/复制/重命名/删除模板 |
 | 候选 diff 完成 | 已完成 | 能展示候选与草稿差异，支持忽略 |
 | 表格全局顺序完成 | 已完成 | 表格段落按文档流输出，`table_cell` 分类不回退 |
-| P1 全部完成 | 第 8 周 | 所有任务完成，`pnpm run ci` 通过，文档更新 |
+| P1 全部完成 | 已完成 | 所有任务完成，`pnpm run ci` 通过，文档更新 |
 
 ---
 
