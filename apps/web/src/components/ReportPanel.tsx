@@ -153,6 +153,11 @@ function ReportIssueCard({
       ) : (
         <div className="text">「{issue.textPreview}」</div>
       )}
+      {issue.roleConfidence === "low" ? (
+        <div className="confidence-warning">
+          角色识别置信度低：{issue.roleConfidenceReason ?? "仅按启发式规则判断"}
+        </div>
+      ) : null}
       {issue.suggestion ? (
         <div className="fix-hint">
           <span className={`fix-tag ${issue.fixability ?? "manual"}`}>

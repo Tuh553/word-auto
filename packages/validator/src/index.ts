@@ -1,5 +1,8 @@
 export * from "./types.js";
-export { classifyParagraphs } from "./classify.js";
+export {
+  classifyParagraphDetails,
+  classifyParagraphs,
+} from "./classify.js";
 export { validateDoc } from "./validate.js";
 export { computeFixHint, type FixHint, type Fixability } from "./fixhints.js";
 export {

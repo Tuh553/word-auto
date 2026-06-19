@@ -1,5 +1,5 @@
 import type { DocModel, Paragraph } from "@word-auto/parser";
-import { classifyParagraphs } from "./classify.js";
+import { classifyParagraphDetails } from "./classify.js";
 import { extractDocumentProposal } from "./proposals-document.js";
 import {
   type CandidateSample,
@@ -178,32 +178,43 @@ const extractFieldProposal = (
 
 const collectParagraphsByRole = (
   model: DocModel,
-): { byRole: Map<Role, Paragraph[]>; classifiedCount: number } => {
-  const roles = classifyParagraphs(model.paragraphs);
+): {
+  byRole: Map<Role, Paragraph[]>;
+  classifiedCount: number;
+  lowConfidenceCount: number;
+} => {
+  const classified = classifyParagraphDetails(model.paragraphs);
   const byRole = new Map<Role, Paragraph[]>();
   let classifiedCount = 0;
+  let lowConfidenceCount = 0;
 
-  model.paragraphs.forEach((para, index) => {
-    const role = roles[index];
+  classified.forEach(({ confidence, para, role }) => {
     if (!role) return;
     classifiedCount++;
+    if (confidence === "low") lowConfidenceCount++;
     const list = byRole.get(role) ?? [];
     list.push(para);
     byRole.set(role, list);
   });
 
-  return { byRole, classifiedCount };
+  return { byRole, classifiedCount, lowConfidenceCount };
 };
 
 const buildNotices = (
   model: DocModel,
   classifiedCount: number,
+  lowConfidenceCount: number,
   hasDocumentConflicts: boolean,
 ): string[] => {
   const notices: string[] = [];
   if (classifiedCount < model.paragraphs.length) {
     notices.push(
       `有 ${model.paragraphs.length - classifiedCount} 段未被角色识别，候选结果只基于已识别段落`,
+    );
+  }
+  if (lowConfidenceCount > 0) {
+    notices.push(
+      `有 ${lowConfidenceCount} 段角色识别置信度低，接受候选前请优先复核相关样本`,
     );
   }
   if (model.sections.length === 0) {
@@ -232,7 +243,7 @@ export const extractRuleProposal = (
   model: DocModel,
   options: { sourceName?: string } = {},
 ): RuleProposal => {
-  const { byRole, classifiedCount } = collectParagraphsByRole(model);
+  const { byRole, classifiedCount, lowConfidenceCount } = collectParagraphsByRole(model);
   const document = extractDocumentProposal(model);
   const hasDocumentConflicts =
     document?.fields.some((field) => field.conflicts && field.conflicts.length > 0) ?? false;
@@ -243,7 +254,7 @@ export const extractRuleProposal = (
     paragraphCount: model.paragraphs.length,
     classifiedCount,
     unclassifiedCount: model.paragraphs.length - classifiedCount,
-    notices: buildNotices(model, classifiedCount, hasDocumentConflicts),
+    notices: buildNotices(model, classifiedCount, lowConfidenceCount, hasDocumentConflicts),
     document: document ?? undefined,
     roles: buildRoleProposals(byRole),
   };

@@ -1,5 +1,5 @@
 import { units, type DocModel } from "@word-auto/parser";
-import { classifyParagraphs } from "./classify.js";
+import { classifyParagraphDetails } from "./classify.js";
 import { computeFixHint } from "./fixhints.js";
 import { checkHeaderFooter } from "./header-footer-check.js";
 import { checkNoteConsistency } from "./notes-check.js";
@@ -9,6 +9,7 @@ import { isEditableRuleLibrary } from "./rules.js";
 import { checkDocumentStatistics } from "./statistics-check.js";
 import type {
   EditableRuleLibrary,
+  ClassifiedParagraph,
   Issue,
   RuleLibrary,
   ValidationReport,
@@ -206,11 +207,26 @@ const checkPageNumbers = (
   return out;
 };
 
+const withRoleConfidence = (
+  issue: Issue,
+  classified: ClassifiedParagraph | undefined,
+): Issue => {
+  if (issue.paraIndex < 0 || !classified?.confidence) return issue;
+  return {
+    ...issue,
+    roleConfidence: classified.confidence,
+    roleConfidenceReason: classified.reason,
+  };
+};
+
 const collectStructuredIssues = (
   model: DocModel,
-  classified: Array<{ para: DocModel["paragraphs"][number]; role: ReturnType<typeof classifyParagraphs>[number] | null }>,
+  classified: ClassifiedParagraph[],
 ): Issue[] => {
   const issues: Issue[] = [];
+  const classifiedByParaIndex = new Map(
+    classified.map((item) => [item.para.index, item] as const),
+  );
   const structuredIssues = [
     ...checkNumberingSequence(model, classified),
     ...checkCaptionReferenceValidity(classified),
@@ -219,7 +235,8 @@ const collectStructuredIssues = (
 
   for (const item of structuredIssues) {
     if (item.type === "paragraph" && item.paragraphIndex !== undefined) {
-      const para = model.paragraphs[item.paragraphIndex];
+      const detail = classifiedByParaIndex.get(item.paragraphIndex);
+      const para = detail?.para ?? model.paragraphs[item.paragraphIndex];
       issues.push({
         paraIndex: item.paragraphIndex,
         role: item.role,
@@ -231,6 +248,8 @@ const collectStructuredIssues = (
         textPreview: para?.text.slice(0, 24) ?? "",
         suggestion: item.fixHint,
         fixability: item.canAutoFix ? "auto" : "manual",
+        roleConfidence: detail?.confidence,
+        roleConfidenceReason: detail?.reason,
       });
       continue;
     }
@@ -257,7 +276,7 @@ const collectStructuredIssues = (
 
 const collectParagraphIssues = (
   model: DocModel,
-  classified: Array<{ para: DocModel["paragraphs"][number]; role: ReturnType<typeof classifyParagraphs>[number] | null }>,
+  classified: ClassifiedParagraph[],
   rules: ValidationRules,
 ): { classifiedCount: number; issues: Issue[] } => {
   const issues: Issue[] = [];
@@ -269,13 +288,15 @@ const collectParagraphIssues = (
     classifiedCount++;
 
     if (isEditableRuleLibrary(rules)) {
-      issues.push(...checkEditablePara(paragraph, current.role, rules));
+      issues.push(...checkEditablePara(paragraph, current.role, rules)
+        .map((issue) => withRoleConfidence(issue, current)));
       return;
     }
 
     const rule = findRuleForRole(current.role, rules.styles);
     if (!rule) return;
-    issues.push(...checkPara(paragraph, current.role, rule, getRoleProvenance(rules, current.role)));
+    issues.push(...checkPara(paragraph, current.role, rule, getRoleProvenance(rules, current.role))
+      .map((issue) => withRoleConfidence(issue, current)));
   });
 
   return { classifiedCount, issues };
@@ -294,11 +315,7 @@ export const validateDoc = (
   model: DocModel,
   rules: ValidationRules,
 ): ValidationReport => {
-  const roles = classifyParagraphs(model.paragraphs);
-  const classified = roles.map((role, index) => ({
-    para: model.paragraphs[index],
-    role: role ?? null,
-  }));
+  const classified = classifyParagraphDetails(model.paragraphs);
 
   const issues: Issue[] = [
     ...checkDocument(model, rules),

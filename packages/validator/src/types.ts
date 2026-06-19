@@ -316,11 +316,18 @@ export type Role =
   | "unknown";
 
 export type Severity = "error" | "warn" | "info";
+export type RoleConfidence = "high" | "medium" | "low";
 
 /** 带角色的已分类段落 */
 export interface ClassifiedParagraph {
   para: Paragraph;
   role: Role | null;
+  confidence?: RoleConfidence;
+  reason?: string;
+}
+
+export interface ClassifiedParagraphDetail extends ClassifiedParagraph {
+  confidence: RoleConfidence;
 }
 
 export type CaptionKind = "figure" | "table" | "equation";
@@ -373,6 +380,8 @@ export interface ValidationIssue {
   startRunIndex?: number;
   endRunIndex?: number;
   affectedText?: string;
+  roleConfidence?: RoleConfidence;
+  roleConfidenceReason?: string;
   provenance?: string;
   /** 可操作的人话修复指引 */
   suggestion?: string;
@@ -394,6 +403,8 @@ export interface Issue {
   startRunIndex?: number;
   endRunIndex?: number;
   affectedText?: string;
+  roleConfidence?: RoleConfidence;
+  roleConfidenceReason?: string;
   provenance?: string;
   /** 可操作的人话修复指引（如「请将该段落字号调整为 12pt」） */
   suggestion?: string;

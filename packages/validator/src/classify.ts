@@ -1,5 +1,9 @@
 import type { Paragraph } from "@word-auto/parser";
-import type { Role } from "./types.js";
+import type {
+  ClassifiedParagraphDetail,
+  Role,
+  RoleConfidence,
+} from "./types.js";
 
 /** 去除所有空白，便于标题文本精确匹配 */
 const compact = (s: string): string => s.replace(/\s+/g, "");
@@ -44,6 +48,11 @@ type Section =
 type BackMatterSection = Extract<Section, "acknowledgement" | "appendix" | "achievement">;
 type BodySection = Extract<Section, "cn_abstract" | "en_abstract" | "references" | BackMatterSection | "toc" | "body">;
 type SectionRole = { role: Role; section: Section };
+type RoleDetail = {
+  role: Role | null;
+  confidence: RoleConfidence;
+  reason?: string;
+};
 
 const TOC_ROLE_BY_STYLE_ID: Record<string, Role> = {
   toc1: "toc1",
@@ -125,19 +134,74 @@ const isEquationLine = (
     (alignment === "center" || alignment === "right" || text.length <= 80);
 };
 
+const detail = (
+  para: Paragraph,
+  role: Role | null,
+  confidence: RoleConfidence,
+  reason?: string,
+): ClassifiedParagraphDetail => ({
+  para,
+  role,
+  confidence,
+  reason,
+});
+
 const specialBodyRole = (
   paras: Paragraph[],
   index: number,
   p: Paragraph,
   t: string,
-): Role | null => {
+): RoleDetail | null => {
   const align = p.effective.alignment;
   const adjacentDrawing = hasDrawing(paras[index - 1]) || hasDrawing(paras[index + 1]);
 
-  if (isFigureCaption(t) || isRelaxedFigureCaption(t, adjacentDrawing, align)) return "figure_caption";
-  if (isTableCaption(t)) return "table_caption";
-  if (isSourceNote(t)) return "source_note";
-  if (isEquationLine(t, p, align)) return "formula_line";
+  if (isRelaxedFigureCaption(t, adjacentDrawing, align)) {
+    return {
+      role: "figure_caption",
+      confidence: "high",
+      reason: "drawing 邻接结构信号支持图题注判断",
+    };
+  }
+  if (isFigureCaption(t)) {
+    return adjacentDrawing
+      ? {
+          role: "figure_caption",
+          confidence: "high",
+          reason: "drawing 邻接结构信号支持图题注判断",
+        }
+      : {
+          role: "figure_caption",
+          confidence: "low",
+          reason: "仅按文本题注模式判断",
+        };
+  }
+  if (isTableCaption(t)) {
+    return {
+      role: "table_caption",
+      confidence: "low",
+      reason: "仅按文本题注模式判断",
+    };
+  }
+  if (isSourceNote(t)) {
+    return {
+      role: "source_note",
+      confidence: "low",
+      reason: "仅按资料来源文本模式判断",
+    };
+  }
+  if (isEquationLine(t, p, align)) {
+    return hasFormulaStructure(p)
+      ? {
+          role: "formula_line",
+          confidence: "high",
+          reason: "OMML 或嵌入对象结构信号支持公式行判断",
+        }
+      : {
+          role: "formula_line",
+          confidence: "low",
+          reason: "仅按文本公式编号模式判断",
+        };
+  }
   return null;
 };
 
@@ -166,10 +230,26 @@ const outlineRole = (p: Paragraph): SectionRole | null => {
   return null;
 };
 
-const bodyRoleForSection = (section: BodySection, text: string): Role | null => {
-  if (section !== "body") return BODY_ROLE_BY_SECTION[section] ?? null;
-  if (COVER_HINT.test(text) && text.length < 25) return null;
-  return "body_text";
+const bodyRoleForSection = (section: BodySection, text: string): RoleDetail => {
+  if (section !== "body") {
+    return {
+      role: BODY_ROLE_BY_SECTION[section] ?? null,
+      confidence: "high",
+      reason: "由明确章节上下文判断",
+    };
+  }
+  if (COVER_HINT.test(text) && text.length < 25) {
+    return {
+      role: null,
+      confidence: "medium",
+      reason: "疑似封面字段，跳过正文规则",
+    };
+  }
+  return {
+    role: "body_text",
+    confidence: "high",
+    reason: "由正文标题上下文判断",
+  };
 };
 
 /**
@@ -178,20 +258,20 @@ const bodyRoleForSection = (section: BodySection, text: string): Role | null => 
  * 文档开头到第一个「摘要」之间视为封面/扉页区，整体跳过（规则 scope 不含封面）。
  * 识别不出的（空段、目录条目等）返回 null，不参与校验。
  */
-export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
+export const classifyParagraphDetails = (paras: Paragraph[]): ClassifiedParagraphDetail[] => {
   let section: Section = "cover";
-  const roles: (Role | null)[] = [];
+  const out: ClassifiedParagraphDetail[] = [];
 
   for (let i = 0; i < paras.length; i += 1) {
     const p = paras[i];
     // 表格单元格段落：独立角色，不参与正文章节状态机
     if (p.inTable) {
-      roles.push("table_cell");
+      out.push(detail(p, "table_cell", "high", "表格单元格结构标记"));
       continue;
     }
     const compactText = compact(p.text);
     if (!compactText) {
-      roles.push(null);
+      out.push(detail(p, null, "high", "空段落"));
       continue;
     }
     const inlineText = normalizeInline(p.text);
@@ -199,44 +279,48 @@ export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] => {
     const sectionHeading = sectionHeadingRole(compactText);
     if (sectionHeading) {
       section = sectionHeading.section;
-      roles.push(sectionHeading.role);
+      out.push(detail(p, sectionHeading.role, "high", "明确章节标题关键词命中"));
       continue;
     }
 
     if (section === "cover") {
-      roles.push(null);
+      out.push(detail(p, null, "high", "摘要前封面区跳过"));
       continue;
     }
 
     const toc = tocRole(p.styleId);
     if (toc) {
-      roles.push(toc);
+      out.push(detail(p, toc, "high", "目录样式明确命中"));
       continue;
     }
 
     const keyword = keywordRole(compactText);
     if (keyword) {
-      roles.push(keyword);
+      out.push(detail(p, keyword, "medium", "关键词文本模式命中"));
       continue;
     }
 
     const outline = outlineRole(p);
     if (outline) {
       section = outline.section;
-      roles.push(outline.role);
+      out.push(detail(p, outline.role, "high", "大纲级别或标题样式明确命中"));
       continue;
     }
 
     if (section === "body") {
       const special = specialBodyRole(paras, i, p, inlineText);
       if (special) {
-        roles.push(special);
+        out.push(detail(p, special.role, special.confidence, special.reason));
         continue;
       }
     }
 
-    roles.push(bodyRoleForSection(section, compactText));
+    const body = bodyRoleForSection(section, compactText);
+    out.push(detail(p, body.role, body.confidence, body.reason));
   }
 
-  return roles;
+  return out;
 };
+
+export const classifyParagraphs = (paras: Paragraph[]): (Role | null)[] =>
+  classifyParagraphDetails(paras).map((item) => item.role);

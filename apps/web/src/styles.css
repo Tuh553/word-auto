@@ -361,6 +361,15 @@ button:disabled {
   margin-top: 4px;
 }
 
+.confidence-warning {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+}
+
 .fix-hint {
   margin-top: 8px;
   display: flex;

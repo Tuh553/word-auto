@@ -7,7 +7,7 @@
 跨平台、可容器化、可并发。
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-monorepo-F69220?logo=pnpm&logoColor=white)
 
@@ -46,7 +46,7 @@ word-auto/
 | --- | --- | --- |
 | 解析 | `fflate` + `fast-xml-parser` | zip 解压 + XML 解析 |
 | 运行时 | `tsx` | 直接执行 TypeScript 无需编译 |
-| 前端 | React 19 + Vite 6 | Web 工作台 |
+| 前端 | React 18.3.1 + Vite 6 | Web 工作台 |
 | 预览 | `docx-preview` | 浏览器渲染 docx 原貌 + 叠加高亮 |
 | 包管理 | pnpm workspace | Monorepo 管理 |
 
@@ -111,13 +111,16 @@ pnpm run ci
 - 正文、参考文献标题/条目、后置章节（致谢/附录/成果）
 - 图题注、表题注、资料来源、公式编号行、表格单元格
 - 列表识别（有序/无序，支持多级嵌套）
+- 结构化分类入口输出角色识别置信度，低置信启发式命中会透传到报告
 
 ### 📐 检测规则
 
 - ✅ 字体、字号、加粗、对齐、行距、首行缩进（支持 `exact` / `oneOf` / `range` / `unset` 模式）
 - ✅ 页边距、页眉/页脚距、装订线、纸张尺寸
+- ✅ 页眉/页脚样式检测（页眉字体、字号、页眉线、页码位置/字体/字号）
 - ✅ 分节页码检测（前置罗马数字 / 正文阿拉伯数字重起编号）
 - ✅ 目录条目（TOC1/2/3）与结构化左侧页眉检测
+- ✅ 统计型检测（关键词数量、摘要字数/词数、参考文献数量、外文占比）
 - ✅ 编号连续性检测（标题题序、图/表题注连号，支持中文数字与多级编号）
 - ✅ 脚注/尾注一致性（失效引用 + 孤立定义）
 - ✅ run 级混排检测（段落内局部字体/字号不合规）
@@ -132,6 +135,7 @@ pnpm run ci
 - ✅ 多模板切换 + 自定义规则库 JSON 导入/导出
 - ✅ 模板候选提取 MVP（上传标准模板，聚合角色字段候选值、覆盖率、冲突值、可信提示）
 - ✅ 报告聚合视图（按语义章节/角色/严重级/字段分组，联动预览定位）
+- ✅ 低置信角色识别提示（仅低置信 issue 显著展示）
 - ✅ 修复建议（携带可操作指引与可修复性标记）
 - ✅ 规则溯源（issue 展示规则库 `source.provenance` 原始规范依据）
 
@@ -145,10 +149,10 @@ pnpm run ci
 
 详见 [`docs/TODO.md`](./docs/TODO.md)。当前重点：
 
-- 🎯 角色识别置信度量化
-- 📊 统计型文档检测（跨段落引用一致性）
-- 📑 页眉/页脚样式检测
+- 🧩 多模板管理补齐（新建、复制、重命名、删除）
 - 🔧 模板候选质量提升
+- 📊 多样本聚合与评分校准
+- 📋 表格全局顺序与附录细分
 - ⚡ Web 性能优化与交付物导出
 
 **不在计划内**：自动改写正文、套版功能（属于远期高风险阶段）。

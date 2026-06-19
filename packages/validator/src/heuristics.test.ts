@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { DocModel, LineSpacing, Paragraph } from "@word-auto/parser";
-import { classifyParagraphs, validateDoc, type EditableRuleLibrary, type RuleLibrary } from "./index.js";
+import {
+  classifyParagraphDetails,
+  classifyParagraphs,
+  validateDoc,
+  type EditableRuleLibrary,
+  type RuleLibrary,
+} from "./index.js";
 
 const mkPara = (
   text: string,
@@ -131,6 +137,81 @@ test("结构信号增强：drawing 邻接图题注、对象公式编号行不再
     "figure_caption",
     "formula_line",
   ]);
+});
+
+test("角色识别置信度：结构化入口兼容旧 classifyParagraphs 返回", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0 }),
+    mkPara("正文内容"),
+  ];
+
+  const details = classifyParagraphDetails(paras);
+
+  assert.deepEqual(details.map((item) => item.role), classifyParagraphs(paras));
+  assert.deepEqual(
+    details.map((item) => item.para),
+    paras,
+  );
+});
+
+test("角色识别置信度：明确章节标题和 outline 命中为 high", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("第一章 绪论", { outlineLevel: 0 }),
+  ];
+
+  const details = classifyParagraphDetails(paras);
+
+  assert.equal(details[0]?.role, "abstract_title_cn");
+  assert.equal(details[0]?.confidence, "high");
+  assert.match(details[0]?.reason ?? "", /章节标题/);
+  assert.equal(details[1]?.role, "heading1");
+  assert.equal(details[1]?.confidence, "high");
+  assert.match(details[1]?.reason ?? "", /大纲级别/);
+});
+
+test("角色识别置信度：仅靠文本启发命中的特殊正文元素为 low", () => {
+  const paras = [
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0 }),
+    mkPara("图1-1 系统架构图"),
+    mkPara("资料来源：教育部统计年鉴"),
+    mkPara("F=ma（3-2）", { alignment: "center" }),
+  ];
+
+  const details = classifyParagraphDetails(paras);
+
+  assert.deepEqual(
+    details.slice(3).map((item) => [item.role, item.confidence]),
+    [
+      ["figure_caption", "low"],
+      ["source_note", "low"],
+      ["formula_line", "low"],
+    ],
+  );
+});
+
+test("validateDoc：段落 issue 透传角色识别置信度", () => {
+  const model = mkModel([
+    mkPara("摘要"),
+    mkPara("这是摘要正文"),
+    mkPara("第一章 绪论", { outlineLevel: 0 }),
+    mkPara("资料来源：教育部统计年鉴", { sizePt: 12 }),
+  ]);
+  const rules: RuleLibrary = {
+    styles: {
+      source_note: { size_pt: 9 },
+    },
+  };
+
+  const report = validateDoc(model, rules);
+  const issue = report.issues.find((item) => item.role === "source_note");
+
+  assert.equal(issue?.roleConfidence, "low");
+  assert.match(issue?.roleConfidenceReason ?? "", /资料来源文本模式/);
 });
 
 test("校验命中新规则：特殊元素与后置章节按专属角色校验", () => {

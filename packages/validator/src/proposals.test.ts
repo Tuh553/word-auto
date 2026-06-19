@@ -123,6 +123,26 @@ test("extractRuleProposal：对齐缺失时不再默认提取为 left", () => {
   assert.equal(align?.totalCount, 3);
 });
 
+test("extractRuleProposal：低置信角色样本进入候选 notice", () => {
+  const model = {
+    paragraphs: [
+      mkPara("摘要"),
+      mkPara("这是摘要正文"),
+      mkPara("第一章 绪论", { outlineLevel: 0, sizePt: 16 }),
+      mkPara("图1-1 系统架构图", { alignment: "center", sizePt: 10.5 }),
+    ],
+    styles: new Map(),
+    docDefaults: {},
+    sections: [],
+    headers: [],
+    numbering: { abstractNums: new Map(), nums: new Map() },
+  };
+
+  const proposal = extractRuleProposal(model, { sourceName: "sample.docx" });
+
+  assert.match(proposal.notices.join("\n"), /1 段角色识别置信度低/);
+});
+
 test("extractRuleProposal：提取 document 页面设置候选并识别分节冲突", () => {
   const model = {
     paragraphs: [mkPara("正文一", { alignment: "both", sizePt: 12 })],

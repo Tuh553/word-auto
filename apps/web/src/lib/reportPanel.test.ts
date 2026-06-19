@@ -6,7 +6,10 @@ import type { Severity, ValidationReport } from "@word-auto/validator";
 import { ReportPanel } from "../components/ReportPanel.js";
 import type { ReportGroupBy, ReportSortBy } from "./reportGroups.js";
 
-const mkReport = (provenance?: string): ValidationReport => ({
+const mkReport = (
+  provenance?: string,
+  issuePatch: Partial<ValidationReport["issues"][number]> = {},
+): ValidationReport => ({
   ruleName: "Demo",
   paragraphCount: 4,
   classifiedCount: 2,
@@ -23,6 +26,7 @@ const mkReport = (provenance?: string): ValidationReport => ({
       provenance,
       suggestion: "请将该段落字号调整为 12pt",
       fixability: "auto",
+      ...issuePatch,
     },
   ],
   summary: {
@@ -87,6 +91,39 @@ test("ReportPanel：渲染修复建议文案与可修复性标签", () => {
   assert.match(html, /请将该段落字号调整为 12pt/);
   assert.match(html, /可自动修复/);
   assert.match(html, /fix-tag auto/);
+});
+
+test("ReportPanel：低置信 issue 渲染角色识别提示", () => {
+  const html = renderToStaticMarkup(createElement(ReportPanel, {
+    report: mkReport(undefined, {
+      roleConfidence: "low",
+      roleConfidenceReason: "仅按文本题注模式判断",
+    }),
+    active: ALL_SEVERITIES,
+    groupBy: DEFAULT_GROUP_BY,
+    sortBy: DEFAULT_SORT_BY,
+    onToggle: () => {},
+    onGroupByChange: () => {},
+    onSortByChange: () => {},
+    onSelect: () => {},
+  }));
+
+  assert.match(html, /角色识别置信度低：仅按文本题注模式判断/);
+});
+
+test("ReportPanel：非低置信 issue 不渲染角色识别提示", () => {
+  const html = renderToStaticMarkup(createElement(ReportPanel, {
+    report: mkReport(undefined, { roleConfidence: "medium" }),
+    active: ALL_SEVERITIES,
+    groupBy: DEFAULT_GROUP_BY,
+    sortBy: DEFAULT_SORT_BY,
+    onToggle: () => {},
+    onGroupByChange: () => {},
+    onSortByChange: () => {},
+    onSelect: () => {},
+  }));
+
+  assert.equal(html.includes("角色识别置信度低"), false);
 });
 
 test("ReportPanel：渲染分组与排序控件，并按语义章节输出分组标题", () => {

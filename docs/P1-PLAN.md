@@ -1,6 +1,6 @@
 # P1 开发计划
 
-最后更新：2026-06-16
+最后更新：2026-06-19
 
 本文档是 P1（优先级 1）阶段的详细开发计划，聚焦**解析准确率**、**校验与报告可信度**、**规则库与模板候选**三大方向。
 
@@ -12,12 +12,15 @@ validator 的分类、lint、修复建议和编号检测热路径已拆出辅助
 检测局部 run 字体/字号异常并输出 run 区间。Web 报告先展示 `affectedText`，预览局部高亮
 留到 P2 体验增强。
 
+2026-06-19 校验与报告可信度闭环：页眉/页脚样式检测、统计型文档检测、角色识别置信度
+均已实现并接入 `validateDoc` / Web 报告；阶段 2 不再作为后续待办。
+
 ## 总体排期
 
 | 阶段 | 工作量 | 关键里程碑 |
 |------|--------|-----------|
 | 阶段 1：解析能力增强 | 2-3 周 | 域/题注/交叉引用/脚注尾注解析、run 级混排检测 |
-| 阶段 2：校验与报告可信度提升 | 1-2 周 | 页眉/页脚样式检测、统计型检测、置信度标记 |
+| 阶段 2：校验与报告可信度提升 | 已完成 | 页眉/页脚样式检测、统计型检测、置信度标记 |
 | 阶段 3：规则库与模板候选 | 1-2 周 | 模板管理、候选 diff/证据/评分 |
 | 阶段 4：兜底与补充 | 1 周 | 表格全局顺序、附录细分 |
 | **总计** | **5-8 周** | P1 全部完成 |
@@ -263,9 +266,9 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 当前已解析页眉/页脚基础结构（左/中/右位置 + `PAGE` 域），但未校验样式。
 
 **任务清单**：
-- [ ] parser 增强：页眉/页脚样式解析
-  - [ ] 解析页眉下划线（`w:pBdr` 的 `w:bottom`）
-  - [ ] 解析页码字体/字号（`PAGE` 域所在 run 的有效格式）
+- [x] parser 增强：页眉/页脚样式解析
+  - [x] 解析页眉下划线（`w:pBdr` 的 `w:bottom`）
+  - [x] 解析页码字体/字号（`PAGE` 域所在 run 的有效格式）
   - [ ] 扩展 `HeaderFooter` 类型：
     ```typescript
     interface HeaderFooter {
@@ -281,20 +284,23 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
       };
     }
     ```
-- [ ] 扩展规则库：增加页眉/页脚样式规则
-  - [ ] 增加 `header_text`/`footer_text` 角色
-  - [ ] 支持字段：`fontEastAsia`/`fontAscii`/`sizePt`/`alignment`/`underline`
-- [ ] validator 接入：页眉/页脚样式检测
-  - [ ] 校验页眉文本字体/字号
-  - [ ] 校验页眉下划线类型
-  - [ ] 校验页码位置（左/中/右）
-  - [ ] 校验页码字体/字号
-- [ ] 金标准测试：验证页眉/页脚样式检测准确性
+- [x] 扩展规则库：增加页眉/页脚样式规则
+  - [x] 支持页眉文本字体、字号、页眉线和页码位置/字体/字号
+- [x] validator 接入：页眉/页脚样式检测
+  - [x] 校验页眉文本字体/字号
+  - [x] 校验页眉下划线类型
+  - [x] 校验页码位置（左/中/右）
+  - [x] 校验页码字体/字号
+- [x] 金标准测试：验证页眉/页脚样式检测准确性
 
 **产出**：
 - 页眉/页脚样式规则
 - 检测逻辑
 - 金标准测试
+
+**实现状态（2026-06-19）**：
+- `packages/validator/src/header-footer-check.ts` 已接入 `validateDoc`。
+- 相关回归覆盖在 `packages/validator/src/heuristics.test.ts`。
 
 **验收标准**：
 - 能检测标准模板的页眉字体、页眉下划线、页码位置
@@ -310,13 +316,13 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 部分规范要求统计型指标（如"关键词 3-5 个"、"摘要 300-500 字"）。
 
 **任务清单**：
-- [ ] 实现统计型检测器：
-  - [ ] 参考文献条数：统计 `reference_body` 角色段落数
-  - [ ] 外文占比：正则匹配英文字符比例
-  - [ ] 关键词数量：按分号/逗号分隔计数
-  - [ ] 摘要字数：统计 `abstract_body_cn`/`abstract_body_en` 总字符数
-- [ ] 扩展规则库：增加 `statistics` 规则类型
-  - [ ] 规则字段：`metric`（指标名）、`min`/`max`/`range`（阈值）
+- [x] 实现统计型检测器：
+  - [x] 参考文献条数：统计 `reference_body` 角色段落数
+  - [x] 外文占比：统计外文参考文献比例
+  - [x] 关键词数量：按分号/逗号等分隔计数
+  - [x] 摘要字数：统计 `abstract_body_cn` 字数与 `abstract_body_en` 词数
+- [x] 扩展规则库：增加 `statistics` 规则类型
+  - [x] 规则字段：关键词、摘要、参考文献统计阈值
   - [ ] 示例规则：
     ```json
     {
@@ -328,15 +334,20 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
       }
     }
     ```
-- [ ] validator 接入：生成统计型 issue
-  - [ ] 超出阈值时生成 `warn`/`error` 级 issue
-  - [ ] issue 描述包含实际值与期望范围
-- [ ] 金标准测试：验证统计型检测准确性
+- [x] validator 接入：生成统计型 issue
+  - [x] 超出阈值时生成 `warn`/`error` 级 issue
+  - [x] issue 描述包含实际值与期望范围
+- [x] 金标准测试：验证统计型检测准确性
 
 **产出**：
 - 统计型检测器
 - `statistics` 规则类型
 - 统计报告
+
+**实现状态（2026-06-19）**：
+- `packages/validator/src/statistics-check.ts` 与 `statistics-rules.ts` 已接入规则规范化和
+  `validateDoc`。
+- 相关测试在 `packages/validator/src/statistics-check.test.ts`。
 
 **验收标准**：
 - 能检测关键词数量、摘要字数、参考文献条数
@@ -352,26 +363,33 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 部分角色识别基于启发式（如封面特征字段、图题注宽松模式），可能误判。
 
 **任务清单**：
-- [ ] 识别低置信场景：
-  - [ ] 封面特征字段（`COVER_HINT`）命中但段落 > 25 字
-  - [ ] 图题注宽松模式（`FIGURE_CAPTION_RELAXED`）命中但无邻接 `drawing`
-  - [ ] 公式编号行命中但无 OMML/对象结构
-  - [ ] 表题注命中但段落无表格邻接
-- [ ] 扩展 `Paragraph` 类型：
+- [x] 识别低置信场景：
+  - [x] 图/表题注仅靠文本模式命中且无结构信号
+  - [x] 公式编号行命中但无 OMML/对象结构
+  - [x] 资料来源仅靠文本模式命中
+- [x] 新增结构化分类结果：
   ```typescript
-  interface Paragraph {
-    // ... 现有字段
-    roleConfidence?: 'high' | 'low';
+  interface ClassifiedParagraphDetail {
+    para: Paragraph;
+    role: Role | null;
+    confidence: 'high' | 'medium' | 'low';
+    reason?: string;
   }
   ```
-- [ ] validator 透传置信度：issue 增加 `roleConfidence` 字段
-- [ ] web 报告增强：低置信段落显示置信度标记（如 ⚠️ 图标）
-- [ ] 金标准测试：验证置信度标记准确性
+- [x] validator 透传置信度：issue 增加 `roleConfidence` / `roleConfidenceReason`
+- [x] web 报告增强：仅低置信段落显示简短置信度提示
+- [x] 模板候选：使用结构化分类入口，并在 notice 中提示低置信样本数量
+- [x] 金标准测试：验证置信度标记准确性
 
 **产出**：
 - 置信度标记逻辑
 - 前端展示
 - 降低误导风险
+
+**实现状态（2026-06-19）**：
+- `classifyParagraphDetails(...)` 保持旧 `classifyParagraphs(...)` 兼容。
+- `validateDoc` 会把段落级 issue 的角色识别置信度透传给 Web 报告。
+- `extractRuleProposal` 会提示低置信样本数量，避免候选证据被误读为完全可靠。
 
 **验收标准**：
 - 低置信段落能被正确标记
@@ -575,8 +593,9 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 | 域解析基础设施完成 | 第 2 周 | 能识别题注域、交叉引用域、页码域，单测通过 |
 | 题注与交叉引用完成 | 第 3 周 | 连号检测基于域，准确率 ≥ 正则版本 |
 | run 级混排检测完成 | 第 3 周 | 能检测段落内局部混排，报告能展示问题 run 区间 |
-| 页眉/页脚样式检测完成 | 第 4 周 | 能检测页眉字体、下划线、页码位置 |
-| 统计型检测完成 | 第 5 周 | 能检测关键词数量、摘要字数、参考文献条数 |
+| 页眉/页脚样式检测完成 | 已完成 | 能检测页眉字体、下划线、页码位置 |
+| 统计型检测完成 | 已完成 | 能检测关键词数量、摘要字数、参考文献条数 |
+| 角色识别置信度完成 | 已完成 | 低置信启发式命中透传到报告 |
 | 模板管理完成 | 第 6 周 | UI 支持新建/复制/重命名/删除模板 |
 | 候选 diff 完成 | 第 6 周 | 能展示候选与草稿差异，支持忽略 |
 | 多样本聚合完成 | 第 7 周 | 能上传多篇样本，评分反映候选质量 |
