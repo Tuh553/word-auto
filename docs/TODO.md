@@ -39,8 +39,8 @@
   `useDetectionFlow` / `useRuleLibraries` / `useRuleProposals` 分离，后续做 Worker 或多模板管理时不再堆叠到单文件。
 - Web Worker：解析与校验已移出主线程，大文档检测不再阻塞主 UI。
 - Web 预览片段高亮：选中带 `affectedText` 的 run 级 issue 时，预览会在目标段落内优先高亮对应文本片段；
-  片段匹配失败时回退整段高亮。
-- 报告与预览双向联动：已支持报告点击滚动预览、预览点击反选报告，以及预览滚动按当前可见 issue 自动切换报告选中项；程序滚动带抑制窗口，避免联动抖动。
+  片段匹配失败或同一 issue 在段内重复命中时，稳定回退整段高亮。
+- 报告与预览双向联动：已支持报告点击滚动预览、预览点击反选报告，以及预览滚动按当前可见 issue 自动切换报告选中项；程序滚动带抑制窗口，避免联动抖动；同段多个 issue 点击按“严重级优先 -> 当前可见顺序”稳定选中。
 - 附录细分：validator 已在附录上下文内识别 `appendix_subheading`、`appendix_list_item`、
   `appendix_signature`，并保留旧 `appendix_body` 兜底；标准模板中 3 个附录清单项已从
   `appendix_body` 拆出为 `appendix_list_item`。
@@ -63,7 +63,7 @@ P1 已完成，后续重点转入 Web 体验与交付。
 
 1. 批量检测：一次上传多篇 `.docx`，输出汇总与单篇下钻。
 2. 带批注 docx 导出：纯 OOXML 生成批注，不改写正文。
-3. 预览联动打磨：run 级局部高亮、报告与预览双向滚动体验继续收敛。
+3. 预览联动打磨：继续增强 run 级局部高亮的可视表达与更细粒度的局部 hover / explain 体验。
 
 ## P3：平台化与远期
 

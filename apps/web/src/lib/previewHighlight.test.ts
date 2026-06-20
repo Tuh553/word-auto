@@ -1,10 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  findBestFragmentMatch,
+  findFragmentMatchCandidates,
   findPreviewIssueKeyFromNode,
+  findPreviewParagraphIssueKeysFromNode,
   findNormalizedTextRange,
   findPreviewBlockTextIndex,
   normalizePreviewText,
+  pickParagraphIssueKey,
   pickPreviewIssueInViewport,
 } from "./previewHighlight.js";
 
@@ -45,6 +49,53 @@ test("findNormalizedTextRange：片段匹配兼容渲染文本空白差异", () 
 
 test("findNormalizedTextRange：片段不存在时返回 null 供整段 fallback", () => {
   assert.equal(findNormalizedTextRange("目标段文本", "不存在"), null);
+});
+
+test("findFragmentMatchCandidates：重复片段时返回同段内全部候选范围", () => {
+  const candidates = findFragmentMatchCandidates("abc mixed xyz mixed", [
+    { issueKey: "issue-1", affectedText: "mixed", severity: "error" },
+  ]);
+
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.range),
+    [
+      { start: 4, end: 9 },
+      { start: 14, end: 19 },
+    ],
+  );
+});
+
+test("findBestFragmentMatch：同一 issue 在段内命中多次时返回 null，供整段 fallback", () => {
+  assert.equal(
+    findBestFragmentMatch("abc mixed xyz mixed", {
+      issueKey: "issue-1",
+      paraIndex: 0,
+      text: "abc mixed xyz mixed",
+      affectedText: "mixed",
+      paragraphIssues: [
+        { issueKey: "issue-1", affectedText: "mixed", severity: "error" },
+      ],
+    }),
+    null,
+  );
+});
+
+test("pickParagraphIssueKey：同段多个 issue 时按严重级和可见顺序稳定选择", () => {
+  const issueKey = pickParagraphIssueKey(
+    ["warn-1", "error-1", "info-1"],
+    {
+      issueKey: "warn-1",
+      paraIndex: 0,
+      text: "正文",
+      paragraphIssues: [
+        { issueKey: "warn-1", affectedText: null, severity: "warn" },
+        { issueKey: "error-1", affectedText: "正文", severity: "error" },
+        { issueKey: "info-1", affectedText: null, severity: "info" },
+      ],
+    },
+  );
+
+  assert.equal(issueKey, "error-1");
 });
 
 test("pickPreviewIssueInViewport：优先选择覆盖视口中心且最接近中心的 issue", () => {
@@ -90,4 +141,15 @@ test("findPreviewIssueKeyFromNode：沿父节点链找到最近的 issueKey", ()
 
   assert.equal(findPreviewIssueKeyFromNode(leaf), "root");
   assert.equal(findPreviewIssueKeyFromNode(null), null);
+});
+
+test("findPreviewParagraphIssueKeysFromNode：沿父节点链读取段级 issueKey 列表", () => {
+  const root = {
+    dataset: { paragraphIssueKeys: "issue-1|issue-2" },
+    parentElement: null,
+  };
+  const child = { dataset: {}, parentElement: root };
+
+  assert.deepEqual(findPreviewParagraphIssueKeysFromNode(child), ["issue-1", "issue-2"]);
+  assert.deepEqual(findPreviewParagraphIssueKeysFromNode(null), []);
 });

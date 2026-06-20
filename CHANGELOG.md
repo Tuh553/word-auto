@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **预览同段多 issue 稳定命中模型**：Web 预览为同一段落保留当前可见 issue 列表，点击段内非片段区域时按“严重级优先 -> 当前可见顺序”稳定反选报告项
+- **重复片段 fallback 策略**：当同一选中 issue 的 `affectedText` 在目标段落内重复出现时，不再模糊猜测命中区域，而是稳定回退整段高亮
+- **预览联动纯函数测试补强**：新增重复片段、同段多 issue、筛选后可见目标和报告 selected helper 回归测试
 - **Web 报告与预览双向联动**：支持报告点击滚动预览、预览点击反选报告，以及预览滚动按当前可见 issue 自动切换报告选中项
 - **预览滚动命中策略 helper**：新增“中心优先、顶部回退”的纯函数，用于从当前视口内候选段落稳定选中 issue
 - **numbering.xml 自动编号解析**：实现完整的 OOXML numbering.xml 解析，支持抽象编号定义（abstractNum）、编号实例（num）和段落编号引用（numPr）
@@ -24,6 +27,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Web 预览目标数据结构**：`buildPreviewIssueTargets` 和 `buildPreviewHighlightTarget` 现在显式携带同段当前可见 issue 集，供片段高亮、段级点击和筛选后反向联动复用
 - **Web 检测测试入口扩展**：`@word-auto/web` 测试脚本从 `src/lib/*.test.ts` 扩展到 `src/**/*.test.ts`，允许组件级轻测试纳入门禁
 - **类型系统扩展**：
   - `Paragraph` 新增 `numbering?: ParagraphNumbering` 字段
@@ -45,6 +49,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **run 级局部高亮误命中**：修复长段落或重复 `affectedText` 下可能误高亮错误区域的问题；无法可靠区分时稳定回退整段
+- **同段多个 issue 反向联动歧义**：修复预览点击同一段时可能误选同段其他 issue 的问题，改为固定且可预测的优先级策略
 - **预览联动抖动**：修复报告点击触发预览平滑滚动时，滚动监听可能反向改选 issue 导致的联动反馈循环
 - **筛选后反向联动越界**：预览点击和滚动反选现在只针对当前可见 issue 集合，不会误选已筛掉的问题
 - **预览滚动回跳**：用户手动滚动预览时，报告切换选中项不再重新触发预览跳转，高亮保留但视口不被拉回

@@ -221,3 +221,16 @@ test("findSelectedIssueElement：能稳定找到当前选中的报告项", () =>
   assert.equal(findSelectedIssueElement(container, "missing"), null);
   assert.equal(findSelectedIssueElement(null, selectedIssueKey), null);
 });
+
+test("findSelectedIssueElement：selectedIssueKey 为空时不触发滚入视图目标查找", () => {
+  let queried = false;
+  const container = {
+    querySelectorAll: () => {
+      queried = true;
+      return [];
+    },
+  } as unknown as ParentNode;
+
+  assert.equal(findSelectedIssueElement(container, null), null);
+  assert.equal(queried, false);
+});

@@ -14,6 +14,13 @@ export interface PreviewIssueTarget {
   issueKey: string;
   paraIndex: number;
   text: string;
+  issues: PreviewParagraphIssue[];
+}
+
+export interface PreviewParagraphIssue {
+  issueKey: string;
+  affectedText: string | null;
+  severity: Severity;
 }
 
 const SEVERITY_LABELS: Record<Severity, string> = {
@@ -329,6 +336,12 @@ export const findVisibleIssueForParagraph = (
 ): Issue | undefined =>
   sortIssues(issues, "paragraph").find((issue) => issue.paraIndex === paraIndex);
 
+export const findVisibleIssuesForParagraph = (
+  issues: Issue[],
+  paraIndex: number,
+): Issue[] =>
+  sortIssues(issues, "paragraph").filter((issue) => issue.paraIndex === paraIndex);
+
 export const resolveSelectedIssue = (
   issues: Issue[],
   selectedIssueKey: string | null,
@@ -341,11 +354,22 @@ export const buildPreviewIssueTargets = (
 ): PreviewIssueTarget[] => {
   const targets = new Map<number, PreviewIssueTarget>();
   for (const issue of sortIssues(issues, "paragraph")) {
-    if (issue.paraIndex < 0 || targets.has(issue.paraIndex)) continue;
+    if (issue.paraIndex < 0) continue;
     const text = paragraphs[issue.paraIndex]?.text;
     if (!text) continue;
+    const target = targets.get(issue.paraIndex);
+    const previewIssue = {
+      affectedText: issue.affectedText ?? null,
+      issueKey: getIssueKey(issue),
+      severity: issue.severity,
+    };
+    if (target) {
+      target.issues.push(previewIssue);
+      continue;
+    }
     targets.set(issue.paraIndex, {
       issueKey: getIssueKey(issue),
+      issues: [previewIssue],
       paraIndex: issue.paraIndex,
       text,
     });
@@ -356,6 +380,7 @@ export const buildPreviewIssueTargets = (
 export const buildPreviewHighlightTarget = (
   issue: Issue | undefined,
   paragraphs: Array<{ text: string }>,
+  visibleIssues: Issue[],
 ): PreviewHighlightTarget | null => {
   if (!issue || issue.paraIndex < 0) return null;
   const text = paragraphs[issue.paraIndex]?.text;
@@ -363,6 +388,13 @@ export const buildPreviewHighlightTarget = (
   return {
     affectedText: issue.affectedText ?? null,
     issueKey: getIssueKey(issue),
+    paragraphIssues: findVisibleIssuesForParagraph(visibleIssues, issue.paraIndex).map(
+      (visibleIssue) => ({
+        affectedText: visibleIssue.affectedText ?? null,
+        issueKey: getIssueKey(visibleIssue),
+        severity: visibleIssue.severity,
+      }),
+    ),
     paraIndex: issue.paraIndex,
     text,
   };

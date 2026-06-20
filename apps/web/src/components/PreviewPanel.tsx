@@ -2,9 +2,12 @@ import { useEffect, useRef, useState, type MouseEvent, type UIEvent } from "reac
 import { renderAsync } from "docx-preview";
 import type { PreviewIssueTarget } from "../lib/reportGroups.js";
 import {
+  findBestFragmentMatch,
   findNormalizedTextRange,
+  findPreviewParagraphIssueKeysFromNode,
   findPreviewBlockTextIndex,
   findPreviewIssueKeyFromNode,
+  pickParagraphIssueKey,
   pickPreviewIssueInViewport,
   type PreviewHighlightTarget,
 } from "../lib/previewHighlight.js";
@@ -42,6 +45,7 @@ const resetPreviewTargets = (host: HTMLElement) => {
   host.querySelectorAll<HTMLElement>(".wa-preview-hit").forEach((block) => {
     block.classList.remove("wa-preview-hit");
     delete block.dataset.issueKey;
+    delete block.dataset.paragraphIssueKeys;
   });
 };
 
@@ -94,10 +98,8 @@ const findTextPosition = (
 
 const highlightTextFragment = (
   block: HTMLElement,
-  affectedText: string | null | undefined,
+  range: { start: number; end: number } | null,
 ): HTMLElement | null => {
-  const text = block.textContent ?? "";
-  const range = findNormalizedTextRange(text, affectedText);
   if (!range) return null;
   const start = findTextPosition(block, range.start);
   const end = findTextPosition(block, range.end);
@@ -123,8 +125,13 @@ const highlightPreviewTarget = (
   const blocks = Array.from(host.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
   const block = findBlockByText(blocks, target.text);
   if (!block) return target.issueKey ?? null;
-  const fragment = highlightTextFragment(block, target.affectedText);
+  const fragment = highlightTextFragment(
+    block,
+    findBestFragmentMatch(block.textContent ?? "", target)?.range ??
+      findNormalizedTextRange(block.textContent ?? "", target.affectedText),
+  );
   if (fragment) {
+    if (target.issueKey) fragment.dataset.issueKey = target.issueKey;
     if (shouldScrollToTarget) {
       fragment.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -148,6 +155,7 @@ const markPreviewIssueTargets = (
     if (!block || block.dataset.issueKey) continue;
     block.classList.add("wa-preview-hit");
     block.dataset.issueKey = target.issueKey;
+    block.dataset.paragraphIssueKeys = target.issues.map((issue) => issue.issueKey).join("|");
   }
 };
 
@@ -165,9 +173,33 @@ const pickIssueKeyFromPreviewScroll = (
 const pickIssueKeyFromPreviewClick = (event: MouseEvent<HTMLDivElement>) =>
   event.target instanceof Element
     ? findPreviewIssueKeyFromNode(
-      event.target as Element & { dataset?: { issueKey?: string } },
+      event.target as Element & { dataset?: { issueKey?: string; paragraphIssueKeys?: string } },
     )
     : null;
+
+const getParagraphIssueKeyFromPreviewClick = (
+  event: MouseEvent<HTMLDivElement>,
+  target: PreviewHighlightTarget | null,
+) => {
+  const paragraphIssueKeys =
+    event.target instanceof Element
+      ? findPreviewParagraphIssueKeysFromNode(
+        event.target as Element & {
+          dataset?: { issueKey?: string; paragraphIssueKeys?: string };
+        },
+      )
+      : [];
+  return pickParagraphIssueKey(paragraphIssueKeys, target);
+};
+
+const fixCollapsedLineHeights = (host: HTMLElement) => {
+  host.querySelectorAll<HTMLElement>("*").forEach((el) => {
+    const cs = getComputedStyle(el);
+    const lh = parseFloat(cs.lineHeight);
+    const fs = parseFloat(cs.fontSize);
+    if (lh && fs && lh < fs) el.style.lineHeight = "normal";
+  });
+};
 
 export function PreviewPanel({
   buffer,
@@ -198,12 +230,7 @@ export function PreviewPanel({
         host.replaceChildren(mount);
         // 修补：docx-preview 对部分固定行距文档会算出极小行高(如 1pt)，导致文字行重叠。
         // 凡行高 < 字高(必然重叠)的元素，行高重置为 normal；正常行距(≥字高)不动。
-        host.querySelectorAll<HTMLElement>("*").forEach((el) => {
-          const cs = getComputedStyle(el);
-          const lh = parseFloat(cs.lineHeight);
-          const fs = parseFloat(cs.fontSize);
-          if (lh && fs && lh < fs) el.style.lineHeight = "normal";
-        });
+        fixCollapsedLineHeights(host);
         setRenderVersion((version) => version + 1);
       })
       .catch((e: unknown) => {
@@ -244,7 +271,12 @@ export function PreviewPanel({
 
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     const issueKey = pickIssueKeyFromPreviewClick(event);
-    if (issueKey) onSelectTarget(issueKey, "preview-click");
+    if (issueKey) {
+      onSelectTarget(issueKey, "preview-click");
+      return;
+    }
+    const paragraphIssueKey = getParagraphIssueKeyFromPreviewClick(event, target);
+    if (paragraphIssueKey) onSelectTarget(paragraphIssueKey, "preview-click");
   };
 
   return (

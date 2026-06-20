@@ -1,8 +1,11 @@
+import type { PreviewParagraphIssue } from "./reportGroups.js";
+
 export interface PreviewHighlightTarget {
   issueKey?: string;
   paraIndex: number;
   text: string;
   affectedText?: string | null;
+  paragraphIssues?: PreviewParagraphIssue[];
 }
 
 export interface TextRange {
@@ -22,9 +25,21 @@ export interface PreviewViewport {
 }
 
 export interface PreviewIssueNodeLike {
-  dataset?: { issueKey?: string };
+  dataset?: { issueKey?: string; paragraphIssueKeys?: string };
   parentElement?: PreviewIssueNodeLike | null;
 }
+
+export interface FragmentMatchCandidate {
+  issueKey: string;
+  range: TextRange;
+  severity: "error" | "warn" | "info";
+}
+
+const SEVERITY_ORDER = {
+  error: 0,
+  warn: 1,
+  info: 2,
+} as const;
 
 export const normalizePreviewText = (text: string | null | undefined): string =>
   (text ?? "").replace(/\s+/g, "");
@@ -56,6 +71,18 @@ export const findPreviewIssueKeyFromNode = (
     current = current.parentElement ?? null;
   }
   return null;
+};
+
+export const findPreviewParagraphIssueKeysFromNode = (
+  node: PreviewIssueNodeLike | null | undefined,
+): string[] => {
+  let current = node ?? null;
+  while (current) {
+    const issueKeys = current.dataset?.paragraphIssueKeys;
+    if (issueKeys) return issueKeys.split("|").filter(Boolean);
+    current = current.parentElement ?? null;
+  }
+  return [];
 };
 
 export const pickPreviewIssueInViewport = (
@@ -99,18 +126,81 @@ const buildNormalizedIndex = (text: string) => {
   return { indexes, normalized };
 };
 
+const collectNormalizedTextRanges = (
+  text: string,
+  targetText: string | null | undefined,
+): TextRange[] => {
+  const needle = normalizePreviewText(targetText);
+  if (!needle) return [];
+  const { indexes, normalized } = buildNormalizedIndex(text);
+  if (!normalized.includes(needle)) return [];
+  const ranges: TextRange[] = [];
+  let searchStart = 0;
+  while (searchStart < normalized.length) {
+    const normalizedStart = normalized.indexOf(needle, searchStart);
+    if (normalizedStart < 0) break;
+    const normalizedEnd = normalizedStart + needle.length - 1;
+    const start = indexes[normalizedStart];
+    const end = indexes[normalizedEnd];
+    if (start != null && end != null) {
+      ranges.push({ end: end + 1, start });
+    }
+    searchStart = normalizedStart + needle.length;
+  }
+  return ranges;
+};
+
 export const findNormalizedTextRange = (
   text: string,
   targetText: string | null | undefined,
 ): TextRange | null => {
-  const needle = normalizePreviewText(targetText);
-  if (!needle) return null;
-  const { indexes, normalized } = buildNormalizedIndex(text);
-  const normalizedStart = normalized.indexOf(needle);
-  if (normalizedStart < 0) return null;
-  const normalizedEnd = normalizedStart + needle.length - 1;
-  const start = indexes[normalizedStart];
-  const end = indexes[normalizedEnd];
-  if (start == null || end == null) return null;
-  return { start, end: end + 1 };
+  return collectNormalizedTextRanges(text, targetText)[0] ?? null;
+};
+
+export const findFragmentMatchCandidates = (
+  text: string,
+  issues: PreviewParagraphIssue[],
+): FragmentMatchCandidate[] =>
+  issues.flatMap((issue) =>
+    collectNormalizedTextRanges(text, issue.affectedText).map((range) => ({
+      issueKey: issue.issueKey,
+      range,
+      severity: issue.severity,
+    }))
+  );
+
+export const findBestFragmentMatch = (
+  text: string,
+  target: PreviewHighlightTarget | null,
+): FragmentMatchCandidate | null => {
+  if (!target?.affectedText || !target.issueKey) return null;
+  const paragraphIssues = target.paragraphIssues ?? [];
+  const allMatches = findFragmentMatchCandidates(text, paragraphIssues);
+  const targetMatches = allMatches.filter((match) => match.issueKey === target.issueKey);
+  if (targetMatches.length !== 1) return null;
+  return targetMatches[0] ?? null;
+};
+
+export const pickParagraphIssueKey = (
+  paragraphIssueKeys: string[],
+  target: PreviewHighlightTarget | null,
+): string | null => {
+  if (paragraphIssueKeys.length === 0) return null;
+  if (!target?.paragraphIssues?.length) return paragraphIssueKeys[0] ?? null;
+  const issueOrder = new Map(
+    target.paragraphIssues.map((issue, index) => [issue.issueKey, index] as const),
+  );
+  return [...paragraphIssueKeys]
+    .sort((left, right) => {
+      const leftIssue = target.paragraphIssues?.find((issue) => issue.issueKey === left);
+      const rightIssue = target.paragraphIssues?.find((issue) => issue.issueKey === right);
+      const severityOrder =
+        (leftIssue ? SEVERITY_ORDER[leftIssue.severity] : Number.MAX_SAFE_INTEGER) -
+        (rightIssue ? SEVERITY_ORDER[rightIssue.severity] : Number.MAX_SAFE_INTEGER);
+      if (severityOrder !== 0) return severityOrder;
+      return (
+        (issueOrder.get(left) ?? Number.MAX_SAFE_INTEGER) -
+        (issueOrder.get(right) ?? Number.MAX_SAFE_INTEGER)
+      );
+    })[0] ?? null;
 };

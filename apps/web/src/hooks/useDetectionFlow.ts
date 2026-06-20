@@ -37,24 +37,29 @@ const getFirstNavigablePreviewTarget = (
   result: AnalyzeResult,
   active: Set<Severity>,
 ): PreviewHighlightTarget | null => {
-  const firstIssue = findFirstNavigableIssue(
-    result.report.issues.filter((issue) => active.has(issue.severity)),
-  );
-  return buildPreviewHighlightTarget(firstIssue, result.model.paragraphs);
+  const visibleIssues = result.report.issues.filter((issue) => active.has(issue.severity));
+  const firstIssue = findFirstNavigableIssue(visibleIssues);
+  return buildPreviewHighlightTarget(firstIssue, result.model.paragraphs, visibleIssues);
 };
 
 const getIssuePreviewTarget = (
   result: AnalyzeResult,
   issueKey: string | null,
+  visibleIssues: AnalyzeResult["report"]["issues"],
 ): PreviewHighlightTarget | null => {
   const issue = findIssueByKey(result.report.issues, issueKey);
-  return buildPreviewHighlightTarget(issue, result.model.paragraphs);
+  return buildPreviewHighlightTarget(issue, result.model.paragraphs, visibleIssues);
 };
 
 const getVisibleIssues = (
   result: AnalyzeResult,
   active: Set<Severity>,
 ) => result.report.issues.filter((issue) => active.has(issue.severity));
+
+const getSelectionVisibleIssues = (
+  result: AnalyzeResult | null,
+  active: Set<Severity>,
+) => result ? getVisibleIssues(result, active) : [];
 
 const useIssueSelection = () => {
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
@@ -76,33 +81,22 @@ const useIssueSelection = () => {
     active: Set<Severity>,
     preferredIssueKey = selectedIssueKey,
   ) => {
-    const selectedIssue = resolveSelectedIssue(
-      getVisibleIssues(result, active),
-      preferredIssueKey,
-    );
+    const visibleIssues = getVisibleIssues(result, active);
+    const selectedIssue = resolveSelectedIssue(visibleIssues, preferredIssueKey);
     const issueKey = selectedIssue ? getIssueKey(selectedIssue) : null;
     setSelectedIssueKey(issueKey);
     setSelectedPreviewTarget(
       issueKey
-        ? getIssuePreviewTarget(result, issueKey)
+        ? getIssuePreviewTarget(result, issueKey, visibleIssues)
         : getFirstNavigablePreviewTarget(result, active),
     );
-    setShouldScrollSelectedPreviewTarget(true);
-  };
-
-  const selectIssue = (result: AnalyzeResult | null, issueKey: string | null) => {
-    if (!result || !issueKey) {
-      clearSelection();
-      return;
-    }
-    setSelectedIssueKey(issueKey);
-    setSelectedPreviewTarget(getIssuePreviewTarget(result, issueKey));
     setShouldScrollSelectedPreviewTarget(true);
   };
 
   const selectIssueFromSource = (
     result: AnalyzeResult | null,
     issueKey: string | null,
+    visibleIssues: AnalyzeResult["report"]["issues"],
     source: SelectionSource,
   ) => {
     if (!result || !issueKey) {
@@ -111,7 +105,7 @@ const useIssueSelection = () => {
     }
     if (source === "preview-scroll" && issueKey === selectedIssueKey) return;
     setSelectedIssueKey(issueKey);
-    setSelectedPreviewTarget(getIssuePreviewTarget(result, issueKey));
+    setSelectedPreviewTarget(getIssuePreviewTarget(result, issueKey, visibleIssues));
     setShouldScrollSelectedPreviewTarget(source === "report-click");
     if (source === "report-click") {
       setSuppressScrollSelectionUntil(Date.now() + REPORT_SCROLL_SUPPRESSION_MS);
@@ -122,13 +116,68 @@ const useIssueSelection = () => {
 
   return {
     clearSelection,
-    selectIssue,
     selectIssueFromSource,
     selectResolvedIssue,
     selectedIssueKey,
     selectedPreviewTarget,
     shouldScrollSelectedPreviewTarget,
     suppressScrollSelectionUntil,
+  };
+};
+
+const useVisibleSelection = (
+  result: AnalyzeResult | null,
+  active: Set<Severity>,
+  selection: ReturnType<typeof useIssueSelection>,
+) => {
+  const visibleIssues = getSelectionVisibleIssues(result, active);
+
+  const selectIssue = (issueKey: string | null) => {
+    selection.selectIssueFromSource(result, issueKey, visibleIssues, "report-click");
+  };
+
+  const selectIssueFromSource = (
+    nextResult: AnalyzeResult | null,
+    issueKey: string | null,
+    source: SelectionSource,
+  ) => {
+    const nextVisibleIssues = getSelectionVisibleIssues(nextResult, active);
+    selection.selectIssueFromSource(nextResult, issueKey, nextVisibleIssues, source);
+  };
+
+  return { selectIssue, selectIssueFromSource, visibleIssues };
+};
+
+const useDetectionState = () => {
+  const [step, setStep] = useState(0);
+  const [file, setFile] = useState<File | null>(null);
+  const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
+  const [active, setActive] = useState<Set<Severity>>(new Set(ALL_SEVERITIES));
+  const [reportGroupBy, setReportGroupBy] = useState<ReportGroupBy>("section");
+  const [reportSortBy, setReportSortBy] = useState<ReportSortBy>("paragraph");
+  const [result, setResult] = useState<AnalyzeResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+
+  return {
+    active,
+    buffer,
+    error,
+    file,
+    over,
+    reportGroupBy,
+    reportSortBy,
+    result,
+    setActive,
+    setBuffer,
+    setError,
+    setFile,
+    setOver,
+    setReportGroupBy,
+    setReportSortBy,
+    setResult,
+    setStep,
+    step,
   };
 };
 
@@ -177,90 +226,86 @@ const useAnalysisRunner = ({
 };
 
 export const useDetectionFlow = () => {
-  const [step, setStep] = useState(0);
-  const [file, setFile] = useState<File | null>(null);
-  const [buffer, setBuffer] = useState<ArrayBuffer | null>(null);
-  const [active, setActive] = useState<Set<Severity>>(new Set(ALL_SEVERITIES));
-  const [reportGroupBy, setReportGroupBy] = useState<ReportGroupBy>("section");
-  const [reportSortBy, setReportSortBy] = useState<ReportSortBy>("paragraph");
-  const [result, setResult] = useState<AnalyzeResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const state = useDetectionState();
   const selection = useIssueSelection();
-  const [over, setOver] = useState(false);
 
   const applyResult = (nextResult: AnalyzeResult, advanceToResult = false) => {
-    setResult(nextResult);
-    setError(null);
-    selection.selectResolvedIssue(nextResult, active);
-    if (advanceToResult) setStep(3);
+    state.setResult(nextResult);
+    state.setError(null);
+    selection.selectResolvedIssue(nextResult, state.active);
+    if (advanceToResult) state.setStep(3);
   };
 
   const { invalidateAnalysis, isAnalyzing, runAnalysis } = useAnalysisRunner({
     applyResult,
-    buffer,
-    setError,
+    buffer: state.buffer,
+    setError: state.setError,
   });
 
   const pickFile = async (selectedFile: File) => {
     invalidateAnalysis();
-    setError(null);
-    setFile(selectedFile);
-    setBuffer(await selectedFile.arrayBuffer());
+    state.setError(null);
+    state.setFile(selectedFile);
+    state.setBuffer(await selectedFile.arrayBuffer());
   };
 
-  const selectIssue = (issueKey: string | null) => {
-    selection.selectIssueFromSource(result, issueKey, "report-click");
-  };
+  const {
+    selectIssue,
+    selectIssueFromSource,
+    visibleIssues,
+  } = useVisibleSelection(state.result, state.active, selection);
 
   const toggleSeverity = (severity: Severity) => {
-    const next = new Set(active);
+    const next = new Set(state.active);
     if (next.has(severity)) next.delete(severity);
     else next.add(severity);
-    setActive(next);
-    if (result) selection.selectResolvedIssue(result, next, selection.selectedIssueKey);
+    state.setActive(next);
+    if (state.result) {
+      selection.selectResolvedIssue(state.result, next, selection.selectedIssueKey);
+    }
   };
 
   const reset = () => {
     invalidateAnalysis();
-    setStep(0);
-    setFile(null);
-    setBuffer(null);
-    setResult(null);
-    setError(null);
+    state.setStep(0);
+    state.setFile(null);
+    state.setBuffer(null);
+    state.setResult(null);
+    state.setError(null);
     selection.clearSelection();
   };
 
-  const previewIssueTargets = result
-    ? buildPreviewIssueTargets(getVisibleIssues(result, active), result.model.paragraphs)
+  const previewIssueTargets = state.result
+    ? buildPreviewIssueTargets(visibleIssues, state.result.model.paragraphs)
     : [];
 
   return {
-    active,
-    buffer,
-    clearError: () => setError(null),
-    error,
-    file,
+    active: state.active,
+    buffer: state.buffer,
+    clearError: () => state.setError(null),
+    error: state.error,
+    file: state.file,
     isAnalyzing,
-    over,
-    reportGroupBy,
-    reportSortBy,
-    result,
+    over: state.over,
+    reportGroupBy: state.reportGroupBy,
+    reportSortBy: state.reportSortBy,
+    result: state.result,
     previewIssueTargets,
     selectedIssueKey: selection.selectedIssueKey,
     selectedPreviewTarget: selection.selectedPreviewTarget,
     shouldScrollSelectedPreviewTarget: selection.shouldScrollSelectedPreviewTarget,
     suppressScrollSelectionUntil: selection.suppressScrollSelectionUntil,
-    step,
+    step: state.step,
     applyResult,
     pickFile,
     reset,
     runAnalysis,
     selectIssue,
-    selectIssueFromSource: selection.selectIssueFromSource,
-    setOver,
-    setReportGroupBy,
-    setReportSortBy,
-    setStep,
+    selectIssueFromSource,
+    setOver: state.setOver,
+    setReportGroupBy: state.setReportGroupBy,
+    setReportSortBy: state.setReportSortBy,
+    setStep: state.setStep,
     toggleSeverity,
   };
 };
