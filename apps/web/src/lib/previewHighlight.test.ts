@@ -19,14 +19,52 @@ test("normalizePreviewText：移除空白用于预览文本匹配", () => {
 test("findPreviewBlockTextIndex：只返回目标段落文本命中的 block", () => {
   const index = findPreviewBlockTextIndex(
     ["第一段有重复片段", "目标段包含 局部错误 文本", "第三段也有局部错误"],
-    "目标段包含局部错误文本",
+    { text: "目标段包含局部错误文本" },
   );
 
   assert.equal(index, 1);
 });
 
 test("findPreviewBlockTextIndex：目标文本太短时不猜测命中", () => {
-  assert.equal(findPreviewBlockTextIndex(["甲", "乙"], "甲"), -1);
+  assert.equal(findPreviewBlockTextIndex(["甲", "乙"], { text: "甲" }), -1);
+});
+
+test("findPreviewBlockTextIndex：重复正文时优先结合上下文定位到正确块", () => {
+  const blockTexts = [
+    "封面",
+    "章节 A",
+    "正文文字正文文字正文文字",
+    "过渡段落 A",
+    "章节 B",
+    "正文文字正文文字正文文字",
+    "过渡段落 B",
+  ];
+
+  assert.equal(
+    findPreviewBlockTextIndex(blockTexts, {
+      text: "正文文字正文文字正文文字",
+      previousText: "章节 B",
+      nextText: "过渡段落 B",
+      occurrenceIndex: 1,
+    }),
+    5,
+  );
+});
+
+test("findPreviewBlockTextIndex：上下文都缺失时按重复序号稳定回退", () => {
+  const blockTexts = [
+    "正文文字正文文字正文文字",
+    "正文文字正文文字正文文字",
+    "正文文字正文文字正文文字",
+  ];
+
+  assert.equal(
+    findPreviewBlockTextIndex(blockTexts, {
+      text: "正文文字正文文字正文文字",
+      occurrenceIndex: 2,
+    }),
+    2,
+  );
 });
 
 test("findNormalizedTextRange：在段落内返回片段原始下标范围", () => {

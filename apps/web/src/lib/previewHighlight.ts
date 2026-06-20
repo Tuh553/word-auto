@@ -1,9 +1,19 @@
 import type { PreviewParagraphIssue } from "./reportGroups.js";
 
+export interface PreviewBlockLookupTarget {
+  text: string;
+  previousText?: string | null;
+  nextText?: string | null;
+  occurrenceIndex?: number;
+}
+
 export interface PreviewHighlightTarget {
+  text: string;
+  previousText?: string | null;
+  nextText?: string | null;
+  occurrenceIndex?: number;
   issueKey?: string;
   paraIndex: number;
-  text: string;
   affectedText?: string | null;
   paragraphIssues?: PreviewParagraphIssue[];
 }
@@ -47,13 +57,96 @@ export const normalizePreviewText = (text: string | null | undefined): string =>
 const getPreviewTextKey = (text: string): string =>
   normalizePreviewText(text).slice(0, 18);
 
+export const getPreviewNeighborText = (
+  paragraphs: Array<{ text: string }>,
+  paraIndex: number,
+  step: -1 | 1,
+): string | null => {
+  for (
+    let current = paraIndex + step;
+    current >= 0 && current < paragraphs.length;
+    current += step
+  ) {
+    const text = paragraphs[current]?.text?.trim();
+    if (text) return paragraphs[current]?.text ?? null;
+  }
+  return null;
+};
+
+export const getPreviewOccurrenceIndex = (
+  paragraphs: Array<{ text: string }>,
+  paraIndex: number,
+  text: string,
+): number => {
+  let occurrenceIndex = 0;
+  for (let index = 0; index < paraIndex; index++) {
+    if ((paragraphs[index]?.text ?? "") === text) occurrenceIndex++;
+  }
+  return occurrenceIndex;
+};
+
+const getNormalizedNeighborText = (
+  blockTexts: string[],
+  index: number,
+  step: -1 | 1,
+): string => {
+  for (let current = index + step; current >= 0 && current < blockTexts.length; current += step) {
+    const normalized = normalizePreviewText(blockTexts[current]);
+    if (normalized) return normalized;
+  }
+  return "";
+};
+
+const scorePreviewBlockCandidate = (
+  blockTexts: string[],
+  index: number,
+  target: PreviewBlockLookupTarget,
+): number => {
+  let score = 0;
+  const previousText = normalizePreviewText(target.previousText);
+  const nextText = normalizePreviewText(target.nextText);
+  if (previousText && getNormalizedNeighborText(blockTexts, index, -1) === previousText) {
+    score += 2;
+  }
+  if (nextText && getNormalizedNeighborText(blockTexts, index, 1) === nextText) {
+    score += 2;
+  }
+  return score;
+};
+
 export const findPreviewBlockTextIndex = (
   blockTexts: string[],
-  targetText: string,
+  target: PreviewBlockLookupTarget | string,
 ): number => {
-  const key = getPreviewTextKey(targetText);
-  if (key.length < 3) return -1;
-  return blockTexts.findIndex((text) => normalizePreviewText(text).includes(key));
+  const targetInfo = typeof target === "string" ? { text: target } : target;
+  const normalizedTarget = normalizePreviewText(targetInfo.text);
+  const key = getPreviewTextKey(targetInfo.text);
+  if (key.length < 3 || !normalizedTarget) return -1;
+
+  const exactMatches = blockTexts.flatMap((text, index) =>
+    normalizePreviewText(text) === normalizedTarget ? [index] : [],
+  );
+  const candidates = exactMatches.length > 0
+    ? exactMatches
+    : blockTexts.flatMap((text, index) =>
+      normalizePreviewText(text).includes(key) ? [index] : [],
+    );
+  if (candidates.length === 0) return -1;
+  if (candidates.length === 1) return candidates[0] ?? -1;
+
+  const targetOccurrenceIndex = targetInfo.occurrenceIndex ?? 0;
+  return candidates
+    .map((index, occurrenceIndex) => ({
+      contextScore: scorePreviewBlockCandidate(blockTexts, index, targetInfo),
+      index,
+      occurrenceIndex,
+    }))
+    .sort((left, right) =>
+      right.contextScore - left.contextScore ||
+      Math.abs(left.occurrenceIndex - targetOccurrenceIndex) -
+        Math.abs(right.occurrenceIndex - targetOccurrenceIndex) ||
+      left.index - right.index
+    )[0]?.index ?? -1;
 };
 
 const byTopThenBottom = (

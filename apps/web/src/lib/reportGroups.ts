@@ -1,5 +1,9 @@
 import type { Issue, Role, Severity } from "@word-auto/validator";
-import type { PreviewHighlightTarget } from "./previewHighlight.js";
+import {
+  getPreviewNeighborText,
+  getPreviewOccurrenceIndex,
+  type PreviewHighlightTarget,
+} from "./previewHighlight.js";
 
 export type ReportGroupBy = "section" | "role" | "severity" | "field";
 export type ReportSortBy = "paragraph" | "severity";
@@ -14,6 +18,9 @@ export interface PreviewIssueTarget {
   issueKey: string;
   paraIndex: number;
   text: string;
+  previousText: string | null;
+  nextText: string | null;
+  occurrenceIndex: number;
   issues: PreviewParagraphIssue[];
 }
 
@@ -378,7 +385,10 @@ export const buildPreviewIssueTargets = (
     targets.set(issue.paraIndex, {
       issueKey: getIssueKey(issue),
       issues: [previewIssue],
+      nextText: getPreviewNeighborText(paragraphs, issue.paraIndex, 1),
+      occurrenceIndex: getPreviewOccurrenceIndex(paragraphs, issue.paraIndex, text),
       paraIndex: issue.paraIndex,
+      previousText: getPreviewNeighborText(paragraphs, issue.paraIndex, -1),
       text,
     });
   }
@@ -396,6 +406,8 @@ export const buildPreviewHighlightTarget = (
   return {
     affectedText: issue.affectedText ?? null,
     issueKey: getIssueKey(issue),
+    nextText: getPreviewNeighborText(paragraphs, issue.paraIndex, 1),
+    occurrenceIndex: getPreviewOccurrenceIndex(paragraphs, issue.paraIndex, text),
     paragraphIssues: findVisibleIssuesForParagraph(visibleIssues, issue.paraIndex).map(
       (visibleIssue) => ({
         affectedText: visibleIssue.affectedText ?? null,
@@ -404,6 +416,7 @@ export const buildPreviewHighlightTarget = (
       }),
     ),
     paraIndex: issue.paraIndex,
+    previousText: getPreviewNeighborText(paragraphs, issue.paraIndex, -1),
     text,
   };
 };

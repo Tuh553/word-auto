@@ -68,11 +68,11 @@ const resetActiveHighlight = (host: HTMLElement) => {
 
 const findBlockByText = (
   blocks: HTMLElement[],
-  text: string,
+  target: PreviewHighlightTarget | PreviewIssueTarget,
 ): HTMLElement | undefined => {
   const index = findPreviewBlockTextIndex(
     blocks.map((block) => block.textContent ?? ""),
-    text,
+    target,
   );
   return index < 0 ? undefined : blocks[index];
 };
@@ -123,7 +123,7 @@ const highlightPreviewTarget = (
   resetActiveHighlight(host);
   if (!target) return null;
   const blocks = Array.from(host.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
-  const block = findBlockByText(blocks, target.text);
+  const block = findBlockByText(blocks, target);
   if (!block) return target.issueKey ?? null;
   const fragment = highlightTextFragment(
     block,
@@ -151,7 +151,7 @@ const markPreviewIssueTargets = (
   resetPreviewTargets(host);
   const blocks = Array.from(host.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
   for (const target of targets) {
-    const block = findBlockByText(blocks, target.text);
+    const block = findBlockByText(blocks, target);
     if (!block || block.dataset.issueKey) continue;
     block.classList.add("wa-preview-hit");
     block.dataset.issueKey = target.issueKey;
