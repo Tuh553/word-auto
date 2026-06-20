@@ -1,18 +1,22 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type UIEvent } from "react";
 import { renderAsync } from "docx-preview";
 import type { PreviewIssueTarget } from "../lib/reportGroups.js";
 import {
   findNormalizedTextRange,
   findPreviewBlockTextIndex,
+  findPreviewIssueKeyFromNode,
+  pickPreviewIssueInViewport,
   type PreviewHighlightTarget,
 } from "../lib/previewHighlight.js";
 
 interface Props {
   buffer: ArrayBuffer;
   /** 要定位高亮的段落与可选片段（文档级问题为 null，不定位） */
+  shouldScrollToTarget: boolean;
   target: PreviewHighlightTarget | null;
   targets: PreviewIssueTarget[];
-  onSelectTarget: (issueKey: string) => void;
+  suppressScrollSelectionUntil: number;
+  onSelectTarget: (issueKey: string, source: "preview-click" | "preview-scroll") => void;
 }
 
 const BLOCK_SELECTOR = "p, h1, h2, h3, h4, h5, h6, td, li";
@@ -22,6 +26,17 @@ interface TextPosition {
   node: Text;
   offset: number;
 }
+
+const collectPreviewIssueCandidates = (host: HTMLElement) =>
+  Array.from(host.querySelectorAll<HTMLElement>(".wa-preview-hit")).flatMap((block) => {
+    const issueKey = block.dataset.issueKey;
+    if (!issueKey) return [];
+    return [{
+      bottom: block.offsetTop + block.offsetHeight,
+      issueKey,
+      top: block.offsetTop,
+    }];
+  });
 
 const resetPreviewTargets = (host: HTMLElement) => {
   host.querySelectorAll<HTMLElement>(".wa-preview-hit").forEach((block) => {
@@ -98,14 +113,73 @@ const highlightTextFragment = (
   return marker;
 };
 
+const highlightPreviewTarget = (
+  host: HTMLElement,
+  target: PreviewHighlightTarget | null,
+  shouldScrollToTarget: boolean,
+): string | null => {
+  resetActiveHighlight(host);
+  if (!target) return null;
+  const blocks = Array.from(host.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
+  const block = findBlockByText(blocks, target.text);
+  if (!block) return target.issueKey ?? null;
+  const fragment = highlightTextFragment(block, target.affectedText);
+  if (fragment) {
+    if (shouldScrollToTarget) {
+      fragment.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return target.issueKey ?? null;
+  }
+  block.classList.add("wa-hl");
+  if (shouldScrollToTarget) {
+    block.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  return target.issueKey ?? null;
+};
+
+const markPreviewIssueTargets = (
+  host: HTMLElement,
+  targets: PreviewIssueTarget[],
+): void => {
+  resetPreviewTargets(host);
+  const blocks = Array.from(host.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
+  for (const target of targets) {
+    const block = findBlockByText(blocks, target.text);
+    if (!block || block.dataset.issueKey) continue;
+    block.classList.add("wa-preview-hit");
+    block.dataset.issueKey = target.issueKey;
+  }
+};
+
+const pickIssueKeyFromPreviewScroll = (
+  host: HTMLDivElement,
+  suppressScrollSelectionUntil: number,
+): string | null => {
+  if (Date.now() < suppressScrollSelectionUntil) return null;
+  return pickPreviewIssueInViewport(collectPreviewIssueCandidates(host), {
+    clientHeight: host.clientHeight,
+    scrollTop: host.scrollTop,
+  });
+};
+
+const pickIssueKeyFromPreviewClick = (event: MouseEvent<HTMLDivElement>) =>
+  event.target instanceof Element
+    ? findPreviewIssueKeyFromNode(
+      event.target as Element & { dataset?: { issueKey?: string } },
+    )
+    : null;
+
 export function PreviewPanel({
   buffer,
+  shouldScrollToTarget,
   target,
   targets,
+  suppressScrollSelectionUntil,
   onSelectTarget,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [renderVersion, setRenderVersion] = useState(0);
+  const lastScrollIssueKeyRef = useRef<string | null>(null);
 
   // 用 docx-preview 默认配置（默认即分页渲染、保留页高），不再自行覆盖
   // ignoreHeight/breakPages/experimental 等——那些覆盖反而破坏分页布局。
@@ -143,41 +217,42 @@ export function PreviewPanel({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    resetPreviewTargets(el);
-    const blocks = Array.from(el.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
-    for (const target of targets) {
-      const block = findBlockByText(blocks, target.text);
-      if (!block || block.dataset.issueKey) continue;
-      block.classList.add("wa-preview-hit");
-      block.dataset.issueKey = target.issueKey;
-    }
+    lastScrollIssueKeyRef.current = null;
+    markPreviewIssueTargets(el, targets);
   }, [renderVersion, targets]);
 
   // 按段落原文匹配定位（不依赖序号，避免与渲染 DOM 错位）
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    resetActiveHighlight(el);
-    if (!target) return;
-    const blocks = Array.from(el.querySelectorAll<HTMLElement>(BLOCK_SELECTOR));
-    const block = findBlockByText(blocks, target.text);
-    if (!block) return;
-    const fragment = highlightTextFragment(block, target.affectedText);
-    if (fragment) {
-      fragment.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    block.classList.add("wa-hl");
-    block.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [renderVersion, target]);
+    lastScrollIssueKeyRef.current = highlightPreviewTarget(
+      el,
+      target,
+      shouldScrollToTarget,
+    );
+  }, [renderVersion, shouldScrollToTarget, target]);
 
-  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
-    const target = event.target instanceof Element
-      ? event.target.closest<HTMLElement>(".wa-preview-hit")
-      : null;
-    const issueKey = target?.dataset.issueKey;
-    if (issueKey) onSelectTarget(issueKey);
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    const issueKey = pickIssueKeyFromPreviewScroll(
+      event.currentTarget,
+      suppressScrollSelectionUntil,
+    );
+    if (!issueKey || issueKey === lastScrollIssueKeyRef.current) return;
+    lastScrollIssueKeyRef.current = issueKey;
+    onSelectTarget(issueKey, "preview-scroll");
   };
 
-  return <div className="preview" ref={ref} onClick={handleClick} />;
+  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+    const issueKey = pickIssueKeyFromPreviewClick(event);
+    if (issueKey) onSelectTarget(issueKey, "preview-click");
+  };
+
+  return (
+    <div
+      className="preview"
+      ref={ref}
+      onClick={handleClick}
+      onScroll={handleScroll}
+    />
+  );
 }

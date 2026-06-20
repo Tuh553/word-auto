@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Web 报告与预览双向联动**：支持报告点击滚动预览、预览点击反选报告，以及预览滚动按当前可见 issue 自动切换报告选中项
+- **预览滚动命中策略 helper**：新增“中心优先、顶部回退”的纯函数，用于从当前视口内候选段落稳定选中 issue
 - **numbering.xml 自动编号解析**：实现完整的 OOXML numbering.xml 解析，支持抽象编号定义（abstractNum）、编号实例（num）和段落编号引用（numPr）
 - **标题题序连续性检测**：自动检测各级标题编号连续性（1→2→3），支持中文数字（第一章→第二章）和多级编号（1.1→1.2），章节变化时自动重置下级计数器
 - **图表题注连号校验**：检测图题注和表题注编号连续性，支持单级编号（图1→图2）和两级编号（图1-1→图1-2→图2-1），主编号变化时检测次编号重置
@@ -22,6 +24,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Web 检测测试入口扩展**：`@word-auto/web` 测试脚本从 `src/lib/*.test.ts` 扩展到 `src/**/*.test.ts`，允许组件级轻测试纳入门禁
 - **类型系统扩展**：
   - `Paragraph` 新增 `numbering?: ParagraphNumbering` 字段
   - `DocModel` 新增 `numbering: NumberingDefinitions` 字段
@@ -36,11 +39,15 @@ All notable changes to this project will be documented in this file.
 - **校验流程集成**：`validateDoc` 自动调用编号连续性检测，编号问题统一输出到 `ValidationReport`
 - **题注连号策略明确**：图 / 表题注优先消费 `SEQ` 域编号，段落正则仅作为无域样本兜底
 - **测试基线更新**：新增 parser `PAGEREF` synthetic 用例与 validator 引用有效性用例，标准模板当前仍保留 1 个表题注连号问题
+- **测试基线更新**：补充预览滚动命中、报告选中定位和预览点击反向选中的 Web 回归测试
 - **数据流统一**：`classified` 数组与主校验循环对 undefined 角色的处理逻辑统一（均跳过）
 - **标准模板分类基线更新**：3 个附录清单项从 `appendix_body` 拆出为 `appendix_list_item`，总 issue 数和严重级别不变
 
 ### Fixed
 
+- **预览联动抖动**：修复报告点击触发预览平滑滚动时，滚动监听可能反向改选 issue 导致的联动反馈循环
+- **筛选后反向联动越界**：预览点击和滚动反选现在只针对当前可见 issue 集合，不会误选已筛掉的问题
+- **预览滚动回跳**：用户手动滚动预览时，报告切换选中项不再重新触发预览跳转，高亮保留但视口不被拉回
 - **章节切换逻辑缺陷**：修复图/表题注检测中章节变化时未重置 `lastMajor` 的 bug，避免跨章节编号误报
 - **排序键冲突**：修复 `ROLE_ORDER` 中 `acknowledgement_heading/body` 与 `reference_heading/body` 使用相同排序值的问题
 - **类型安全**：移除 `ValidationIssue` 到 `Issue` 转换中的 `as any` 类型断言，收窄类型定义避免运行时错误
@@ -79,30 +86,32 @@ All notable changes to this project will be documented in this file.
 - `apps/web/src/components/RuleConfigPanelSections.tsx` - 规则配置 toolbar / summary / role-field pane
 - `apps/web/src/components/ruleConfigShared.ts` - 规则值格式化、模式切换、输入解析 helper
 - `apps/web/src/hooks/useDetectionFlow.ts` - 检测流程状态与动作
+- `apps/web/src/components/PreviewPanel.test.ts` - 预览点击反向选中轻测试
 - `apps/web/src/hooks/useRuleLibraries.ts` - 规则库草稿、发布、导入导出状态与动作
 - `apps/web/src/hooks/useRuleProposals.ts` - 模板候选提取与接受动作
 - `apps/web/src/lib/previewHighlight.ts` - Web 预览段落与片段匹配 helper
+- `apps/web/src/lib/previewHighlight.ts` - 增加预览滚动命中 issue 与预览点击 issueKey 解析 helper
 
 **修改文件**：
 - `packages/parser/src/index.ts`, `types.ts`, `ooxml.ts` - 集成编号解析与结构化页眉页脚输出
 - `packages/validator/src/index.ts`, `types.ts`, `validate.ts`, `rules.ts`, `numbering-check.ts` - 集成编号检测与结构化页眉检测
 - `packages/validator/src/*.test.ts` - 更新测试基线
 - `apps/web/src/lib/reportGroups.ts` - 支持编号字段分组、预览片段目标选择并修复排序冲突
-- `apps/web/src/App.tsx`, `ReportPanel.tsx`, `RuleConfigPanel.tsx`, `TemplateProposalPanel.tsx` - 组件瘦身与复用 shared helper
+- `apps/web/src/App.tsx`, `PreviewPanel.tsx`, `ReportPanel.tsx`, `DetectWorkspace.tsx`, `RuleConfigPanel.tsx`, `TemplateProposalPanel.tsx` - 组件瘦身、双向联动与 shared helper 复用
 - `packages/validator/src/classify.ts`, `fixhints.ts`, `lint.ts`, `numbering-check.ts` - 保持行为不变的结构拆分
 
 **测试覆盖**：
 - parser: 26 个测试 ✅
 - validator: 103 个测试 ✅
-- web: 41 个测试 ✅
-- **总计 170 个测试全部通过**
+- web: 48 个测试 ✅
+- **总计 177 个测试全部通过**
 
 **质量保证**：
 - 类型检查：`pnpm typecheck` ✅
 - ESLint：`pnpm lint` ✅（`--max-warnings 0`）
 - 未用代码检查：`pnpm knip` ✅
 - 复制粘贴检查：`pnpm jscpd` ✅（0 clones）
-- 单元测试：`pnpm test` ✅（164/164）
+- 单元测试：`pnpm test` ✅（177/177）
 - 构建验证：`pnpm build` ✅
 - CI 门禁：`pnpm run ci` ✅
 - 代码审查：Claude Code extra-high effort（9个角度 × 72候选）✅

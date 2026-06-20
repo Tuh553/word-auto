@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  findPreviewIssueKeyFromNode,
   findNormalizedTextRange,
   findPreviewBlockTextIndex,
   normalizePreviewText,
+  pickPreviewIssueInViewport,
 } from "./previewHighlight.js";
 
 test("normalizePreviewText：移除空白用于预览文本匹配", () => {
@@ -43,4 +45,49 @@ test("findNormalizedTextRange：片段匹配兼容渲染文本空白差异", () 
 
 test("findNormalizedTextRange：片段不存在时返回 null 供整段 fallback", () => {
   assert.equal(findNormalizedTextRange("目标段文本", "不存在"), null);
+});
+
+test("pickPreviewIssueInViewport：优先选择覆盖视口中心且最接近中心的 issue", () => {
+  const issueKey = pickPreviewIssueInViewport(
+    [
+      { issueKey: "a", top: 0, bottom: 120 },
+      { issueKey: "b", top: 140, bottom: 260 },
+      { issueKey: "c", top: 200, bottom: 360 },
+    ],
+    { clientHeight: 200, scrollTop: 100 },
+  );
+
+  assert.equal(issueKey, "b");
+});
+
+test("pickPreviewIssueInViewport：没有中心命中时回退到视口内最靠前的 issue", () => {
+  const issueKey = pickPreviewIssueInViewport(
+    [
+      { issueKey: "a", top: 0, bottom: 80 },
+      { issueKey: "b", top: 120, bottom: 160 },
+      { issueKey: "c", top: 170, bottom: 190 },
+    ],
+    { clientHeight: 60, scrollTop: 100 },
+  );
+
+  assert.equal(issueKey, "b");
+});
+
+test("pickPreviewIssueInViewport：视口内没有候选 issue 时返回 null", () => {
+  assert.equal(
+    pickPreviewIssueInViewport(
+      [{ issueKey: "a", top: 0, bottom: 50 }],
+      { clientHeight: 100, scrollTop: 200 },
+    ),
+    null,
+  );
+});
+
+test("findPreviewIssueKeyFromNode：沿父节点链找到最近的 issueKey", () => {
+  const root = { dataset: { issueKey: "root" }, parentElement: null };
+  const child = { dataset: {}, parentElement: root };
+  const leaf = { parentElement: child };
+
+  assert.equal(findPreviewIssueKeyFromNode(leaf), "root");
+  assert.equal(findPreviewIssueKeyFromNode(null), null);
 });

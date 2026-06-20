@@ -37,8 +37,10 @@
 - 角色识别置信度：结构化分类入口已输出 `high` / `medium` / `low`，段落 issue 会透传置信度，Web 报告仅对低置信项显著提示。
 - Web 结构拆分：`App` 已收敛为导航和编排，检测工作区、规则工作区、规则字段编辑组件与
   `useDetectionFlow` / `useRuleLibraries` / `useRuleProposals` 分离，后续做 Worker 或多模板管理时不再堆叠到单文件。
+- Web Worker：解析与校验已移出主线程，大文档检测不再阻塞主 UI。
 - Web 预览片段高亮：选中带 `affectedText` 的 run 级 issue 时，预览会在目标段落内优先高亮对应文本片段；
   片段匹配失败时回退整段高亮。
+- 报告与预览双向联动：已支持报告点击滚动预览、预览点击反选报告，以及预览滚动按当前可见 issue 自动切换报告选中项；程序滚动带抑制窗口，避免联动抖动。
 - 附录细分：validator 已在附录上下文内识别 `appendix_subheading`、`appendix_list_item`、
   `appendix_signature`，并保留旧 `appendix_body` 兜底；标准模板中 3 个附录清单项已从
   `appendix_body` 拆出为 `appendix_list_item`。
@@ -59,10 +61,9 @@ P1 已完成，后续重点转入 Web 体验与交付。
 
 ## P2：Web 体验与交付
 
-1. Web Worker：解析与校验移出主线程，避免大文档阻塞 UI。
-2. 预览联动：报告与预览双向滚动。
-3. 批量检测：一次上传多篇 `.docx`，输出汇总与单篇下钻。
-4. 带批注 docx 导出：纯 OOXML 生成批注，不改写正文。
+1. 批量检测：一次上传多篇 `.docx`，输出汇总与单篇下钻。
+2. 带批注 docx 导出：纯 OOXML 生成批注，不改写正文。
+3. 预览联动打磨：run 级局部高亮、报告与预览双向滚动体验继续收敛。
 
 ## P3：平台化与远期
 

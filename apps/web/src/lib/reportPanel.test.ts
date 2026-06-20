@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Severity, ValidationReport } from "@word-auto/validator";
-import { ReportPanel } from "../components/ReportPanel.js";
+import {
+  findSelectedIssueElement,
+  ReportPanel,
+} from "../components/ReportPanel.js";
 import { getIssueKey, type ReportGroupBy, type ReportSortBy } from "./reportGroups.js";
 
 const mkReport = (
@@ -199,4 +202,22 @@ test("ReportPanel：当前选中 issue 渲染 selected 状态", () => {
 
   assert.match(html, /issue error selected/);
   assert.match(html, /data-issue-key=/);
+});
+
+test("findSelectedIssueElement：能稳定找到当前选中的报告项", () => {
+  const selectedIssueKey = "issue-2";
+  const selected = {
+    dataset: { issueKey: selectedIssueKey },
+  } as unknown as HTMLElement;
+  const container = {
+    querySelectorAll: () => [
+      { dataset: { issueKey: "issue-1" } },
+      selected,
+      { dataset: { issueKey: "issue-3" } },
+    ],
+  } as unknown as ParentNode;
+
+  assert.equal(findSelectedIssueElement(container, selectedIssueKey), selected);
+  assert.equal(findSelectedIssueElement(container, "missing"), null);
+  assert.equal(findSelectedIssueElement(null, selectedIssueKey), null);
 });

@@ -143,7 +143,9 @@ function DetectScreen({
       result={detect.result}
       selectedIssueKey={detect.selectedIssueKey}
       selectedPreviewTarget={detect.selectedPreviewTarget}
+      shouldScrollSelectedPreviewTarget={detect.shouldScrollSelectedPreviewTarget}
       step={detect.step}
+      suppressScrollSelectionUntil={detect.suppressScrollSelectionUntil}
       templateId={rules.templateId}
       unpublishedChanges={rules.unpublishedChanges}
       onGroupByChange={detect.setReportGroupBy}
@@ -154,6 +156,9 @@ function DetectScreen({
         void detect.runAnalysis(rules.currentLibrary?.published ?? null);
       }}
       onSelectIssue={detect.selectIssue}
+      onSelectIssueFromPreview={(issueKey, source) => {
+        detect.selectIssueFromSource(detect.result, issueKey, source);
+      }}
       onSortByChange={detect.setReportSortBy}
       onStepChange={detect.setStep}
       onTemplateChange={(id) => {

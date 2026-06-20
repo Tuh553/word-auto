@@ -30,6 +30,8 @@ type DetectWorkspaceProps = {
   result: AnalyzeResult | null;
   selectedIssueKey: string | null;
   step: number;
+  shouldScrollSelectedPreviewTarget: boolean;
+  suppressScrollSelectionUntil: number;
   templateId: string;
   unpublishedChanges: boolean;
   onGroupByChange: (value: ReportGroupBy) => void;
@@ -38,6 +40,10 @@ type DetectWorkspaceProps = {
   onReset: () => void;
   onRun: () => void;
   onSelectIssue: (issueKey: string | null) => void;
+  onSelectIssueFromPreview: (
+    issueKey: string,
+    source: "preview-click" | "preview-scroll",
+  ) => void;
   onSortByChange: (value: ReportSortBy) => void;
   onStepChange: (step: number) => void;
   onTemplateChange: (id: string) => void;
@@ -212,9 +218,12 @@ function ResultStep({
   previewIssueTargets,
   selectedIssueKey,
   selectedPreviewTarget,
+  shouldScrollSelectedPreviewTarget,
+  suppressScrollSelectionUntil,
   onGroupByChange,
   onReset,
   onSelectIssue,
+  onSelectIssueFromPreview,
   onSortByChange,
   onToggleSeverity,
 }: Pick<
@@ -227,9 +236,12 @@ function ResultStep({
   | "previewIssueTargets"
   | "selectedIssueKey"
   | "selectedPreviewTarget"
+  | "shouldScrollSelectedPreviewTarget"
+  | "suppressScrollSelectionUntil"
   | "onGroupByChange"
   | "onReset"
   | "onSelectIssue"
+  | "onSelectIssueFromPreview"
   | "onSortByChange"
   | "onToggleSeverity"
 >) {
@@ -244,9 +256,11 @@ function ResultStep({
         <div className="preview-wrap">
           <PreviewPanel
             buffer={buffer}
+            shouldScrollToTarget={shouldScrollSelectedPreviewTarget}
+            suppressScrollSelectionUntil={suppressScrollSelectionUntil}
             target={selectedPreviewTarget}
             targets={previewIssueTargets}
-            onSelectTarget={onSelectIssue}
+            onSelectTarget={onSelectIssueFromPreview}
           />
         </div>
         <ReportPanel
@@ -312,9 +326,12 @@ function StepContent(props: DetectWorkspaceProps) {
       result={props.result}
       selectedIssueKey={props.selectedIssueKey}
       selectedPreviewTarget={props.selectedPreviewTarget}
+      shouldScrollSelectedPreviewTarget={props.shouldScrollSelectedPreviewTarget}
+      suppressScrollSelectionUntil={props.suppressScrollSelectionUntil}
       onGroupByChange={props.onGroupByChange}
       onReset={props.onReset}
       onSelectIssue={props.onSelectIssue}
+      onSelectIssueFromPreview={props.onSelectIssueFromPreview}
       onSortByChange={props.onSortByChange}
       onToggleSeverity={props.onToggleSeverity}
     />

@@ -19,6 +19,9 @@ import type { RuleLibraryRecord } from "../lib/ruleLibraries.js";
 import type { Severity } from "@word-auto/validator";
 
 const ALL_SEVERITIES: Severity[] = ["error", "warn", "info"];
+const REPORT_SCROLL_SUPPRESSION_MS = 400;
+
+type SelectionSource = "report-click" | "preview-click" | "preview-scroll";
 
 type RunAnalysisOptions = {
   advanceToResult?: boolean;
@@ -57,10 +60,15 @@ const useIssueSelection = () => {
   const [selectedIssueKey, setSelectedIssueKey] = useState<string | null>(null);
   const [selectedPreviewTarget, setSelectedPreviewTarget] =
     useState<PreviewHighlightTarget | null>(null);
+  const [shouldScrollSelectedPreviewTarget, setShouldScrollSelectedPreviewTarget] =
+    useState(false);
+  const [suppressScrollSelectionUntil, setSuppressScrollSelectionUntil] = useState(0);
 
   const clearSelection = () => {
     setSelectedIssueKey(null);
     setSelectedPreviewTarget(null);
+    setShouldScrollSelectedPreviewTarget(false);
+    setSuppressScrollSelectionUntil(0);
   };
 
   const selectResolvedIssue = (
@@ -79,6 +87,7 @@ const useIssueSelection = () => {
         ? getIssuePreviewTarget(result, issueKey)
         : getFirstNavigablePreviewTarget(result, active),
     );
+    setShouldScrollSelectedPreviewTarget(true);
   };
 
   const selectIssue = (result: AnalyzeResult | null, issueKey: string | null) => {
@@ -88,14 +97,38 @@ const useIssueSelection = () => {
     }
     setSelectedIssueKey(issueKey);
     setSelectedPreviewTarget(getIssuePreviewTarget(result, issueKey));
+    setShouldScrollSelectedPreviewTarget(true);
+  };
+
+  const selectIssueFromSource = (
+    result: AnalyzeResult | null,
+    issueKey: string | null,
+    source: SelectionSource,
+  ) => {
+    if (!result || !issueKey) {
+      clearSelection();
+      return;
+    }
+    if (source === "preview-scroll" && issueKey === selectedIssueKey) return;
+    setSelectedIssueKey(issueKey);
+    setSelectedPreviewTarget(getIssuePreviewTarget(result, issueKey));
+    setShouldScrollSelectedPreviewTarget(source === "report-click");
+    if (source === "report-click") {
+      setSuppressScrollSelectionUntil(Date.now() + REPORT_SCROLL_SUPPRESSION_MS);
+      return;
+    }
+    setSuppressScrollSelectionUntil(0);
   };
 
   return {
     clearSelection,
     selectIssue,
+    selectIssueFromSource,
     selectResolvedIssue,
     selectedIssueKey,
     selectedPreviewTarget,
+    shouldScrollSelectedPreviewTarget,
+    suppressScrollSelectionUntil,
   };
 };
 
@@ -176,7 +209,7 @@ export const useDetectionFlow = () => {
   };
 
   const selectIssue = (issueKey: string | null) => {
-    selection.selectIssue(result, issueKey);
+    selection.selectIssueFromSource(result, issueKey, "report-click");
   };
 
   const toggleSeverity = (severity: Severity) => {
@@ -215,12 +248,15 @@ export const useDetectionFlow = () => {
     previewIssueTargets,
     selectedIssueKey: selection.selectedIssueKey,
     selectedPreviewTarget: selection.selectedPreviewTarget,
+    shouldScrollSelectedPreviewTarget: selection.shouldScrollSelectedPreviewTarget,
+    suppressScrollSelectionUntil: selection.suppressScrollSelectionUntil,
     step,
     applyResult,
     pickFile,
     reset,
     runAnalysis,
     selectIssue,
+    selectIssueFromSource: selection.selectIssueFromSource,
     setOver,
     setReportGroupBy,
     setReportSortBy,

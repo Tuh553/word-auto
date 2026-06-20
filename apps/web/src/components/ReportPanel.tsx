@@ -9,6 +9,17 @@ import {
   type ReportSortBy,
 } from "../lib/reportGroups.js";
 
+export const findSelectedIssueElement = (
+  container: ParentNode | null | undefined,
+  selectedIssueKey: string | null,
+): HTMLElement | null => {
+  if (!selectedIssueKey || !container) return null;
+  const items = container.querySelectorAll<HTMLElement>("[data-issue-key]");
+  return Array.from(items).find(
+    (item) => item.dataset.issueKey === selectedIssueKey,
+  ) ?? null;
+};
+
 const SEV: Record<Severity, string> = {
   error: "错误",
   warn: "警告",
@@ -236,11 +247,7 @@ export function ReportPanel({
   const groups = buildReportGroups(issues, groupBy, sortBy);
 
   useEffect(() => {
-    if (!selectedIssueKey) return;
-    const items = reportRef.current?.querySelectorAll<HTMLElement>("[data-issue-key]");
-    const selected = Array.from(items ?? []).find(
-      (item) => item.dataset.issueKey === selectedIssueKey,
-    );
+    const selected = findSelectedIssueElement(reportRef.current, selectedIssueKey);
     selected?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [groups, selectedIssueKey]);
 
