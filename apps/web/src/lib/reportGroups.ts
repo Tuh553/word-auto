@@ -224,7 +224,7 @@ const compareBySeverity = (left: Issue, right: Issue): number =>
   left.role.localeCompare(right.role) ||
   left.field.localeCompare(right.field);
 
-const sortIssues = (issues: Issue[], sortBy: ReportSortBy): Issue[] =>
+export const sortReportIssues = (issues: Issue[], sortBy: ReportSortBy): Issue[] =>
   [...issues].sort(sortBy === "severity" ? compareBySeverity : compareByParagraph);
 
 const compareGroups = (
@@ -283,6 +283,14 @@ export const formatIssueRole = (role: Role): string =>
 export const formatIssueField = (field: string): string =>
   FIELD_LABELS[field] ?? field;
 
+export const formatSeverity = (severity: Severity): string =>
+  SEVERITY_LABELS[severity];
+
+export const filterIssuesBySeverity = (
+  issues: Issue[],
+  active: ReadonlySet<Severity>,
+): Issue[] => issues.filter((issue) => active.has(issue.severity));
+
 export const buildReportGroups = (
   issues: Issue[],
   groupBy: ReportGroupBy,
@@ -290,7 +298,7 @@ export const buildReportGroups = (
 ): ReportIssueGroup[] => {
   const groups = new Map<string, ReportIssueGroup>();
 
-  for (const issue of sortIssues(issues, sortBy)) {
+  for (const issue of sortReportIssues(issues, sortBy)) {
     const meta = getGroupMeta(issue, groupBy);
     const group = groups.get(meta.key);
     if (group) {
@@ -308,7 +316,7 @@ export const buildReportGroups = (
 };
 
 export const findFirstNavigableIssue = (issues: Issue[]): Issue | undefined =>
-  sortIssues(issues, "paragraph").find((issue) => issue.paraIndex >= 0);
+  sortReportIssues(issues, "paragraph").find((issue) => issue.paraIndex >= 0);
 
 export const getIssueKey = (issue: Issue): string =>
   [
@@ -334,13 +342,13 @@ export const findVisibleIssueForParagraph = (
   issues: Issue[],
   paraIndex: number,
 ): Issue | undefined =>
-  sortIssues(issues, "paragraph").find((issue) => issue.paraIndex === paraIndex);
+  sortReportIssues(issues, "paragraph").find((issue) => issue.paraIndex === paraIndex);
 
 export const findVisibleIssuesForParagraph = (
   issues: Issue[],
   paraIndex: number,
 ): Issue[] =>
-  sortIssues(issues, "paragraph").filter((issue) => issue.paraIndex === paraIndex);
+  sortReportIssues(issues, "paragraph").filter((issue) => issue.paraIndex === paraIndex);
 
 export const resolveSelectedIssue = (
   issues: Issue[],
@@ -353,7 +361,7 @@ export const buildPreviewIssueTargets = (
   paragraphs: Array<{ text: string }>,
 ): PreviewIssueTarget[] => {
   const targets = new Map<number, PreviewIssueTarget>();
-  for (const issue of sortIssues(issues, "paragraph")) {
+  for (const issue of sortReportIssues(issues, "paragraph")) {
     if (issue.paraIndex < 0) continue;
     const text = paragraphs[issue.paraIndex]?.text;
     if (!text) continue;

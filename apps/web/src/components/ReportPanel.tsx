@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Severity, ValidationReport } from "@word-auto/validator";
 import {
   buildReportGroups,
@@ -8,6 +8,11 @@ import {
   type ReportGroupBy,
   type ReportSortBy,
 } from "../lib/reportGroups.js";
+import {
+  buildVisibleIssues,
+  buildReportCopyState,
+  writeTextToClipboard,
+} from "../lib/reportCopy.js";
 
 export const findSelectedIssueElement = (
   container: ParentNode | null | undefined,
@@ -29,6 +34,7 @@ const SEV: Record<Severity, string> = {
 interface Props {
   report: ValidationReport;
   active: Set<Severity>;
+  fileName?: string | null;
   groupBy: ReportGroupBy;
   sortBy: ReportSortBy;
   selectedIssueKey: string | null;
@@ -83,42 +89,118 @@ function SeverityChips({
 }
 
 function ReportToolbar({
+  cardDisabledReason,
+  checklistDisabledReason,
+  copyFeedback,
   groupBy,
+  onCopyCard,
+  onCopyChecklist,
   onGroupByChange,
   onSortByChange,
   sortBy,
-}: Pick<Props, "groupBy" | "onGroupByChange" | "onSortByChange" | "sortBy">) {
+}: Pick<Props, "groupBy" | "onGroupByChange" | "onSortByChange" | "sortBy"> & {
+  cardDisabledReason?: string;
+  checklistDisabledReason?: string;
+  copyFeedback: string | null;
+  onCopyCard: () => void;
+  onCopyChecklist: () => void;
+}) {
   return (
-    <div className="report-toolbar">
-      <label className="report-toolbar-row">
-        <span>分组方式</span>
-        <select
-          value={groupBy}
-          onChange={(event) => onGroupByChange(event.target.value as ReportGroupBy)}
+    <>
+      <div className="report-toolbar">
+        <label className="report-toolbar-row">
+          <span>分组方式</span>
+          <select
+            value={groupBy}
+            onChange={(event) => onGroupByChange(event.target.value as ReportGroupBy)}
+          >
+            {GROUP_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                按{option.label}分组
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="report-toolbar-row">
+          <span>组内排序</span>
+          <select
+            value={sortBy}
+            onChange={(event) => onSortByChange(event.target.value as ReportSortBy)}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="report-copy-actions">
+        <button
+          type="button"
+          disabled={!!checklistDisabledReason}
+          title={checklistDisabledReason}
+          onClick={onCopyChecklist}
         >
-          {GROUP_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              按{option.label}分组
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="report-toolbar-row">
-        <span>组内排序</span>
-        <select
-          value={sortBy}
-          onChange={(event) => onSortByChange(event.target.value as ReportSortBy)}
+          复制修改清单
+        </button>
+        <button
+          type="button"
+          disabled={!!cardDisabledReason}
+          title={cardDisabledReason}
+          onClick={onCopyCard}
         >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+          复制修订建议卡片
+        </button>
+      </div>
+      {copyFeedback ? <div className="report-copy-feedback">{copyFeedback}</div> : null}
+    </>
   );
 }
+
+const getCopyFailureMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message) {
+    return `复制失败：${error.message}`;
+  }
+  return "复制失败：请检查浏览器剪贴板权限后重试";
+};
+
+export const createReportCopyHandlers = ({
+  copyState,
+  issueCount,
+  setCopyFeedback,
+  writeText = writeTextToClipboard,
+}: {
+  copyState: ReturnType<typeof buildReportCopyState>;
+  issueCount: number;
+  setCopyFeedback: (message: string) => void;
+  writeText?: (text: string) => Promise<void>;
+}) => ({
+  handleCopyCard: async () => {
+    if (!copyState.card.ok) {
+      setCopyFeedback(copyState.card.reason ?? "当前没有可复制的问题卡片");
+      return;
+    }
+    try {
+      await writeText(copyState.card.text);
+      setCopyFeedback("已复制当前修订建议卡片");
+    } catch (error) {
+      setCopyFeedback(getCopyFailureMessage(error));
+    }
+  },
+  handleCopyChecklist: async () => {
+    if (!copyState.checklist.ok) {
+      setCopyFeedback(copyState.checklist.reason ?? "当前筛选结果没有可复制的问题");
+      return;
+    }
+    try {
+      await writeText(copyState.checklist.text);
+      setCopyFeedback(`已复制 ${issueCount} 条修改清单`);
+    } catch (error) {
+      setCopyFeedback(getCopyFailureMessage(error));
+    }
+  },
+});
 
 function ReportSummary({
   classifiedCount,
@@ -233,6 +315,7 @@ function ReportGroups({
 export function ReportPanel({
   report,
   active,
+  fileName,
   groupBy,
   sortBy,
   selectedIssueKey,
@@ -242,9 +325,20 @@ export function ReportPanel({
   onSelect,
 }: Props) {
   const reportRef = useRef<HTMLDivElement>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const { summary } = report;
-  const issues = report.issues.filter((i) => active.has(i.severity));
+  const issues = buildVisibleIssues(report.issues, active, sortBy);
   const groups = buildReportGroups(issues, groupBy, sortBy);
+  const copyState = buildReportCopyState({
+    fileName,
+    visibleIssues: issues,
+    selectedIssueKey,
+  });
+  const copyHandlers = createReportCopyHandlers({
+    copyState,
+    issueCount: issues.length,
+    setCopyFeedback,
+  });
 
   useEffect(() => {
     const selected = findSelectedIssueElement(reportRef.current, selectedIssueKey);
@@ -256,7 +350,12 @@ export function ReportPanel({
       <ReportStats summary={summary} />
       <SeverityChips active={active} onToggle={onToggle} />
       <ReportToolbar
+        cardDisabledReason={copyState.availability.cardReason}
+        checklistDisabledReason={copyState.availability.checklistReason}
+        copyFeedback={copyFeedback}
         groupBy={groupBy}
+        onCopyCard={() => void copyHandlers.handleCopyCard()}
+        onCopyChecklist={() => void copyHandlers.handleCopyChecklist()}
         onGroupByChange={onGroupByChange}
         onSortByChange={onSortByChange}
         sortBy={sortBy}

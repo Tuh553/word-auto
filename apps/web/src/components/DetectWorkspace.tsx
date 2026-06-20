@@ -212,6 +212,7 @@ function SeverityStep({
 function ResultStep({
   active,
   buffer,
+  fileName,
   reportGroupBy,
   reportSortBy,
   result,
@@ -230,6 +231,7 @@ function ResultStep({
   DetectWorkspaceProps,
   | "active"
   | "buffer"
+  | "fileName"
   | "reportGroupBy"
   | "reportSortBy"
   | "result"
@@ -266,6 +268,7 @@ function ResultStep({
         <ReportPanel
           report={result.report}
           active={active}
+          fileName={fileName}
           groupBy={reportGroupBy}
           sortBy={reportSortBy}
           selectedIssueKey={selectedIssueKey}
@@ -320,6 +323,7 @@ function StepContent(props: DetectWorkspaceProps) {
     <ResultStep
       active={props.active}
       buffer={props.buffer}
+      fileName={props.fileName}
       previewIssueTargets={props.previewIssueTargets}
       reportGroupBy={props.reportGroupBy}
       reportSortBy={props.reportSortBy}

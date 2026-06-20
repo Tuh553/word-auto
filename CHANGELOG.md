@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Web 报告复制 MVP**：检测结果页新增“复制修改清单”和“复制修订建议卡片”入口，分别基于当前 severity 筛选后的可见 issue 列表与当前选中 issue 生成外部沟通可直接粘贴的中文文本
+- **报告复制纯函数与测试**：新增 `reportCopy.ts`，统一收口可见 issue 顺序、卡片目标解析、文本格式化与剪贴板写入；补齐单条卡片、修改清单、文档级 issue、空列表与 selected fallback 测试
 - **预览同段多 issue 稳定命中模型**：Web 预览为同一段落保留当前可见 issue 列表，点击段内非片段区域时按“严重级优先 -> 当前可见顺序”稳定反选报告项
 - **重复片段 fallback 策略**：当同一选中 issue 的 `affectedText` 在目标段落内重复出现时，不再模糊猜测命中区域，而是稳定回退整段高亮
 - **预览联动纯函数测试补强**：新增重复片段、同段多 issue、筛选后可见目标和报告 selected helper 回归测试
@@ -27,6 +29,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Web 报告工具栏语义统一**：报告面板现在通过共用 helper 复用“当前筛选后可见 issue”和 `resolveSelectedIssue` 语义，复制、预览联动与报告选中不再各自维护目标解析逻辑
 - **Web 预览目标数据结构**：`buildPreviewIssueTargets` 和 `buildPreviewHighlightTarget` 现在显式携带同段当前可见 issue 集，供片段高亮、段级点击和筛选后反向联动复用
 - **Web 检测测试入口扩展**：`@word-auto/web` 测试脚本从 `src/lib/*.test.ts` 扩展到 `src/**/*.test.ts`，允许组件级轻测试纳入门禁
 - **类型系统扩展**：
