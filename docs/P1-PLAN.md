@@ -574,7 +574,7 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 ### 3. 资源依赖
 
 - 标准模板样本：需要足够多的标准模板用于测试域解析、题注、脚注等
-- 前端资源：批量检测、带批注 docx 导出和报告/预览双向滚动需要前端开发资源
+- 前端资源：带批注 docx 导出和报告/预览双向滚动需要前端开发资源
 
 ---
 
@@ -599,8 +599,7 @@ OOXML 域由 `w:fldChar`（域边界：`begin`/`separate`/`end`）与 `w:instrTe
 
 P1 完成后，进入 P2（Web 体验与交付）：
 1. Web Worker 解析（避免大文档阻塞 UI）
-2. 批量检测（一次上传多篇，汇总报告）
-3. 带批注 docx 导出（纯 OOXML 生成批注）
-4. 报告与预览双向滚动
+2. 带批注 docx 导出（纯 OOXML 生成批注）
+3. 报告与预览双向滚动
 
 详见 [`docs/TODO.md`](./TODO.md) 的 P2 部分。
